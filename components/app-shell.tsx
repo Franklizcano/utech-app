@@ -1,18 +1,13 @@
 "use client"
 
-import { Cpu, ShieldCheck, Wrench, UserRound } from "lucide-react"
+import { Cpu, ShieldCheck, Wrench, UserRound, LogOut } from "lucide-react"
 import { useStore } from "@/lib/store"
 import { ServiceWorkspace } from "@/components/service-workspace"
 import { ClientPortal } from "@/components/client/client-portal"
 import { AdminView } from "@/components/admin/admin-view"
+import { LoginScreen } from "@/components/login-screen"
 import type { Role } from "@/lib/types"
 import { cn } from "@/lib/utils"
-
-const ROLES: { value: Role; label: string; icon: typeof ShieldCheck }[] = [
-  { value: "admin", label: "Admin", icon: ShieldCheck },
-  { value: "empleado", label: "Empleado", icon: Wrench },
-  { value: "cliente", label: "Cliente", icon: UserRound },
-]
 
 const ROLE_SUBTITLE: Record<Role, string> = {
   admin: "Panel completo: operaciones, usuarios y estadísticas",
@@ -20,8 +15,20 @@ const ROLE_SUBTITLE: Record<Role, string> = {
   cliente: "Portal de seguimiento de tu reparación",
 }
 
+const ROLE_ICON: Record<Role, typeof ShieldCheck> = {
+  admin: ShieldCheck,
+  empleado: Wrench,
+  cliente: UserRound,
+}
+
 export function AppShell() {
-  const { role, setRole } = useStore()
+  const { role, isLoggedIn, logout } = useStore()
+
+  if (!isLoggedIn) {
+    return <LoginScreen />
+  }
+
+  const RoleIcon = ROLE_ICON[role]
 
   return (
     <div className="min-h-screen bg-background">
@@ -37,29 +44,23 @@ export function AppShell() {
             </div>
           </div>
 
-          <div
-            className="flex items-center gap-1 rounded-lg border border-border bg-card p-1"
-            role="tablist"
-            aria-label="Simulación de rol"
-          >
-            {ROLES.map(({ value, label, icon: Icon }) => (
-              <button
-                key={value}
-                type="button"
-                role="tab"
-                aria-selected={role === value}
-                onClick={() => setRole(value)}
-                className={cn(
-                  "inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium transition-colors",
-                  role === value
-                    ? "bg-primary text-primary-foreground"
-                    : "text-muted-foreground hover:bg-secondary hover:text-foreground",
-                )}
-              >
-                <Icon className="size-4" />
-                <span>{label}</span>
-              </button>
-            ))}
+          <div className="flex items-center gap-3">
+            <div className="flex items-center gap-2 rounded-lg border border-border bg-card px-3 py-1.5">
+              <RoleIcon className="size-4 text-primary" />
+              <span className="text-sm font-medium text-foreground capitalize">
+                {role === "empleado" ? "Colaborador" : role === "admin" ? "Admin" : "Cliente"}
+              </span>
+            </div>
+
+            <button
+              type="button"
+              onClick={logout}
+              className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-card px-3 py-1.5 text-sm text-muted-foreground transition-colors hover:border-destructive/50 hover:text-destructive"
+              aria-label="Cerrar sesión"
+            >
+              <LogOut className="size-4" />
+              <span className="hidden sm:inline">Salir</span>
+            </button>
           </div>
         </div>
       </header>
@@ -67,7 +68,7 @@ export function AppShell() {
       <main className="mx-auto max-w-6xl px-4 py-8 sm:px-6">
         <div className="mb-6">
           <p className="text-xs font-medium uppercase tracking-wide text-primary">
-            Vista de {role === "admin" ? "administrador" : role}
+            Vista de {role === "admin" ? "administrador" : role === "empleado" ? "colaborador" : role}
           </p>
           <p className="text-sm text-muted-foreground">{ROLE_SUBTITLE[role]}</p>
         </div>

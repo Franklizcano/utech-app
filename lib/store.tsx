@@ -139,6 +139,9 @@ export interface NewOrderInput {
 interface StoreValue {
   role: Role
   setRole: (role: Role) => void
+  isLoggedIn: boolean
+  login: (role: Role) => void
+  logout: () => void
   users: User[]
   orders: Order[]
   employees: User[]
@@ -161,12 +164,23 @@ const StoreContext = createContext<StoreValue | null>(null)
 
 export function StoreProvider({ children }: { children: ReactNode }) {
   const [role, setRole] = useState<Role>("empleado")
+  const [isLoggedIn, setIsLoggedIn] = useState(false)
   const [users, setUsers] = useState<User[]>(initialUsers)
   const [orders, setOrders] = useState<Order[]>(initialOrders)
   const [activeClientOrderId, setActiveClientOrderId] = useState<string | null>(null)
 
   const value = useMemo<StoreValue>(() => {
     const employees = users.filter((u) => u.role === "empleado" || u.role === "admin")
+
+    function login(selectedRole: Role) {
+      setRole(selectedRole)
+      setIsLoggedIn(true)
+    }
+
+    function logout() {
+      setIsLoggedIn(false)
+      setActiveClientOrderId(null)
+    }
 
     function addOrder(input: NewOrderInput): Order {
       const code = `TF-${1027 + orders.length}`
@@ -261,6 +275,9 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     return {
       role,
       setRole,
+      isLoggedIn,
+      login,
+      logout,
       users,
       orders,
       employees,
@@ -276,7 +293,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       toggleUserActive,
       markNotificationsRead,
     }
-  }, [role, users, orders, activeClientOrderId])
+  }, [role, isLoggedIn, users, orders, activeClientOrderId])
 
   return <StoreContext.Provider value={value}>{children}</StoreContext.Provider>
 }
