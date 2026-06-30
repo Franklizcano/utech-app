@@ -32,7 +32,7 @@ export function AppShell() {
               <Cpu className="size-5" />
             </div>
             <div>
-              <p className="font-semibold leading-tight text-foreground">TecnoFix</p>
+              <p className="font-semibold leading-tight text-foreground">UTech</p>
               <p className="text-xs text-muted-foreground">Servicio técnico de PCs y consolas</p>
             </div>
           </div>

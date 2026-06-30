@@ -10,7 +10,7 @@ const geistMono = Geist_Mono({
 })
 
 export const metadata: Metadata = {
-  title: 'TecnoFix — Gestión de Servicio Técnico',
+  title: 'UTech — Gestión de Servicio Técnico',
   description:
     'Plataforma de gestión para servicio técnico de PCs y consolas: pedidos, presupuestos y seguimiento en tiempo real.',
   generator: 'v0.app',
