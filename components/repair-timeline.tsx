@@ -1,3 +1,6 @@
+"use client"
+
+import { useEffect, useState } from "react"
 import { Check } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { STATUS_FLOW, STATUS_LABELS, type Order } from "@/lib/types"
@@ -12,6 +15,12 @@ function formatDate(iso: string) {
 }
 
 export function RepairTimeline({ order }: { order: Order }) {
+  const [mounted, setMounted] = useState(false)
+
+  useEffect(() => {
+    setMounted(true)
+  }, [])
+
   // Pasos visibles del flujo (sin "entregado" salvo que el equipo ya fue entregado)
   const steps = STATUS_FLOW.filter((s) => s !== "entregado" || order.status === "entregado")
   const currentIndex = steps.indexOf(order.status)
@@ -55,7 +64,7 @@ export function RepairTimeline({ order }: { order: Order }) {
                 {STATUS_LABELS[step]}
               </p>
               {event?.note && <p className="mt-0.5 text-sm text-muted-foreground">{event.note}</p>}
-              {event && <p className="mt-1 text-xs text-muted-foreground/70">{formatDate(event.date)}</p>}
+              {event && mounted && <p className="mt-1 text-xs text-muted-foreground/70">{formatDate(event.date)}</p>}
               {!event && current && <p className="mt-0.5 text-sm text-muted-foreground">En curso...</p>}
             </div>
           </li>
