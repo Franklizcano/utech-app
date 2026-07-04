@@ -7,9 +7,11 @@ import {
   type DeviceType,
   type Order,
   type OrderStatus,
+  type OrderState,
   type Role,
   type User,
-  STATUS_LABELS,
+  DEFAULT_STATES,
+  getStatusLabel,
 } from "@/lib/types"
 
 let counter = 100
@@ -145,6 +147,7 @@ interface StoreValue {
   users: User[]
   orders: Order[]
   employees: User[]
+  states: OrderState[]
   // cliente
   activeClientOrderId: string | null
   setActiveClientOrderId: (id: string | null) => void
@@ -159,6 +162,11 @@ interface StoreValue {
   updateUser: (id: string, input: { name: string; email: string; role: Role; active: boolean }) => void
   toggleUserActive: (id: string) => void
   markNotificationsRead: (orderId: string) => void
+  // estado management
+  addState: (label: string, color: string) => void
+  updateState: (id: string, label: string, color: string) => void
+  deleteState: (id: string) => void
+  reorderStates: (ids: string[]) => void
 }
 
 const StoreContext = createContext<StoreValue | null>(null)
@@ -168,6 +176,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const [isLoggedIn, setIsLoggedIn] = useState(false)
   const [users, setUsers] = useState<User[]>(initialUsers)
   const [orders, setOrders] = useState<Order[]>(initialOrders)
+  const [states, setStates] = useState<OrderState[]>(DEFAULT_STATES)
   const [activeClientOrderId, setActiveClientOrderId] = useState<string | null>(null)
 
   const value = useMemo<StoreValue>(() => {
@@ -212,13 +221,14 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       setOrders((prev) =>
         prev.map((o) => {
           if (o.id !== orderId) return o
+          const statusLabel = getStatusLabel(status, states)
           return {
             ...o,
             status,
             timeline: [...o.timeline, { id: uid("ev"), status, note, date: now() }],
             notifications: [
               ...o.notifications,
-              { id: uid("nt"), message: `Estado actualizado: ${STATUS_LABELS[status]}.${note ? ` ${note}` : ""}`, date: now(), read: false },
+              { id: uid("nt"), message: `Estado actualizado: ${statusLabel}.${note ? ` ${note}` : ""}`, date: now(), read: false },
             ],
           }
         }),
@@ -289,6 +299,34 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       )
     }
 
+    function addState(label: string, color: string) {
+      const maxPosition = Math.max(0, ...states.map((s) => s.position))
+      const newState: OrderState = { id: uid("st"), label, color, position: maxPosition + 1 }
+      setStates((prev) => [...prev, newState])
+    }
+
+    function updateState(id: string, label: string, color: string) {
+      setStates((prev) => prev.map((s) => (s.id === id ? { ...s, label, color } : s)))
+    }
+
+    function deleteState(id: string) {
+      setStates((prev) => {
+        // No permitir eliminar si es el único estado
+        if (prev.length <= 1) return prev
+        return prev.filter((s) => s.id !== id)
+      })
+    }
+
+    function reorderStates(ids: string[]) {
+      setStates((prev) => {
+        const newStates = ids.map((id, idx) => {
+          const state = prev.find((s) => s.id === id)
+          return state ? { ...state, position: idx } : null
+        }).filter(Boolean) as OrderState[]
+        return newStates
+      })
+    }
+
     return {
       role,
       setRole,
@@ -298,6 +336,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       users,
       orders,
       employees,
+      states,
       activeClientOrderId,
       setActiveClientOrderId,
       addOrder,
@@ -310,8 +349,12 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       updateUser,
       toggleUserActive,
       markNotificationsRead,
+      addState,
+      updateState,
+      deleteState,
+      reorderStates,
     }
-  }, [role, isLoggedIn, users, orders, activeClientOrderId])
+  }, [role, isLoggedIn, users, orders, states, activeClientOrderId])
 
   return <StoreContext.Provider value={value}>{children}</StoreContext.Provider>
 }

@@ -2,30 +2,36 @@ export type Role = "admin" | "empleado" | "cliente"
 
 export type DeviceType = "PC" | "Notebook" | "PlayStation" | "Xbox" | "Nintendo" | "Otro"
 
-export type OrderStatus =
-  | "recibido"
-  | "en_diagnostico"
-  | "esperando_repuestos"
-  | "en_reparacion"
-  | "listo"
-  | "entregado"
+export type OrderStatus = string
 
-export const STATUS_FLOW: OrderStatus[] = [
-  "recibido",
-  "en_diagnostico",
-  "esperando_repuestos",
-  "en_reparacion",
-  "listo",
-  "entregado",
+export interface OrderState {
+  id: string
+  label: string
+  color: string // hex color
+  position: number // orden en el flujo
+}
+
+// Estados por defecto iniciales
+export const DEFAULT_STATES: OrderState[] = [
+  { id: "recibido", label: "Recibido", color: "#8b5cf6", position: 0 },
+  { id: "en_diagnostico", label: "En diagnóstico", color: "#06b6d4", position: 1 },
+  { id: "esperando_repuestos", label: "Esperando repuestos", color: "#f59e0b", position: 2 },
+  { id: "en_reparacion", label: "En reparación", color: "#3b82f6", position: 3 },
+  { id: "listo", label: "Listo para retirar", color: "#10b981", position: 4 },
+  { id: "entregado", label: "Entregado", color: "#6366f1", position: 5 },
 ]
 
-export const STATUS_LABELS: Record<OrderStatus, string> = {
-  recibido: "Recibido",
-  en_diagnostico: "En diagnóstico",
-  esperando_repuestos: "Esperando repuestos",
-  en_reparacion: "En reparación",
-  listo: "Listo para retirar",
-  entregado: "Entregado",
+// Helpers para compatibilidad con código existente
+export function getStatusFlow(states: OrderState[]): OrderStatus[] {
+  return states.sort((a, b) => a.position - b.position).map((s) => s.id)
+}
+
+export function getStatusLabel(statusId: OrderStatus, states: OrderState[]): string {
+  return states.find((s) => s.id === statusId)?.label ?? statusId
+}
+
+export function getStatusColor(statusId: OrderStatus, states: OrderState[]): string {
+  return states.find((s) => s.id === statusId)?.color ?? "#6b7280"
 }
 
 export interface User {

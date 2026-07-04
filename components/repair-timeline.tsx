@@ -3,7 +3,8 @@
 import { useEffect, useState } from "react"
 import { Check } from "lucide-react"
 import { cn } from "@/lib/utils"
-import { STATUS_FLOW, STATUS_LABELS, type Order } from "@/lib/types"
+import { useStore } from "@/lib/store"
+import { getStatusFlow, getStatusLabel, type Order } from "@/lib/types"
 
 function formatDate(iso: string) {
   return new Date(iso).toLocaleDateString("es-AR", {
@@ -16,13 +17,15 @@ function formatDate(iso: string) {
 
 export function RepairTimeline({ order }: { order: Order }) {
   const [mounted, setMounted] = useState(false)
+  const { states } = useStore()
 
   useEffect(() => {
     setMounted(true)
   }, [])
 
   // Pasos visibles del flujo (sin "entregado" salvo que el equipo ya fue entregado)
-  const steps = STATUS_FLOW.filter((s) => s !== "entregado" || order.status === "entregado")
+  const statusFlow = getStatusFlow(states)
+  const steps = statusFlow.filter((s) => s !== "entregado" || order.status === "entregado")
   const currentIndex = steps.indexOf(order.status)
 
   return (
@@ -61,7 +64,7 @@ export function RepairTimeline({ order }: { order: Order }) {
                   current ? "text-foreground" : completed ? "text-foreground/90" : "text-muted-foreground",
                 )}
               >
-                {STATUS_LABELS[step]}
+                {getStatusLabel(step, states)}
               </p>
               {event?.note && <p className="mt-0.5 text-sm text-muted-foreground">{event.note}</p>}
               {event && mounted && <p className="mt-1 text-xs text-muted-foreground/70">{formatDate(event.date)}</p>}

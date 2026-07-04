@@ -3,16 +3,7 @@
 import { ClipboardList, Wrench, PackageCheck, DollarSign, Users } from "lucide-react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { useStore, formatCurrency } from "@/lib/store"
-import { STATUS_FLOW, STATUS_LABELS, budgetTotal, type OrderStatus } from "@/lib/types"
-
-const STATUS_BAR: Record<OrderStatus, string> = {
-  recibido: "bg-slate-400",
-  en_diagnostico: "bg-sky-400",
-  esperando_repuestos: "bg-amber-400",
-  en_reparacion: "bg-violet-400",
-  listo: "bg-emerald-400",
-  entregado: "bg-zinc-500",
-}
+import { budgetTotal, getStatusFlow, getStatusLabel } from "@/lib/types"
 
 function StatCard({
   icon: Icon,
@@ -42,14 +33,19 @@ function StatCard({
 }
 
 export function Stats() {
-  const { orders, users } = useStore()
+  const { orders, users, states } = useStore()
 
-  const active = orders.filter((o) => o.status !== "entregado").length
-  const ready = orders.filter((o) => o.status === "listo").length
+  // Buscar el estado "entregado" actual (o usar el último si no existe)
+  const deliveredState = states.find((s) => s.id === "entregado") ?? states[states.length - 1]
+  const readyState = states.find((s) => s.id === "listo") ?? states[states.length - 2]
+
+  const active = orders.filter((o) => o.status !== deliveredState.id).length
+  const ready = orders.filter((o) => o.status === readyState.id).length
   const revenue = orders.reduce((sum, o) => sum + budgetTotal(o), 0)
   const employees = users.filter((u) => u.role === "empleado" || u.role === "admin").length
 
-  const counts = STATUS_FLOW.map((status) => ({
+  const statusFlow = getStatusFlow(states)
+  const counts = statusFlow.map((status) => ({
     status,
     count: orders.filter((o) => o.status === status).length,
   }))
@@ -70,20 +66,26 @@ export function Stats() {
           <CardTitle className="text-base">Pedidos por estado</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
-          {counts.map(({ status, count }) => (
-            <div key={status} className="space-y-1.5">
-              <div className="flex items-center justify-between text-sm">
-                <span className="text-muted-foreground">{STATUS_LABELS[status]}</span>
-                <span className="font-medium tabular-nums text-foreground">{count}</span>
+          {counts.map(({ status, count }) => {
+            const stateColor = states.find((s) => s.id === status)?.color ?? "#6b7280"
+            return (
+              <div key={status} className="space-y-1.5">
+                <div className="flex items-center justify-between text-sm">
+                  <span className="text-muted-foreground">{getStatusLabel(status, states)}</span>
+                  <span className="font-medium tabular-nums text-foreground">{count}</span>
+                </div>
+                <div className="h-2 overflow-hidden rounded-full bg-secondary">
+                  <div
+                    className="h-full rounded-full transition-all"
+                    style={{
+                      width: `${(count / maxCount) * 100}%`,
+                      backgroundColor: stateColor,
+                    }}
+                  />
+                </div>
               </div>
-              <div className="h-2 overflow-hidden rounded-full bg-secondary">
-                <div
-                  className={`h-full rounded-full ${STATUS_BAR[status]} transition-all`}
-                  style={{ width: `${(count / maxCount) * 100}%` }}
-                />
-              </div>
-            </div>
-          ))}
+            )
+          })}
         </CardContent>
       </Card>
     </div>

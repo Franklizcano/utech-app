@@ -23,10 +23,10 @@ import { StatusBadge } from "@/components/status-badge"
 import { RepairTimeline } from "@/components/repair-timeline"
 import { ReassignDialog } from "@/components/employee/reassign-dialog"
 import { useStore, formatCurrency } from "@/lib/store"
-import { STATUS_FLOW, STATUS_LABELS, budgetTotal, type Order, type OrderStatus } from "@/lib/types"
+import { budgetTotal, getStatusFlow, getStatusLabel, type Order, type OrderStatus } from "@/lib/types"
 
 export function OrderDetail({ order }: { order: Order }) {
-  const { addBudgetItem, removeBudgetItem, advanceStatus, sendBudgetNotification } = useStore()
+  const { addBudgetItem, removeBudgetItem, advanceStatus, sendBudgetNotification, states } = useStore()
   const [desc, setDesc] = useState("")
   const [amount, setAmount] = useState("")
   const [nextStatus, setNextStatus] = useState<OrderStatus>(order.status)
@@ -34,6 +34,7 @@ export function OrderDetail({ order }: { order: Order }) {
   const [reassignOpen, setReassignOpen] = useState(false)
 
   const total = budgetTotal(order)
+  const statusFlow = getStatusFlow(states)
 
   function handleAddItem(e: React.FormEvent) {
     e.preventDefault()
@@ -199,9 +200,9 @@ export function OrderDetail({ order }: { order: Order }) {
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  {STATUS_FLOW.map((s) => (
+                  {statusFlow.map((s) => (
                     <SelectItem key={s} value={s}>
-                      {STATUS_LABELS[s]}
+                      {getStatusLabel(s, states)}
                     </SelectItem>
                   ))}
                 </SelectContent>
