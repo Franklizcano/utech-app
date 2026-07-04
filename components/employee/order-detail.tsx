@@ -26,7 +26,7 @@ import { useStore, formatCurrency } from "@/lib/store"
 import { budgetTotal, getStatusFlow, getStatusLabel, type Order, type OrderStatus } from "@/lib/types"
 
 export function OrderDetail({ order }: { order: Order }) {
-  const { addBudgetItem, removeBudgetItem, advanceStatus, sendBudgetNotification, states } = useStore()
+  const { addBudgetItem, removeBudgetItem, advanceStatus, sendBudgetNotification, states, users } = useStore()
   const [desc, setDesc] = useState("")
   const [amount, setAmount] = useState("")
   const [nextStatus, setNextStatus] = useState<OrderStatus>(order.status)
@@ -35,6 +35,7 @@ export function OrderDetail({ order }: { order: Order }) {
 
   const total = budgetTotal(order)
   const statusFlow = getStatusFlow(states)
+  const client = users.find((u) => u.id === order.clientId)
 
   function handleAddItem(e: React.FormEvent) {
     e.preventDefault()
@@ -57,8 +58,8 @@ export function OrderDetail({ order }: { order: Order }) {
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="flex-1">
           <div className="flex items-center gap-3">
-            {order.isCorporate && order.companyLogo && (
-              <img src={order.companyLogo} alt={order.companyName} className="h-12 w-12 rounded object-contain" />
+            {client?.isCorporate && client?.companyLogo && (
+              <img src={client.companyLogo} alt={client.companyName} className="h-12 w-12 rounded object-contain" />
             )}
             <div>
               <div className="flex items-center gap-2">
@@ -67,8 +68,8 @@ export function OrderDetail({ order }: { order: Order }) {
                   {order.code}
                 </span>
               </div>
-              {order.isCorporate && order.companyName && (
-                <p className="mt-0.5 text-sm text-muted-foreground">{order.companyName}</p>
+              {client?.isCorporate && client?.companyName && (
+                <p className="mt-0.5 text-sm text-muted-foreground">{client.companyName}</p>
               )}
               <p className="mt-1 text-sm text-muted-foreground">
                 {order.deviceType} · {order.deviceBrand} {order.deviceModel}

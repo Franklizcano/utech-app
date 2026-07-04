@@ -39,20 +39,20 @@ export function formatCurrency(value: number) {
 }
 
 const initialUsers: User[] = [
-  { id: "u_admin", name: "Lucía Fernández", email: "lucia@tecnofix.com", role: "admin", active: true, createdAt: daysAgo(120) },
-  { id: "u_emp1", name: "Martín Gómez", email: "martin@tecnofix.com", role: "empleado", active: true, createdAt: daysAgo(90) },
-  { id: "u_emp2", name: "Sofía Ruiz", email: "sofia@tecnofix.com", role: "empleado", active: true, createdAt: daysAgo(45) },
-  { id: "u_emp3", name: "Diego Páez", email: "diego@tecnofix.com", role: "empleado", active: false, createdAt: daysAgo(20) },
+  { id: "u_admin", name: "Lucía Fernández", email: "lucia@tecnofix.com", phone: "+54 11 2222-8888", role: "admin", active: true, createdAt: daysAgo(120) },
+  { id: "u_emp1", name: "Martín Gómez", email: "martin@tecnofix.com", phone: "+54 11 3333-4444", role: "empleado", active: true, createdAt: daysAgo(90) },
+  { id: "u_emp2", name: "Sofía Ruiz", email: "sofia@tecnofix.com", phone: "+54 11 4444-5555", role: "empleado", active: true, createdAt: daysAgo(45) },
+  { id: "u_emp3", name: "Diego Páez", email: "diego@tecnofix.com", phone: "+54 11 5555-6666", role: "empleado", active: false, createdAt: daysAgo(20) },
 ]
 
 const initialOrders: Order[] = [
   {
     id: "o_1",
     code: "TF-1024",
+    clientId: "c_1",
     clientName: "Juan Pérez",
     clientPhone: "+54 11 5555-1234",
     clientEmail: "juan.perez@mail.com",
-    isCorporate: false,
     deviceType: "PlayStation",
     deviceBrand: "Sony",
     deviceModel: "PS5 Slim",
@@ -79,10 +79,10 @@ const initialOrders: Order[] = [
   {
     id: "o_2",
     code: "TF-1025",
+    clientId: "c_2",
     clientName: "María López",
     clientPhone: "+54 11 4444-9876",
     clientEmail: "maria.lopez@mail.com",
-    isCorporate: false,
     deviceType: "Notebook",
     deviceBrand: "Lenovo",
     deviceModel: "IdeaPad 3",
@@ -108,10 +108,10 @@ const initialOrders: Order[] = [
   {
     id: "o_3",
     code: "TF-1026",
+    clientId: "c_3",
     clientName: "Carlos Díaz",
     clientPhone: "+54 11 3333-2211",
     clientEmail: "carlos.diaz@mail.com",
-    isCorporate: false,
     deviceType: "PC",
     deviceBrand: "Armada",
     deviceModel: "Gamer Ryzen 5",
@@ -131,12 +131,10 @@ const initialOrders: Order[] = [
 ]
 
 export interface NewOrderInput {
+  clientId: string
   clientName: string
   clientPhone: string
   clientEmail: string
-  isCorporate: boolean
-  companyName?: string
-  companyLogo?: string
   deviceType: DeviceType
   deviceBrand: string
   deviceModel: string
@@ -164,8 +162,8 @@ interface StoreValue {
   addBudgetItem: (orderId: string, description: string, amount: number) => void
   removeBudgetItem: (orderId: string, itemId: string) => void
   sendBudgetNotification: (orderId: string) => void
-  addUser: (input: { name: string; email: string; role: Role }) => void
-  updateUser: (id: string, input: { name: string; email: string; role: Role; active: boolean }) => void
+  addUser: (input: { name: string; email: string; phone: string; role: Role; isCorporate?: boolean; companyName?: string; companyLogo?: string }) => void
+  updateUser: (id: string, input: { name: string; email: string; phone: string; role: Role; active: boolean; isCorporate?: boolean; companyName?: string; companyLogo?: string }) => void
   toggleUserActive: (id: string) => void
   markNotificationsRead: (orderId: string) => void
   // estado management
@@ -203,6 +201,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       const newOrder: Order = {
         id: uid("o"),
         code,
+        clientId: input.clientId,
         clientName: input.clientName,
         clientPhone: input.clientPhone,
         clientEmail: input.clientEmail,
@@ -284,12 +283,23 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       )
     }
 
-    function addUser(input: { name: string; email: string; role: Role }) {
-      const u: User = { id: uid("u"), name: input.name, email: input.email, role: input.role, active: true, createdAt: now() }
+    function addUser(input: { name: string; email: string; phone: string; role: Role; isCorporate?: boolean; companyName?: string; companyLogo?: string }) {
+      const u: User = { 
+        id: uid("u"), 
+        name: input.name, 
+        email: input.email, 
+        phone: input.phone,
+        role: input.role, 
+        active: true,
+        isCorporate: input.isCorporate,
+        companyName: input.companyName,
+        companyLogo: input.companyLogo,
+        createdAt: now() 
+      }
       setUsers((prev) => [...prev, u])
     }
 
-    function updateUser(id: string, input: { name: string; email: string; role: Role; active: boolean }) {
+    function updateUser(id: string, input: { name: string; email: string; phone: string; role: Role; active: boolean; isCorporate?: boolean; companyName?: string; companyLogo?: string }) {
       setUsers((prev) => prev.map((u) => (u.id === id ? { ...u, ...input } : u)))
     }
 

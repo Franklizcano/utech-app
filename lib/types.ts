@@ -38,8 +38,13 @@ export interface User {
   id: string
   name: string
   email: string
+  phone: string
   role: Role
   active: boolean
+  // Campos corporativos (solo para clientes)
+  isCorporate?: boolean
+  companyName?: string
+  companyLogo?: string // URL o data URI
   createdAt: string
 }
 
@@ -67,13 +72,10 @@ export interface Order {
   id: string
   code: string
   // Cliente
+  clientId: string // Referencia al usuario cliente
   clientName: string
   clientPhone: string
   clientEmail: string
-  // Cliente Corporativo
-  isCorporate: boolean
-  companyName?: string
-  companyLogo?: string // URL o data URI
   // Equipo
   deviceType: DeviceType
   deviceBrand: string

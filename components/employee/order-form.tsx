@@ -1,7 +1,7 @@
 "use client"
 
 import { useState } from "react"
-import { ClipboardPlus, User2, Cpu, AlertCircle, Building2 } from "lucide-react"
+import { ClipboardPlus, User2, Cpu, AlertCircle } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -19,54 +19,35 @@ import type { DeviceType } from "@/lib/types"
 const DEVICE_TYPES: DeviceType[] = ["PC", "Notebook", "PlayStation", "Xbox", "Nintendo", "Otro"]
 
 export function OrderForm({ onCreated }: { onCreated?: (orderId: string) => void }) {
-  const { addOrder, employees } = useStore()
+  const { addOrder, employees, users } = useStore()
   const activeEmployees = employees.filter((e) => e.active)
+  const clients = users.filter((u) => u.role === "cliente")
 
-  const [clientName, setClientName] = useState("")
-  const [clientPhone, setClientPhone] = useState("")
-  const [clientEmail, setClientEmail] = useState("")
-  const [isCorporate, setIsCorporate] = useState(false)
-  const [companyName, setCompanyName] = useState("")
-  const [companyLogo, setCompanyLogo] = useState("")
+  const [clientId, setClientId] = useState(clients[0]?.id ?? "")
   const [deviceType, setDeviceType] = useState<DeviceType>("PC")
   const [deviceBrand, setDeviceBrand] = useState("")
   const [deviceModel, setDeviceModel] = useState("")
   const [fault, setFault] = useState("")
   const [assignedTo, setAssignedTo] = useState(activeEmployees[0]?.name ?? "")
 
-  function handleLogoUpload(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0]
-    if (!file) return
-    const reader = new FileReader()
-    reader.onload = (event) => {
-      setCompanyLogo(event.target?.result as string)
-    }
-    reader.readAsDataURL(file)
-  }
+  const selectedClient = clients.find((c) => c.id === clientId)
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
-    if (!clientName || !fault) return
-    if (isCorporate && !companyName) return
+    if (!clientId || !fault) return
+    if (!selectedClient) return
+    
     const order = addOrder({
-      clientName,
-      clientPhone,
-      clientEmail,
-      isCorporate,
-      companyName: isCorporate ? companyName : undefined,
-      companyLogo: isCorporate ? companyLogo : undefined,
+      clientId,
+      clientName: selectedClient.name,
+      clientPhone: selectedClient.phone,
+      clientEmail: selectedClient.email,
       deviceType,
       deviceBrand,
       deviceModel,
       fault,
       assignedTo,
     })
-    setClientName("")
-    setClientPhone("")
-    setClientEmail("")
-    setIsCorporate(false)
-    setCompanyName("")
-    setCompanyLogo("")
     setDeviceType("PC")
     setDeviceBrand("")
     setDeviceModel("")
@@ -79,69 +60,62 @@ export function OrderForm({ onCreated }: { onCreated?: (orderId: string) => void
       <section className="space-y-4">
         <div className="flex items-center gap-2 text-sm font-semibold text-foreground">
           <User2 className="size-4 text-primary" />
-          Datos del cliente
+          Cliente
         </div>
-        <div className="grid gap-4 sm:grid-cols-2">
+        <div className="space-y-4">
           <div className="space-y-2">
-            <Label htmlFor="clientName">Nombre y apellido *</Label>
-            <Input id="clientName" value={clientName} onChange={(e) => setClientName(e.target.value)} placeholder="Ej: Juan Pérez" required />
+            <Label>Seleccionar cliente *</Label>
+            {clients.length === 0 ? (
+              <div className="rounded-lg border border-dashed border-border bg-secondary/30 p-4 text-center text-sm text-muted-foreground">
+                No hay clientes registrados. Crea uno en la gestión de usuarios.
+              </div>
+            ) : (
+              <Select value={clientId} onValueChange={setClientId}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {clients.map((client) => (
+                    <SelectItem key={client.id} value={client.id}>
+                      {client.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
           </div>
-          <div className="space-y-2">
-            <Label htmlFor="clientPhone">Teléfono</Label>
-            <Input id="clientPhone" value={clientPhone} onChange={(e) => setClientPhone(e.target.value)} placeholder="+54 11 5555-1234" />
-          </div>
-          <div className="space-y-2 sm:col-span-2">
-            <Label htmlFor="clientEmail">Email</Label>
-            <Input id="clientEmail" type="email" value={clientEmail} onChange={(e) => setClientEmail(e.target.value)} placeholder="cliente@mail.com" />
-          </div>
-          <div className="space-y-2 sm:col-span-2">
-            <Label className="flex items-center gap-2">
-              <input
-                type="checkbox"
-                checked={isCorporate}
-                onChange={(e) => setIsCorporate(e.target.checked)}
-                className="rounded border-input"
-              />
-              <span>Es cliente corporativo</span>
-            </Label>
-          </div>
-        </div>
 
-        {isCorporate && (
-          <div className="grid gap-4 rounded-lg border border-border bg-secondary/20 p-4 sm:grid-cols-2">
-            <div className="space-y-2">
-              <Label htmlFor="companyName">Nombre de la empresa *</Label>
-              <Input
-                id="companyName"
-                value={companyName}
-                onChange={(e) => setCompanyName(e.target.value)}
-                placeholder="Ej: Tech Solutions S.A."
-                required={isCorporate}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="companyLogo">Logo de la empresa</Label>
-              <Input
-                id="companyLogo"
-                type="file"
-                accept="image/*"
-                onChange={handleLogoUpload}
-              />
-              {companyLogo && (
-                <div className="mt-2 flex items-center gap-2">
-                  <img src={companyLogo} alt="logo" className="h-10 w-10 rounded object-contain" />
-                  <button
-                    type="button"
-                    onClick={() => setCompanyLogo("")}
-                    className="text-xs text-muted-foreground hover:text-foreground"
-                  >
-                    Remover
-                  </button>
+          {selectedClient && (
+            <div className="rounded-lg border border-border bg-secondary/20 p-4 space-y-3">
+              {selectedClient.isCorporate && selectedClient.companyLogo && (
+                <div className="flex items-center gap-3">
+                  <img
+                    src={selectedClient.companyLogo}
+                    alt={selectedClient.companyName}
+                    className="h-12 w-12 rounded object-contain"
+                  />
+                  <div>
+                    <p className="text-sm font-medium text-foreground">{selectedClient.companyName}</p>
+                    <p className="text-xs text-muted-foreground">Contacto: {selectedClient.name}</p>
+                  </div>
                 </div>
               )}
+              {!selectedClient.isCorporate && (
+                <div>
+                  <p className="text-sm font-medium text-foreground">{selectedClient.name}</p>
+                </div>
+              )}
+              <div className="space-y-1 text-sm">
+                <p className="text-muted-foreground">
+                  <span className="font-medium text-foreground">Teléfono:</span> {selectedClient.phone}
+                </p>
+                <p className="text-muted-foreground">
+                  <span className="font-medium text-foreground">Email:</span> {selectedClient.email}
+                </p>
+              </div>
             </div>
-          </div>
-        )}
+          )}
+        </div>
       </section>
 
       <section className="space-y-4">
@@ -212,7 +186,7 @@ export function OrderForm({ onCreated }: { onCreated?: (orderId: string) => void
       </section>
 
       <div className="flex justify-end">
-        <Button type="submit" className="gap-2">
+        <Button type="submit" className="gap-2" disabled={clients.length === 0}>
           <ClipboardPlus className="size-4" />
           Cargar pedido
         </Button>

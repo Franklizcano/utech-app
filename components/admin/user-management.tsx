@@ -1,7 +1,7 @@
 "use client"
 
 import { useState } from "react"
-import { UserPlus, Pencil, ShieldCheck } from "lucide-react"
+import { UserPlus, Pencil, ShieldCheck, Building2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -51,13 +51,21 @@ export function UserManagement() {
   const [editing, setEditing] = useState<User | null>(null)
   const [name, setName] = useState("")
   const [email, setEmail] = useState("")
+  const [phone, setPhone] = useState("")
   const [role, setRole] = useState<Role>("empleado")
+  const [isCorporate, setIsCorporate] = useState(false)
+  const [companyName, setCompanyName] = useState("")
+  const [companyLogo, setCompanyLogo] = useState("")
 
   function openCreate() {
     setEditing(null)
     setName("")
     setEmail("")
+    setPhone("")
     setRole("empleado")
+    setIsCorporate(false)
+    setCompanyName("")
+    setCompanyLogo("")
     setOpen(true)
   }
 
@@ -65,17 +73,47 @@ export function UserManagement() {
     setEditing(user)
     setName(user.name)
     setEmail(user.email)
+    setPhone(user.phone || "")
     setRole(user.role)
+    setIsCorporate(user.isCorporate ?? false)
+    setCompanyName(user.companyName || "")
+    setCompanyLogo(user.companyLogo || "")
     setOpen(true)
+  }
+
+  function handleLogoUpload(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]
+    if (!file) return
+    const reader = new FileReader()
+    reader.onload = (event) => {
+      setCompanyLogo(event.target?.result as string)
+    }
+    reader.readAsDataURL(file)
   }
 
   function handleSave(e: React.FormEvent) {
     e.preventDefault()
-    if (!name.trim() || !email.trim()) return
+    if (!name.trim() || !email.trim() || !phone.trim()) return
+    if (role === "cliente" && isCorporate && !companyName.trim()) return
+    
+    const userData = {
+      name,
+      email,
+      phone,
+      role,
+      ...(role === "cliente" && {
+        isCorporate,
+        ...(isCorporate && {
+          companyName: companyName || undefined,
+          companyLogo: companyLogo || undefined,
+        }),
+      }),
+    }
+
     if (editing) {
-      updateUser(editing.id, { name, email, role, active: editing.active })
+      updateUser(editing.id, { ...userData, active: editing.active })
     } else {
-      addUser({ name, email, role })
+      addUser(userData)
     }
     setOpen(false)
   }
@@ -160,6 +198,10 @@ export function UserManagement() {
               <Input id="u-email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="usuario@tecnofix.com" required />
             </div>
             <div className="space-y-2">
+              <Label htmlFor="u-phone">Teléfono</Label>
+              <Input id="u-phone" type="tel" value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="+54 11 0000-0000" required />
+            </div>
+            <div className="space-y-2">
               <Label>Rol</Label>
               <Select value={role} onValueChange={(v) => setRole(v as Role)}>
                 <SelectTrigger>
@@ -172,6 +214,59 @@ export function UserManagement() {
                 </SelectContent>
               </Select>
             </div>
+
+            {role === "cliente" && (
+              <>
+                <div className="space-y-2">
+                  <Label className="flex items-center gap-2">
+                    <input
+                      type="checkbox"
+                      checked={isCorporate}
+                      onChange={(e) => setIsCorporate(e.target.checked)}
+                      className="rounded border-input"
+                    />
+                    <span>Es cliente corporativo</span>
+                  </Label>
+                </div>
+
+                {isCorporate && (
+                  <div className="space-y-3 rounded-lg border border-border bg-secondary/20 p-3">
+                    <div className="space-y-2">
+                      <Label htmlFor="u-company">Nombre de la empresa *</Label>
+                      <Input
+                        id="u-company"
+                        value={companyName}
+                        onChange={(e) => setCompanyName(e.target.value)}
+                        placeholder="Ej: Tech Solutions S.A."
+                        required={isCorporate}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="u-logo">Logo de la empresa</Label>
+                      <Input
+                        id="u-logo"
+                        type="file"
+                        accept="image/*"
+                        onChange={handleLogoUpload}
+                      />
+                      {companyLogo && (
+                        <div className="flex items-center gap-2 mt-2">
+                          <img src={companyLogo} alt="logo" className="h-10 w-10 rounded object-contain" />
+                          <button
+                            type="button"
+                            onClick={() => setCompanyLogo("")}
+                            className="text-xs text-muted-foreground hover:text-foreground"
+                          >
+                            Remover
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </>
+            )}
+
             <DialogFooter>
               <Button type="button" variant="outline" onClick={() => setOpen(false)}>
                 Cancelar
