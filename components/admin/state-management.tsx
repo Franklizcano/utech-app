@@ -1,7 +1,7 @@
 "use client"
 
 import { useState } from "react"
-import { Plus, Trash2, Edit2 } from "lucide-react"
+import { Plus, Trash2, Edit2, GripVertical } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -24,15 +24,18 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
 import { useStore } from "@/lib/store"
+import { cn } from "@/lib/utils"
 import type { OrderState } from "@/lib/types"
 
 export function StateManagement() {
-  const { states, addState, updateState, deleteState } = useStore()
+  const { states, addState, updateState, deleteState, reorderStates } = useStore()
   const [dialogOpen, setDialogOpen] = useState(false)
   const [editingState, setEditingState] = useState<OrderState | null>(null)
   const [label, setLabel] = useState("")
   const [color, setColor] = useState("#8b5cf6")
   const [deleteTarget, setDeleteTarget] = useState<OrderState | null>(null)
+  const [draggedId, setDraggedId] = useState<string | null>(null)
+  const [dragOverId, setDragOverId] = useState<string | null>(null)
 
   function handleOpenDialog(state?: OrderState) {
     if (state) {
@@ -65,6 +68,50 @@ export function StateManagement() {
     if (states.length === 1) return
     deleteState(state.id)
     setDeleteTarget(null)
+  }
+
+  function handleDragStart(e: React.DragEvent<HTMLDivElement>, stateId: string) {
+    setDraggedId(stateId)
+    e.dataTransfer.effectAllowed = "move"
+  }
+
+  function handleDragOver(e: React.DragEvent<HTMLDivElement>, stateId: string) {
+    e.preventDefault()
+    e.dataTransfer.dropEffect = "move"
+    setDragOverId(stateId)
+  }
+
+  function handleDragLeave() {
+    setDragOverId(null)
+  }
+
+  function handleDrop(e: React.DragEvent<HTMLDivElement>, targetId: string) {
+    e.preventDefault()
+    if (!draggedId || draggedId === targetId) {
+      setDraggedId(null)
+      setDragOverId(null)
+      return
+    }
+
+    const sortedStates = [...states].sort((a, b) => a.position - b.position)
+    const draggedIndex = sortedStates.findIndex((s) => s.id === draggedId)
+    const targetIndex = sortedStates.findIndex((s) => s.id === targetId)
+
+    if (draggedIndex === -1 || targetIndex === -1) {
+      setDraggedId(null)
+      setDragOverId(null)
+      return
+    }
+
+    const newOrder = [...sortedStates]
+    const [draggedState] = newOrder.splice(draggedIndex, 1)
+    newOrder.splice(targetIndex, 0, draggedState)
+
+    const newStateIds = newOrder.map((s) => s.id)
+    reorderStates(newStateIds)
+
+    setDraggedId(null)
+    setDragOverId(null)
   }
 
   const sortedStates = [...states].sort((a, b) => a.position - b.position)
@@ -140,9 +187,24 @@ export function StateManagement() {
             {sortedStates.map((state) => (
               <div
                 key={state.id}
-                className="flex items-center justify-between gap-3 rounded-lg border border-border bg-card p-3 hover:bg-secondary/30 transition-colors"
+                draggable
+                onDragStart={(e) => handleDragStart(e, state.id)}
+                onDragOver={(e) => handleDragOver(e, state.id)}
+                onDragLeave={handleDragLeave}
+                onDrop={(e) => handleDrop(e, state.id)}
+                className={cn(
+                  "flex items-center justify-between gap-3 rounded-lg border transition-all cursor-move",
+                  draggedId === state.id ? "opacity-50 border-primary/50 bg-primary/5" : "border-border bg-card",
+                  dragOverId === state.id && draggedId !== state.id
+                    ? "border-primary/70 bg-primary/10 ring-2 ring-primary/20"
+                    : "hover:bg-secondary/30",
+                )}
+                style={{ padding: "0.75rem" }}
               >
                 <div className="flex items-center gap-3 flex-1">
+                  <div className="text-muted-foreground hover:text-foreground transition-colors flex-shrink-0">
+                    <GripVertical className="h-4 w-4" />
+                  </div>
                   <div
                     className="h-8 w-8 rounded-md border border-border flex-shrink-0"
                     style={{ backgroundColor: state.color }}
