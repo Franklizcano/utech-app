@@ -70,6 +70,10 @@ export interface Order {
   clientName: string
   clientPhone: string
   clientEmail: string
+  // Cliente Corporativo
+  isCorporate: boolean
+  companyName?: string
+  companyLogo?: string // URL o data URI
   // Equipo
   deviceType: DeviceType
   deviceBrand: string

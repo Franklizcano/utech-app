@@ -1,7 +1,7 @@
 "use client"
 
 import { useState } from "react"
-import { ClipboardPlus, User2, Cpu, AlertCircle } from "lucide-react"
+import { ClipboardPlus, User2, Cpu, AlertCircle, Building2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -25,19 +25,36 @@ export function OrderForm({ onCreated }: { onCreated?: (orderId: string) => void
   const [clientName, setClientName] = useState("")
   const [clientPhone, setClientPhone] = useState("")
   const [clientEmail, setClientEmail] = useState("")
+  const [isCorporate, setIsCorporate] = useState(false)
+  const [companyName, setCompanyName] = useState("")
+  const [companyLogo, setCompanyLogo] = useState("")
   const [deviceType, setDeviceType] = useState<DeviceType>("PC")
   const [deviceBrand, setDeviceBrand] = useState("")
   const [deviceModel, setDeviceModel] = useState("")
   const [fault, setFault] = useState("")
   const [assignedTo, setAssignedTo] = useState(activeEmployees[0]?.name ?? "")
 
+  function handleLogoUpload(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]
+    if (!file) return
+    const reader = new FileReader()
+    reader.onload = (event) => {
+      setCompanyLogo(event.target?.result as string)
+    }
+    reader.readAsDataURL(file)
+  }
+
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     if (!clientName || !fault) return
+    if (isCorporate && !companyName) return
     const order = addOrder({
       clientName,
       clientPhone,
       clientEmail,
+      isCorporate,
+      companyName: isCorporate ? companyName : undefined,
+      companyLogo: isCorporate ? companyLogo : undefined,
       deviceType,
       deviceBrand,
       deviceModel,
@@ -47,6 +64,9 @@ export function OrderForm({ onCreated }: { onCreated?: (orderId: string) => void
     setClientName("")
     setClientPhone("")
     setClientEmail("")
+    setIsCorporate(false)
+    setCompanyName("")
+    setCompanyLogo("")
     setDeviceType("PC")
     setDeviceBrand("")
     setDeviceModel("")
@@ -74,7 +94,54 @@ export function OrderForm({ onCreated }: { onCreated?: (orderId: string) => void
             <Label htmlFor="clientEmail">Email</Label>
             <Input id="clientEmail" type="email" value={clientEmail} onChange={(e) => setClientEmail(e.target.value)} placeholder="cliente@mail.com" />
           </div>
+          <div className="space-y-2 sm:col-span-2">
+            <Label className="flex items-center gap-2">
+              <input
+                type="checkbox"
+                checked={isCorporate}
+                onChange={(e) => setIsCorporate(e.target.checked)}
+                className="rounded border-input"
+              />
+              <span>Es cliente corporativo</span>
+            </Label>
+          </div>
         </div>
+
+        {isCorporate && (
+          <div className="grid gap-4 rounded-lg border border-border bg-secondary/20 p-4 sm:grid-cols-2">
+            <div className="space-y-2">
+              <Label htmlFor="companyName">Nombre de la empresa *</Label>
+              <Input
+                id="companyName"
+                value={companyName}
+                onChange={(e) => setCompanyName(e.target.value)}
+                placeholder="Ej: Tech Solutions S.A."
+                required={isCorporate}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="companyLogo">Logo de la empresa</Label>
+              <Input
+                id="companyLogo"
+                type="file"
+                accept="image/*"
+                onChange={handleLogoUpload}
+              />
+              {companyLogo && (
+                <div className="mt-2 flex items-center gap-2">
+                  <img src={companyLogo} alt="logo" className="h-10 w-10 rounded object-contain" />
+                  <button
+                    type="button"
+                    onClick={() => setCompanyLogo("")}
+                    className="text-xs text-muted-foreground hover:text-foreground"
+                  >
+                    Remover
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
       </section>
 
       <section className="space-y-4">

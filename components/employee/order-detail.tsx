@@ -55,16 +55,26 @@ export function OrderDetail({ order }: { order: Order }) {
     <div className="space-y-6">
       {/* Encabezado */}
       <div className="flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <div className="flex items-center gap-2">
-            <h3 className="text-lg font-semibold text-foreground">{order.clientName}</h3>
-            <span className="rounded-md bg-secondary px-2 py-0.5 font-mono text-xs text-secondary-foreground">
-              {order.code}
-            </span>
+        <div className="flex-1">
+          <div className="flex items-center gap-3">
+            {order.isCorporate && order.companyLogo && (
+              <img src={order.companyLogo} alt={order.companyName} className="h-12 w-12 rounded object-contain" />
+            )}
+            <div>
+              <div className="flex items-center gap-2">
+                <h3 className="text-lg font-semibold text-foreground">{order.clientName}</h3>
+                <span className="rounded-md bg-secondary px-2 py-0.5 font-mono text-xs text-secondary-foreground">
+                  {order.code}
+                </span>
+              </div>
+              {order.isCorporate && order.companyName && (
+                <p className="mt-0.5 text-sm text-muted-foreground">{order.companyName}</p>
+              )}
+              <p className="mt-1 text-sm text-muted-foreground">
+                {order.deviceType} · {order.deviceBrand} {order.deviceModel}
+              </p>
+            </div>
           </div>
-          <p className="mt-1 text-sm text-muted-foreground">
-            {order.deviceType} · {order.deviceBrand} {order.deviceModel}
-          </p>
         </div>
         <div className="flex items-center gap-2">
           <StatusBadge status={order.status} />

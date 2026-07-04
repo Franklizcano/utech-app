@@ -52,6 +52,7 @@ const initialOrders: Order[] = [
     clientName: "Juan Pérez",
     clientPhone: "+54 11 5555-1234",
     clientEmail: "juan.perez@mail.com",
+    isCorporate: false,
     deviceType: "PlayStation",
     deviceBrand: "Sony",
     deviceModel: "PS5 Slim",
@@ -81,6 +82,7 @@ const initialOrders: Order[] = [
     clientName: "María López",
     clientPhone: "+54 11 4444-9876",
     clientEmail: "maria.lopez@mail.com",
+    isCorporate: false,
     deviceType: "Notebook",
     deviceBrand: "Lenovo",
     deviceModel: "IdeaPad 3",
@@ -109,6 +111,7 @@ const initialOrders: Order[] = [
     clientName: "Carlos Díaz",
     clientPhone: "+54 11 3333-2211",
     clientEmail: "carlos.diaz@mail.com",
+    isCorporate: false,
     deviceType: "PC",
     deviceBrand: "Armada",
     deviceModel: "Gamer Ryzen 5",
@@ -131,6 +134,9 @@ export interface NewOrderInput {
   clientName: string
   clientPhone: string
   clientEmail: string
+  isCorporate: boolean
+  companyName?: string
+  companyLogo?: string
   deviceType: DeviceType
   deviceBrand: string
   deviceModel: string
