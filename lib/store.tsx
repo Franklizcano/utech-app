@@ -151,6 +151,7 @@ interface StoreValue {
   // acciones
   addOrder: (input: NewOrderInput) => Order
   advanceStatus: (orderId: string, status: OrderStatus, note?: string) => void
+  reassignOrder: (orderId: string, newAssignee: string) => void
   addBudgetItem: (orderId: string, description: string, amount: number) => void
   removeBudgetItem: (orderId: string, itemId: string) => void
   sendBudgetNotification: (orderId: string) => void
@@ -224,6 +225,22 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       )
     }
 
+    function reassignOrder(orderId: string, newAssignee: string) {
+      setOrders((prev) =>
+        prev.map((o) => {
+          if (o.id !== orderId) return o
+          return {
+            ...o,
+            assignedTo: newAssignee,
+            notifications: [
+              ...o.notifications,
+              { id: uid("nt"), message: `Tu pedido ha sido reasignado a ${newAssignee}.`, date: now(), read: false },
+            ],
+          }
+        }),
+      )
+    }
+
     function addBudgetItem(orderId: string, description: string, amount: number) {
       const item: BudgetItem = { id: uid("bi"), description, amount }
       setOrders((prev) => prev.map((o) => (o.id === orderId ? { ...o, budget: [...o.budget, item] } : o)))
@@ -285,6 +302,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       setActiveClientOrderId,
       addOrder,
       advanceStatus,
+      reassignOrder,
       addBudgetItem,
       removeBudgetItem,
       sendBudgetNotification,

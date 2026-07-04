@@ -1,7 +1,7 @@
 "use client"
 
 import { useState } from "react"
-import { Plus, Trash2, Send, ArrowRight, Phone, Mail } from "lucide-react"
+import { Plus, Trash2, Send, ArrowRight, Phone, Mail, User } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -19,11 +19,12 @@ import { useStore, formatCurrency } from "@/lib/store"
 import { STATUS_FLOW, STATUS_LABELS, budgetTotal, type Order, type OrderStatus } from "@/lib/types"
 
 export function OrderDetail({ order }: { order: Order }) {
-  const { addBudgetItem, removeBudgetItem, advanceStatus, sendBudgetNotification } = useStore()
+  const { addBudgetItem, removeBudgetItem, advanceStatus, reassignOrder, sendBudgetNotification, employees } = useStore()
   const [desc, setDesc] = useState("")
   const [amount, setAmount] = useState("")
   const [nextStatus, setNextStatus] = useState<OrderStatus>(order.status)
   const [statusNote, setStatusNote] = useState("")
+  const [newAssignee, setNewAssignee] = useState(order.assignedTo)
 
   const total = budgetTotal(order)
 
@@ -40,6 +41,11 @@ export function OrderDetail({ order }: { order: Order }) {
     if (nextStatus === order.status) return
     advanceStatus(order.id, nextStatus, statusNote.trim() || undefined)
     setStatusNote("")
+  }
+
+  function handleReassign() {
+    if (newAssignee === order.assignedTo) return
+    reassignOrder(order.id, newAssignee)
   }
 
   return (
@@ -76,6 +82,35 @@ export function OrderDetail({ order }: { order: Order }) {
       <div className="rounded-lg border border-border bg-secondary/30 p-4">
         <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Falla reportada</p>
         <p className="mt-1 text-sm text-foreground">{order.fault}</p>
+      </div>
+
+      <div className="flex flex-wrap items-center gap-4 rounded-lg border border-border bg-secondary/20 p-4">
+        <div className="flex items-center gap-2">
+          <User className="size-4 text-muted-foreground" />
+          <span className="text-sm text-muted-foreground">Asignado a:</span>
+          <span className="font-medium text-foreground">{order.assignedTo}</span>
+        </div>
+        <Select value={newAssignee} onValueChange={setNewAssignee}>
+          <SelectTrigger className="w-48">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {employees.map((emp) => (
+              <SelectItem key={emp.id} value={emp.name}>
+                {emp.name}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          disabled={newAssignee === order.assignedTo}
+          onClick={handleReassign}
+        >
+          Reasignar
+        </Button>
       </div>
 
       <div className="grid gap-6 lg:grid-cols-2">
