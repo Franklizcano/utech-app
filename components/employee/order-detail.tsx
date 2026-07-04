@@ -84,33 +84,50 @@ export function OrderDetail({ order }: { order: Order }) {
         <p className="mt-1 text-sm text-foreground">{order.fault}</p>
       </div>
 
-      <div className="flex flex-wrap items-center gap-4 rounded-lg border border-border bg-secondary/20 p-4">
-        <div className="flex items-center gap-2">
-          <User className="size-4 text-muted-foreground" />
-          <span className="text-sm text-muted-foreground">Asignado a:</span>
-          <span className="font-medium text-foreground">{order.assignedTo}</span>
+      <div className="space-y-3 rounded-lg border border-border/50 bg-gradient-to-br from-primary/5 to-transparent p-4">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <div className="flex size-8 items-center justify-center rounded-md bg-primary/20">
+              <User className="size-4 text-primary" />
+            </div>
+            <div className="flex-1">
+              <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Técnico asignado</p>
+              <p className="mt-0.5 text-sm font-medium text-foreground">{order.assignedTo}</p>
+            </div>
+          </div>
         </div>
-        <Select value={newAssignee} onValueChange={setNewAssignee}>
-          <SelectTrigger className="w-48">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            {employees.map((emp) => (
-              <SelectItem key={emp.id} value={emp.name}>
-                {emp.name}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-        <Button
-          type="button"
-          variant="outline"
-          size="sm"
-          disabled={newAssignee === order.assignedTo}
-          onClick={handleReassign}
-        >
-          Reasignar
-        </Button>
+
+        {newAssignee !== order.assignedTo && (
+          <div className="flex items-center gap-2 rounded-md bg-accent/10 px-2 py-1.5">
+            <div className="size-1.5 rounded-full bg-accent" />
+            <p className="text-xs text-accent">Nuevo asignee: <span className="font-medium">{newAssignee}</span></p>
+          </div>
+        )}
+
+        <div className="flex flex-wrap gap-2">
+          <Select value={newAssignee} onValueChange={setNewAssignee}>
+            <SelectTrigger className="flex-1 min-w-48">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {employees.map((emp) => (
+                <SelectItem key={emp.id} value={emp.name}>
+                  {emp.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <Button
+            type="button"
+            size="sm"
+            disabled={newAssignee === order.assignedTo}
+            onClick={handleReassign}
+            className="gap-1"
+          >
+            <ArrowRight className="size-4" />
+            Reasignar
+          </Button>
+        </div>
       </div>
 
       <div className="grid gap-6 lg:grid-cols-2">
