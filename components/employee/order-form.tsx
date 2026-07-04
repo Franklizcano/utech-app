@@ -23,7 +23,11 @@ export function OrderForm({ onCreated }: { onCreated?: (orderId: string) => void
   const activeEmployees = employees.filter((e) => e.active)
   const clients = users.filter((u) => u.role === "cliente")
 
+  const [clientType, setClientType] = useState<"registered" | "occasional">("registered")
   const [clientId, setClientId] = useState(clients[0]?.id ?? "")
+  const [occasionalName, setOccasionalName] = useState("")
+  const [occasionalPhone, setOccasionalPhone] = useState("")
+  const [occasionalEmail, setOccasionalEmail] = useState("")
   const [deviceType, setDeviceType] = useState<DeviceType>("PC")
   const [deviceBrand, setDeviceBrand] = useState("")
   const [deviceModel, setDeviceModel] = useState("")
@@ -31,27 +35,51 @@ export function OrderForm({ onCreated }: { onCreated?: (orderId: string) => void
   const [assignedTo, setAssignedTo] = useState(activeEmployees[0]?.name ?? "")
 
   const selectedClient = clients.find((c) => c.id === clientId)
+  const isUsingOccasional = clientType === "occasional"
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
-    if (!clientId || !fault) return
-    if (!selectedClient) return
+    
+    let clientName: string
+    let clientPhone: string
+    let clientEmail: string
+    let useClientId: string
+    
+    if (isUsingOccasional) {
+      if (!occasionalName.trim() || !occasionalPhone.trim() || !occasionalEmail.trim() || !fault) return
+      clientName = occasionalName
+      clientPhone = occasionalPhone
+      clientEmail = occasionalEmail
+      useClientId = "" // Sin clientId para cliente ocasional
+    } else {
+      if (!clientId || !fault) return
+      if (!selectedClient) return
+      clientName = selectedClient.name
+      clientPhone = selectedClient.phone
+      clientEmail = selectedClient.email
+      useClientId = clientId
+    }
     
     const order = addOrder({
-      clientId,
-      clientName: selectedClient.name,
-      clientPhone: selectedClient.phone,
-      clientEmail: selectedClient.email,
+      clientId: useClientId,
+      clientName,
+      clientPhone,
+      clientEmail,
       deviceType,
       deviceBrand,
       deviceModel,
       fault,
       assignedTo,
     })
+    
+    // Reset form
     setDeviceType("PC")
     setDeviceBrand("")
     setDeviceModel("")
     setFault("")
+    setOccasionalName("")
+    setOccasionalPhone("")
+    setOccasionalEmail("")
     onCreated?.(order.id)
   }
 
@@ -63,55 +91,118 @@ export function OrderForm({ onCreated }: { onCreated?: (orderId: string) => void
           Cliente
         </div>
         <div className="space-y-4">
-          <div className="space-y-2">
-            <Label>Seleccionar cliente *</Label>
-            {clients.length === 0 ? (
-              <div className="rounded-lg border border-dashed border-border bg-secondary/30 p-4 text-center text-sm text-muted-foreground">
-                No hay clientes registrados. Crea uno en la gestión de usuarios.
-              </div>
-            ) : (
-              <Select value={clientId} onValueChange={setClientId}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {clients.map((client) => (
-                    <SelectItem key={client.id} value={client.id}>
-                      {client.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            )}
+          <div className="flex gap-3">
+            <Label className="flex items-center gap-2 cursor-pointer">
+              <input
+                type="radio"
+                checked={clientType === "registered"}
+                onChange={() => setClientType("registered")}
+                className="rounded-full border-input"
+              />
+              <span>Cliente registrado</span>
+            </Label>
+            <Label className="flex items-center gap-2 cursor-pointer">
+              <input
+                type="radio"
+                checked={clientType === "occasional"}
+                onChange={() => setClientType("occasional")}
+                className="rounded-full border-input"
+              />
+              <span>Cliente ocasional</span>
+            </Label>
           </div>
 
-          {selectedClient && (
-            <div className="rounded-lg border border-border bg-secondary/20 p-4 space-y-3">
-              {selectedClient.isCorporate && selectedClient.companyLogo && (
-                <div className="flex items-center gap-3">
-                  <img
-                    src={selectedClient.companyLogo}
-                    alt={selectedClient.companyName}
-                    className="h-12 w-12 rounded object-contain"
-                  />
-                  <div>
-                    <p className="text-sm font-medium text-foreground">{selectedClient.companyName}</p>
-                    <p className="text-xs text-muted-foreground">Contacto: {selectedClient.name}</p>
+          {clientType === "registered" ? (
+            <div className="space-y-2">
+              {clients.length === 0 ? (
+                <div className="rounded-lg border border-dashed border-border bg-secondary/30 p-4 text-center text-sm text-muted-foreground">
+                  No hay clientes registrados. Crea uno en la gestión de usuarios o selecciona "Cliente ocasional".
+                </div>
+              ) : (
+                <>
+                  <Label>Seleccionar cliente *</Label>
+                  <Select value={clientId} onValueChange={setClientId}>
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {clients.map((client) => (
+                        <SelectItem key={client.id} value={client.id}>
+                          {client.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </>
+              )}
+
+              {selectedClient && (
+                <div className="rounded-lg border border-border bg-secondary/20 p-4 space-y-3">
+                  {selectedClient.isCorporate && selectedClient.companyLogo && (
+                    <div className="flex items-center gap-3">
+                      <img
+                        src={selectedClient.companyLogo}
+                        alt={selectedClient.companyName}
+                        className="h-12 w-12 rounded object-contain"
+                      />
+                      <div>
+                        <p className="text-sm font-medium text-foreground">{selectedClient.companyName}</p>
+                        <p className="text-xs text-muted-foreground">Contacto: {selectedClient.name}</p>
+                      </div>
+                    </div>
+                  )}
+                  {!selectedClient.isCorporate && (
+                    <div>
+                      <p className="text-sm font-medium text-foreground">{selectedClient.name}</p>
+                    </div>
+                  )}
+                  <div className="space-y-1 text-sm">
+                    <p className="text-muted-foreground">
+                      <span className="font-medium text-foreground">Teléfono:</span> {selectedClient.phone}
+                    </p>
+                    <p className="text-muted-foreground">
+                      <span className="font-medium text-foreground">Email:</span> {selectedClient.email}
+                    </p>
                   </div>
                 </div>
               )}
-              {!selectedClient.isCorporate && (
-                <div>
-                  <p className="text-sm font-medium text-foreground">{selectedClient.name}</p>
-                </div>
-              )}
-              <div className="space-y-1 text-sm">
-                <p className="text-muted-foreground">
-                  <span className="font-medium text-foreground">Teléfono:</span> {selectedClient.phone}
-                </p>
-                <p className="text-muted-foreground">
-                  <span className="font-medium text-foreground">Email:</span> {selectedClient.email}
-                </p>
+            </div>
+          ) : (
+            <div className="grid gap-4 rounded-lg border border-border bg-secondary/20 p-4 sm:grid-cols-2">
+              <div className="space-y-2 sm:col-span-2">
+                <Label htmlFor="occ-name">Nombre y apellido *</Label>
+                <Input
+                  id="occ-name"
+                  value={occasionalName}
+                  onChange={(e) => setOccasionalName(e.target.value)}
+                  placeholder="Ej: Juan García"
+                  required
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="occ-phone">Teléfono *</Label>
+                <Input
+                  id="occ-phone"
+                  type="tel"
+                  value={occasionalPhone}
+                  onChange={(e) => setOccasionalPhone(e.target.value)}
+                  placeholder="+54 11 0000-0000"
+                  required
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="occ-email">Email *</Label>
+                <Input
+                  id="occ-email"
+                  type="email"
+                  value={occasionalEmail}
+                  onChange={(e) => setOccasionalEmail(e.target.value)}
+                  placeholder="cliente@mail.com"
+                  required
+                />
+              </div>
+              <div className="rounded-lg border border-dashed border-border bg-background p-3 text-xs text-muted-foreground sm:col-span-2">
+                El cliente podrá consultar el estado de su orden usando el código de seguimiento.
               </div>
             </div>
           )}
@@ -186,7 +277,7 @@ export function OrderForm({ onCreated }: { onCreated?: (orderId: string) => void
       </section>
 
       <div className="flex justify-end">
-        <Button type="submit" className="gap-2" disabled={clients.length === 0}>
+        <Button type="submit" className="gap-2">
           <ClipboardPlus className="size-4" />
           Cargar pedido
         </Button>
