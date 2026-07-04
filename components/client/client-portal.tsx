@@ -103,7 +103,7 @@ export function ClientPortal() {
       </div>
 
       <Card>
-        <CardContent className="flex flex-col gap-4 pt-6 sm:flex-row sm:items-center sm:justify-between">
+        <CardContent className="flex flex-col items-center justify-between gap-4 pt-6 sm:flex-row sm:items-center">
           <div className="flex items-center gap-3">
             <div className="flex size-10 items-center justify-center rounded-lg bg-primary/15 text-primary">
               <Wrench className="size-5" />
@@ -113,7 +113,7 @@ export function ClientPortal() {
               <p className="font-medium text-foreground">Reparación en curso</p>
             </div>
           </div>
-          <StatusBadge status={order.status} className="text-sm" />
+          <StatusBadge status={order.status} className="text-sm sm:ml-auto" />
         </CardContent>
       </Card>
 
