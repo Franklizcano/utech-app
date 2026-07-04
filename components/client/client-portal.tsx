@@ -86,22 +86,24 @@ export function ClientPortal() {
 
   return (
     <div className="mx-auto max-w-3xl space-y-6">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <p className="text-sm text-muted-foreground">Hola, {order.clientName.split(" ")[0]}</p>
-          <h2 className="text-xl font-semibold text-foreground">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+        <div className="space-y-2">
+          <p className="text-sm text-muted-foreground">Bienvenido</p>
+          <h2 className="text-2xl font-bold text-foreground">{order.clientName}</h2>
+          <p className="text-sm text-muted-foreground">📞 {order.clientPhone}</p>
+          <p className="text-sm text-foreground">
             {order.deviceBrand} {order.deviceModel}{" "}
-            <span className="font-mono text-sm font-normal text-muted-foreground">· {order.code}</span>
-          </h2>
+            <span className="font-mono text-xs text-muted-foreground">· {order.code}</span>
+          </p>
         </div>
-        <Button variant="outline" size="sm" className="gap-2" onClick={() => setActiveClientOrderId(null)}>
+        <Button variant="outline" size="sm" className="gap-2 self-start" onClick={() => setActiveClientOrderId(null)}>
           <LogOut className="size-4" />
           Salir
         </Button>
       </div>
 
       <Card>
-        <CardContent className="flex flex-wrap items-center justify-between gap-3 pt-6">
+        <CardContent className="flex flex-col gap-4 pt-6 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex items-center gap-3">
             <div className="flex size-10 items-center justify-center rounded-lg bg-primary/15 text-primary">
               <Wrench className="size-5" />
