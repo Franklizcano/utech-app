@@ -1,7 +1,7 @@
 "use client"
 
 import { useState } from "react"
-import { Plus, Trash2, Send, ArrowRight, Phone, Mail, User } from "lucide-react"
+import { Plus, Trash2, Send, ArrowRight, Phone, Mail, MoreVertical } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -13,18 +13,25 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
 import { StatusBadge } from "@/components/status-badge"
 import { RepairTimeline } from "@/components/repair-timeline"
+import { ReassignDialog } from "@/components/employee/reassign-dialog"
 import { useStore, formatCurrency } from "@/lib/store"
 import { STATUS_FLOW, STATUS_LABELS, budgetTotal, type Order, type OrderStatus } from "@/lib/types"
 
 export function OrderDetail({ order }: { order: Order }) {
-  const { addBudgetItem, removeBudgetItem, advanceStatus, reassignOrder, sendBudgetNotification, employees } = useStore()
+  const { addBudgetItem, removeBudgetItem, advanceStatus, sendBudgetNotification } = useStore()
   const [desc, setDesc] = useState("")
   const [amount, setAmount] = useState("")
   const [nextStatus, setNextStatus] = useState<OrderStatus>(order.status)
   const [statusNote, setStatusNote] = useState("")
-  const [newAssignee, setNewAssignee] = useState(order.assignedTo)
+  const [reassignOpen, setReassignOpen] = useState(false)
 
   const total = budgetTotal(order)
 
@@ -43,11 +50,6 @@ export function OrderDetail({ order }: { order: Order }) {
     setStatusNote("")
   }
 
-  function handleReassign() {
-    if (newAssignee === order.assignedTo) return
-    reassignOrder(order.id, newAssignee)
-  }
-
   return (
     <div className="space-y-6">
       {/* Encabezado */}
@@ -63,7 +65,23 @@ export function OrderDetail({ order }: { order: Order }) {
             {order.deviceType} · {order.deviceBrand} {order.deviceModel}
           </p>
         </div>
-        <StatusBadge status={order.status} />
+        <div className="flex items-center gap-2">
+          <StatusBadge status={order.status} />
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="ghost" size="icon" className="h-8 w-8">
+                <MoreVertical className="h-4 w-4" />
+                <span className="sr-only">Abrir menú de acciones</span>
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem onClick={() => setReassignOpen(true)}>
+                <ArrowRight className="mr-2 h-4 w-4" />
+                <span>Reasignar técnico</span>
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
       </div>
 
       <div className="flex flex-wrap gap-x-6 gap-y-1 text-sm text-muted-foreground">
@@ -84,51 +102,7 @@ export function OrderDetail({ order }: { order: Order }) {
         <p className="mt-1 text-sm text-foreground">{order.fault}</p>
       </div>
 
-      <div className="space-y-3 rounded-lg border border-border/50 bg-gradient-to-br from-primary/5 to-transparent p-4">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <div className="flex size-8 items-center justify-center rounded-md bg-primary/20">
-              <User className="size-4 text-primary" />
-            </div>
-            <div className="flex-1">
-              <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Técnico asignado</p>
-              <p className="mt-0.5 text-sm font-medium text-foreground">{order.assignedTo}</p>
-            </div>
-          </div>
-        </div>
-
-        {newAssignee !== order.assignedTo && (
-          <div className="flex items-center gap-2 rounded-md bg-accent/10 px-2 py-1.5">
-            <div className="size-1.5 rounded-full bg-accent" />
-            <p className="text-xs text-accent">Nuevo asignee: <span className="font-medium">{newAssignee}</span></p>
-          </div>
-        )}
-
-        <div className="flex flex-wrap gap-2">
-          <Select value={newAssignee} onValueChange={setNewAssignee}>
-            <SelectTrigger className="flex-1 min-w-48">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {employees.map((emp) => (
-                <SelectItem key={emp.id} value={emp.name}>
-                  {emp.name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          <Button
-            type="button"
-            size="sm"
-            disabled={newAssignee === order.assignedTo}
-            onClick={handleReassign}
-            className="gap-1"
-          >
-            <ArrowRight className="size-4" />
-            Reasignar
-          </Button>
-        </div>
-      </div>
+      <ReassignDialog order={order} open={reassignOpen} onOpenChange={setReassignOpen} />
 
       <div className="grid gap-6 lg:grid-cols-2">
         {/* Presupuesto */}
