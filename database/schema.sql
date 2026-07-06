@@ -19,7 +19,7 @@ CREATE TABLE IF NOT EXISTS roles (
 
 INSERT INTO roles (id, name, description) VALUES
   ('admin', 'Administrador', 'Acceso completo al sistema'),
-  ('empleado', 'Empleado', 'Gestión de órdenes y diagnóstico'),
+  ('colaborador', 'Colaborador', 'Gestión de órdenes y diagnóstico'),
   ('cliente', 'Cliente', 'Acceso a órdenes personales y seguimiento')
 ON CONFLICT (id) DO NOTHING;
 
@@ -309,71 +309,71 @@ WHERE NOT EXISTS (SELECT 1 FROM orders WHERE code = 'TF-1026');
 INSERT INTO budget_items (order_id, description, amount)
 SELECT id, 'Cambio de módulo HDMI PS5', 28000
 FROM orders WHERE code = 'TF-1024'
-WHERE NOT EXISTS (SELECT 1 FROM budget_items WHERE order_id = (SELECT id FROM orders WHERE code = 'TF-1024') LIMIT 1);
+ON CONFLICT DO NOTHING;
 
 INSERT INTO budget_items (order_id, description, amount)
 SELECT id, 'Mano de obra (microsoldadura)', 22000
 FROM orders WHERE code = 'TF-1024'
-WHERE NOT EXISTS (SELECT 1 FROM budget_items WHERE order_id = (SELECT id FROM orders WHERE code = 'TF-1024') AND description = 'Mano de obra (microsoldadura)');
+ON CONFLICT DO NOTHING;
 
 INSERT INTO budget_items (order_id, description, amount)
 SELECT id, 'Limpieza y pasta térmica', 6000
 FROM orders WHERE code = 'TF-1024'
-WHERE NOT EXISTS (SELECT 1 FROM budget_items WHERE order_id = (SELECT id FROM orders WHERE code = 'TF-1024') AND description = 'Limpieza y pasta térmica');
+ON CONFLICT DO NOTHING;
 
 INSERT INTO budget_items (order_id, description, amount)
 SELECT id, 'Cambio de pasta térmica', 9000
 FROM orders WHERE code = 'TF-1025'
-WHERE NOT EXISTS (SELECT 1 FROM budget_items WHERE order_id = (SELECT id FROM orders WHERE code = 'TF-1025') AND description = 'Cambio de pasta térmica');
+ON CONFLICT DO NOTHING;
 
 INSERT INTO budget_items (order_id, description, amount)
 SELECT id, 'Limpieza interna de disipador', 7000
 FROM orders WHERE code = 'TF-1025'
-WHERE NOT EXISTS (SELECT 1 FROM budget_items WHERE order_id = (SELECT id FROM orders WHERE code = 'TF-1025') AND description = 'Limpieza interna de disipador');
+ON CONFLICT DO NOTHING;
 
 INSERT INTO budget_items (order_id, description, amount)
 SELECT id, 'Mano de obra', 12000
 FROM orders WHERE code = 'TF-1025'
-WHERE NOT EXISTS (SELECT 1 FROM budget_items WHERE order_id = (SELECT id FROM orders WHERE code = 'TF-1025') AND description = 'Mano de obra');
+ON CONFLICT DO NOTHING;
 
 -- Insertar eventos de línea de tiempo
 INSERT INTO timeline_events (order_id, status, note, event_date)
 SELECT id, 'recibido', 'Equipo ingresado en mostrador.', NOW() - INTERVAL '6 days'
 FROM orders WHERE code = 'TF-1024'
-WHERE NOT EXISTS (SELECT 1 FROM timeline_events WHERE order_id = (SELECT id FROM orders WHERE code = 'TF-1024') AND status = 'recibido');
+ON CONFLICT DO NOTHING;
 
 INSERT INTO timeline_events (order_id, status, note, event_date)
 SELECT id, 'en_diagnostico', 'Se confirma puerto HDMI dañado.', NOW() - INTERVAL '5 days'
 FROM orders WHERE code = 'TF-1024'
-WHERE NOT EXISTS (SELECT 1 FROM timeline_events WHERE order_id = (SELECT id FROM orders WHERE code = 'TF-1024') AND status = 'en_diagnostico');
+ON CONFLICT DO NOTHING;
 
 INSERT INTO timeline_events (order_id, status, note, event_date)
 SELECT id, 'esperando_repuestos', 'Se encarga módulo HDMI original.', NOW() - INTERVAL '3 days'
 FROM orders WHERE code = 'TF-1024'
-WHERE NOT EXISTS (SELECT 1 FROM timeline_events WHERE order_id = (SELECT id FROM orders WHERE code = 'TF-1024') AND status = 'esperando_repuestos');
+ON CONFLICT DO NOTHING;
 
 -- Insertar notificaciones
 INSERT INTO notifications (order_id, message, read, notification_date)
 SELECT id, 'Tu PS5 fue recibida. Te avisaremos con el diagnóstico.', true, NOW() - INTERVAL '6 days'
 FROM orders WHERE code = 'TF-1024'
-WHERE NOT EXISTS (SELECT 1 FROM notifications WHERE order_id = (SELECT id FROM orders WHERE code = 'TF-1024') LIMIT 1);
+ON CONFLICT DO NOTHING;
 
 INSERT INTO notifications (order_id, message, read, notification_date)
 SELECT id, 'Presupuesto cargado. Total estimado disponible en tu portal.', true, NOW() - INTERVAL '5 days'
 FROM orders WHERE code = 'TF-1024'
-WHERE NOT EXISTS (SELECT 1 FROM notifications WHERE order_id = (SELECT id FROM orders WHERE code = 'TF-1024') AND message LIKE '%Presupuesto%');
+ON CONFLICT DO NOTHING;
 
 INSERT INTO notifications (order_id, message, read, notification_date)
 SELECT id, 'Estamos esperando el repuesto (módulo HDMI).', false, NOW() - INTERVAL '3 days'
 FROM orders WHERE code = 'TF-1024'
-WHERE NOT EXISTS (SELECT 1 FROM notifications WHERE order_id = (SELECT id FROM orders WHERE code = 'TF-1024') AND message LIKE '%repuesto%');
+ON CONFLICT DO NOTHING;
 
 INSERT INTO notifications (order_id, message, read, notification_date)
 SELECT id, 'Tu notebook está lista para retirar.', false, NOW() - INTERVAL '1 day'
 FROM orders WHERE code = 'TF-1025'
-WHERE NOT EXISTS (SELECT 1 FROM notifications WHERE order_id = (SELECT id FROM orders WHERE code = 'TF-1025') AND message LIKE '%lista%');
+ON CONFLICT DO NOTHING;
 
 INSERT INTO notifications (order_id, message, read, notification_date)
 SELECT id, 'Recibimos tu PC, estamos haciendo el diagnóstico.', false, NOW() - INTERVAL '1 day'
 FROM orders WHERE code = 'TF-1026'
-WHERE NOT EXISTS (SELECT 1 FROM notifications WHERE order_id = (SELECT id FROM orders WHERE code = 'TF-1026'));
+ON CONFLICT DO NOTHING;
