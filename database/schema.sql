@@ -241,7 +241,7 @@ CREATE POLICY "clients_view_own_orders" ON orders
 -- Employees y Admin pueden ver todas las órdenes
 CREATE POLICY "employees_view_all_orders" ON orders
   FOR SELECT USING (
-    auth.jwt() ->> 'role' IN ('admin', 'empleado')
+    auth.jwt() ->> 'role' IN ('admin', 'colaborador')
   );
 
 -- ============================================
@@ -251,9 +251,9 @@ CREATE POLICY "employees_view_all_orders" ON orders
 -- Insertar usuarios de ejemplo
 INSERT INTO users (name, email, phone, role, active, created_at) VALUES
   ('Lucía Fernández', 'lucia@tecnofix.com', '+54 11 2222-8888', 'admin', true, NOW() - INTERVAL '120 days'),
-  ('Martín Gómez', 'martin@tecnofix.com', '+54 11 3333-4444', 'empleado', true, NOW() - INTERVAL '90 days'),
-  ('Sofía Ruiz', 'sofia@tecnofix.com', '+54 11 4444-5555', 'empleado', true, NOW() - INTERVAL '45 days'),
-  ('Diego Páez', 'diego@tecnofix.com', '+54 11 5555-6666', 'empleado', false, NOW() - INTERVAL '20 days'),
+  ('Martín Gómez', 'martin@tecnofix.com', '+54 11 3333-4444', 'colaborador', true, NOW() - INTERVAL '90 days'),
+  ('Sofía Ruiz', 'sofia@tecnofix.com', '+54 11 4444-5555', 'colaborador', true, NOW() - INTERVAL '45 days'),
+  ('Diego Páez', 'diego@tecnofix.com', '+54 11 5555-6666', 'colaborador', false, NOW() - INTERVAL '20 days'),
   ('Juan Pérez', 'juan.perez@mail.com', '+54 11 5555-1234', 'cliente', true, NOW() - INTERVAL '6 days'),
   ('María López', 'maria.lopez@mail.com', '+54 11 4444-9876', 'cliente', true, NOW() - INTERVAL '4 days'),
   ('Carlos Díaz', 'carlos.diaz@mail.com', '+54 11 3333-2211', 'cliente', true, NOW() - INTERVAL '1 day')
