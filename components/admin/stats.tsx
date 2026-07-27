@@ -42,7 +42,7 @@ export function Stats() {
   const active = orders.filter((o) => o.status !== deliveredState.id).length
   const ready = orders.filter((o) => o.status === readyState.id).length
   const revenue = orders.reduce((sum, o) => sum + budgetTotal(o), 0)
-  const employees = users.filter((u) => u.role === "empleado" || u.role === "admin").length
+  const employees = users.filter((u) => u.role === "colaborador" || u.role === "admin").length
 
   const statusFlow = getStatusFlow(states)
   const counts = statusFlow.map((status) => ({

@@ -11,24 +11,26 @@ import { cn } from "@/lib/utils"
 
 const ROLE_SUBTITLE: Record<Role, string> = {
   admin: "Panel completo: operaciones, usuarios y estadísticas",
-  empleado: "Carga de pedidos y armado de presupuestos",
+  colaborador: "Carga de pedidos y armado de presupuestos",
   cliente: "Portal de seguimiento de tu reparación",
 }
 
 const ROLE_ICON: Record<Role, typeof ShieldCheck> = {
   admin: ShieldCheck,
-  empleado: Wrench,
+  colaborador: Wrench,
   cliente: UserRound,
 }
 
 export function AppShell() {
-  const { role, isLoggedIn, logout } = useStore()
+  const { role, currentUser, isLoggedIn, logout } = useStore()
 
   if (!isLoggedIn) {
     return <LoginScreen />
   }
 
   const RoleIcon = ROLE_ICON[role]
+  const displayName = currentUser?.name ?? (role === "colaborador" ? "Colaborador" : role === "admin" ? "Admin" : "Cliente")
+  const roleLabel = role === "colaborador" ? "Colaborador" : role === "admin" ? "Admin" : "Cliente"
 
   return (
     <div className="min-h-screen bg-background">
@@ -47,9 +49,10 @@ export function AppShell() {
           <div className="flex items-center gap-3">
             <div className="flex items-center gap-2 rounded-lg border border-border bg-card px-3 py-1.5">
               <RoleIcon className="size-4 text-primary" />
-              <span className="text-sm font-medium text-foreground capitalize">
-                {role === "empleado" ? "Colaborador" : role === "admin" ? "Admin" : "Cliente"}
-              </span>
+              <div className="flex flex-col">
+                <span className="text-sm font-medium text-foreground leading-tight">{displayName}</span>
+                <span className="text-[10px] text-muted-foreground leading-tight">{roleLabel}</span>
+              </div>
             </div>
 
             <button
@@ -68,13 +71,13 @@ export function AppShell() {
       <main className="mx-auto max-w-6xl px-4 py-8 sm:px-6">
         <div className="mb-6">
           <p className="text-xs font-medium uppercase tracking-wide text-primary">
-            Vista de {role === "admin" ? "administrador" : role === "empleado" ? "colaborador" : role}
+            Vista de {role === "admin" ? "administrador" : role === "colaborador" ? "colaborador" : role}
           </p>
           <p className="text-sm text-muted-foreground">{ROLE_SUBTITLE[role]}</p>
         </div>
 
         {role === "admin" && <AdminView />}
-        {role === "empleado" && <ServiceWorkspace />}
+        {role === "colaborador" && <ServiceWorkspace />}
         {role === "cliente" && <ClientPortal />}
       </main>
     </div>

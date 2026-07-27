@@ -1,56 +1,37 @@
 "use client"
 
 import { useState } from "react"
-import { Cpu, Wrench, UserRound, ShieldCheck, ArrowRight, ChevronRight } from "lucide-react"
+import { Cpu, ArrowRight, Loader2, Mail, Lock, AlertCircle } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { useStore } from "@/lib/store"
-import type { Role } from "@/lib/types"
-
-interface RoleOption {
-  value: Role
-  label: string
-  description: string
-  icon: typeof ShieldCheck
-  badge?: string
-  accent: string
-  iconBg: string
-}
-
-const ROLE_OPTIONS: RoleOption[] = [
-  {
-    value: "empleado",
-    label: "Colaborador",
-    description: "Cargá pedidos, armá presupuestos y actualizá el estado de las reparaciones.",
-    icon: Wrench,
-    accent: "hover:border-accent/60 data-[selected=true]:border-accent data-[selected=true]:bg-accent/5",
-    iconBg: "bg-accent/15 text-accent",
-  },
-  {
-    value: "cliente",
-    label: "Cliente",
-    description: "Seguí el estado de tu reparación, revisá el presupuesto y tus notificaciones.",
-    icon: UserRound,
-    accent: "hover:border-primary/60 data-[selected=true]:border-primary data-[selected=true]:bg-primary/5",
-    iconBg: "bg-primary/15 text-primary",
-  },
-  {
-    value: "admin",
-    label: "Admin",
-    description: "Acceso completo: operaciones, gestión de usuarios y estadísticas globales.",
-    icon: ShieldCheck,
-    badge: "Acceso total",
-    accent: "hover:border-rose-500/50 data-[selected=true]:border-rose-500/70 data-[selected=true]:bg-rose-500/5",
-    iconBg: "bg-rose-500/15 text-rose-400",
-  },
-]
+import { loginAction } from "@/app/actions/auth"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
 
 export function LoginScreen() {
   const { login } = useStore()
-  const [selected, setSelected] = useState<Role | null>(null)
+  const [email, setEmail] = useState("")
+  const [password, setPassword] = useState("")
+  const [error, setError] = useState<string | null>(null)
+  const [loading, setLoading] = useState(false)
 
-  function handleLogin() {
-    if (!selected) return
-    login(selected)
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault()
+    setError(null)
+    setLoading(true)
+
+    try {
+      const result = await loginAction(email, password)
+      if (result.success && result.user) {
+        login(result.user)
+      } else {
+        setError(result.error ?? "Error desconocido.")
+      }
+    } catch {
+      setError("No se pudo conectar con el servidor.")
+    } finally {
+      setLoading(false)
+    }
   }
 
   return (
@@ -73,7 +54,7 @@ export function LoginScreen() {
         style={{ background: "radial-gradient(ellipse, var(--color-primary) 0%, transparent 70%)" }}
       />
 
-      <div className="relative z-10 flex w-full max-w-3xl flex-col items-center gap-10">
+      <div className="relative z-10 flex w-full max-w-sm flex-col items-center gap-8">
         {/* Brand */}
         <div className="flex flex-col items-center gap-4 text-center">
           <div className="flex size-14 items-center justify-center rounded-2xl border border-border bg-card shadow-lg">
@@ -83,83 +64,94 @@ export function LoginScreen() {
             <h1 className="text-3xl font-bold tracking-tight text-foreground text-balance">UTech</h1>
             <p className="mt-1 text-sm text-muted-foreground">Servicio técnico de PCs y consolas</p>
           </div>
-          <div className="mt-1">
-            <p className="text-base text-foreground/80 text-balance">
-              Seleccioná tu perfil para continuar
-            </p>
-          </div>
         </div>
 
-        {/* Role cards */}
-        <div className="grid w-full grid-cols-1 gap-4 sm:grid-cols-3">
-          {ROLE_OPTIONS.map(({ value, label, description, icon: Icon, badge, accent, iconBg }) => (
-            <button
-              key={value}
-              type="button"
-              data-selected={selected === value}
-              onClick={() => setSelected(value)}
-              className={cn(
-                "group relative flex flex-col gap-4 rounded-xl border border-border bg-card p-6 text-left transition-all duration-200",
-                "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
-                accent,
-              )}
-            >
-              {badge && (
-                <span className="absolute right-3 top-3 rounded-full bg-rose-500/20 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-rose-400">
-                  {badge}
-                </span>
-              )}
-
-              <div className={cn("flex size-11 items-center justify-center rounded-lg", iconBg)}>
-                <Icon className="size-5" />
-              </div>
-
-              <div className="flex flex-1 flex-col gap-1">
-                <p className="font-semibold text-foreground">{label}</p>
-                <p className="text-sm leading-relaxed text-muted-foreground">{description}</p>
-              </div>
-
-              <div
-                className={cn(
-                  "flex items-center gap-1 text-xs font-medium transition-colors",
-                  selected === value ? "text-foreground" : "text-muted-foreground",
-                )}
-              >
-                {selected === value ? (
-                  <>
-                    <span className="size-2 rounded-full bg-primary" />
-                    Seleccionado
-                  </>
-                ) : (
-                  <>
-                    <ChevronRight className="size-3.5" />
-                    Seleccionar
-                  </>
-                )}
-              </div>
-            </button>
-          ))}
-        </div>
-
-        {/* CTA */}
-        <button
-          type="button"
-          disabled={!selected}
-          onClick={handleLogin}
-          className={cn(
-            "inline-flex items-center gap-2 rounded-xl px-8 py-3 text-sm font-semibold transition-all duration-200",
-            "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
-            selected
-              ? "bg-primary text-primary-foreground hover:opacity-90 active:scale-[0.98] shadow-lg shadow-primary/20"
-              : "cursor-not-allowed bg-secondary text-muted-foreground",
-          )}
+        {/* Login form */}
+        <form
+          onSubmit={handleSubmit}
+          className="w-full rounded-xl border border-border bg-card p-6 shadow-lg space-y-5"
         >
-          Ingresar
-          <ArrowRight className="size-4" />
-        </button>
+          <div className="text-center mb-1">
+            <p className="text-base font-medium text-foreground">Iniciá sesión</p>
+            <p className="text-sm text-muted-foreground mt-0.5">Ingresá tus credenciales para continuar</p>
+          </div>
+
+          {/* Error message */}
+          {error && (
+            <div className="flex items-start gap-2 rounded-lg border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive">
+              <AlertCircle className="size-4 mt-0.5 shrink-0" />
+              <span>{error}</span>
+            </div>
+          )}
+
+          <div className="space-y-4">
+            {/* Email */}
+            <div className="space-y-2">
+              <Label htmlFor="email">
+                <Mail className="size-3.5 text-muted-foreground" />
+                Email
+              </Label>
+              <Input
+                id="email"
+                type="email"
+                placeholder="tu@email.com"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                required
+                autoComplete="email"
+                disabled={loading}
+                className="h-10"
+              />
+            </div>
+
+            {/* Password */}
+            <div className="space-y-2">
+              <Label htmlFor="password">
+                <Lock className="size-3.5 text-muted-foreground" />
+                Contraseña
+              </Label>
+              <Input
+                id="password"
+                type="password"
+                placeholder="••••••••"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                required
+                autoComplete="current-password"
+                disabled={loading}
+                className="h-10"
+              />
+            </div>
+          </div>
+
+          {/* Submit */}
+          <button
+            type="submit"
+            disabled={loading || !email || !password}
+            className={cn(
+              "inline-flex w-full items-center justify-center gap-2 rounded-xl px-8 py-3 text-sm font-semibold transition-all duration-200",
+              "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+              loading || !email || !password
+                ? "cursor-not-allowed bg-secondary text-muted-foreground"
+                : "bg-primary text-primary-foreground hover:opacity-90 active:scale-[0.98] shadow-lg shadow-primary/20",
+            )}
+          >
+            {loading ? (
+              <>
+                <Loader2 className="size-4 animate-spin" />
+                Ingresando...
+              </>
+            ) : (
+              <>
+                Ingresar
+                <ArrowRight className="size-4" />
+              </>
+            )}
+          </button>
+        </form>
 
         <p className="text-xs text-muted-foreground/60">
-          Modo simulación — sin autenticación real
+          Acceso solo para usuarios registrados
         </p>
       </div>
     </div>

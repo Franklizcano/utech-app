@@ -1,4 +1,4 @@
-export type Role = "admin" | "empleado" | "cliente"
+export type Role = "admin" | "colaborador" | "cliente"
 
 export type DeviceType = "PC" | "Notebook" | "PlayStation" | "Xbox" | "Nintendo" | "Otro"
 
