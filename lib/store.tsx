@@ -21,6 +21,12 @@ import {
   deleteOrderStateRemote,
   reorderOrderStatesRemote,
 } from "@/lib/queries/order-states"
+import {
+  fetchUsers,
+  insertUserRemote,
+  updateUserRemote,
+  toggleUserActiveRemote,
+} from "@/lib/queries/users"
 
 let counter = 100
 function uid(prefix = "id") {
@@ -156,6 +162,7 @@ interface StoreValue {
   employees: User[]
   states: OrderState[]
   statesLoading: boolean
+  usersLoading: boolean
   // cliente
   activeClientOrderId: string | null
   setActiveClientOrderId: (id: string | null) => void
@@ -193,6 +200,7 @@ export function StoreProvider({
   const [orders, setOrders] = useState<Order[]>(initialOrders)
   const [states, setStates] = useState<OrderState[]>(DEFAULT_STATES)
   const [statesLoading, setStatesLoading] = useState(true)
+  const [usersLoading, setUsersLoading] = useState(true)
   const [activeClientOrderId, setActiveClientOrderId] = useState<string | null>(null)
 
   // Carga los estados de orden reales desde Supabase al montar el provider.
@@ -204,6 +212,21 @@ export function StoreProvider({
         setStates(remoteStates)
       }
       setStatesLoading(false)
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
+  // Carga los usuarios reales desde Supabase al montar el provider.
+  useEffect(() => {
+    let cancelled = false
+    fetchUsers().then((remoteUsers) => {
+      if (cancelled) return
+      if (remoteUsers.length > 0) {
+        setUsers(remoteUsers)
+      }
+      setUsersLoading(false)
     })
     return () => {
       cancelled = true
@@ -314,27 +337,54 @@ export function StoreProvider({
     }
 
     function addUser(input: { name: string; email: string; phone: string; role: Role; isCorporate?: boolean; companyName?: string; companyLogo?: string }) {
-      const u: User = { 
-        id: uid("u"), 
-        name: input.name, 
-        email: input.email, 
+      const tempId = uid("u")
+      const tempUser: User = {
+        id: tempId,
+        name: input.name,
+        email: input.email,
         phone: input.phone,
-        role: input.role, 
+        role: input.role,
         active: true,
         isCorporate: input.isCorporate,
         companyName: input.companyName,
         companyLogo: input.companyLogo,
-        createdAt: now() 
+        createdAt: now(),
       }
-      setUsers((prev) => [...prev, u])
+      // Actualización optimista
+      setUsers((prev) => [...prev, tempUser])
+      insertUserRemote(input).then((saved) => {
+        if (!saved) {
+          // Revertir si falló la persistencia
+          setUsers((prev) => prev.filter((u) => u.id !== tempId))
+        } else {
+          // Reemplazar el usuario temporal con el real (UUID de la DB)
+          setUsers((prev) => prev.map((u) => (u.id === tempId ? saved : u)))
+        }
+      })
     }
 
     function updateUser(id: string, input: { name: string; email: string; phone: string; role: Role; active: boolean; isCorporate?: boolean; companyName?: string; companyLogo?: string }) {
+      const previousUsers = users
       setUsers((prev) => prev.map((u) => (u.id === id ? { ...u, ...input } : u)))
+      updateUserRemote(id, input).then((ok) => {
+        if (!ok) {
+          setUsers(previousUsers)
+          console.error(`No se pudo persistir la actualización del usuario "${id}" en la base de datos.`)
+        }
+      })
     }
 
     function toggleUserActive(id: string) {
-      setUsers((prev) => prev.map((u) => (u.id === id ? { ...u, active: !u.active } : u)))
+      const previousUsers = users
+      const user = users.find((u) => u.id === id)
+      const newActive = !user?.active ?? false
+      setUsers((prev) => prev.map((u) => (u.id === id ? { ...u, active: newActive } : u)))
+      toggleUserActiveRemote(id, newActive).then((ok) => {
+        if (!ok) {
+          setUsers(previousUsers)
+          console.error(`No se pudo persistir el cambio de estado del usuario "${id}" en la base de datos.`)
+        }
+      })
     }
 
     function markNotificationsRead(orderId: string) {
@@ -403,6 +453,7 @@ export function StoreProvider({
       employees,
       states,
       statesLoading,
+      usersLoading,
       activeClientOrderId,
       setActiveClientOrderId,
       addOrder,
@@ -420,7 +471,7 @@ export function StoreProvider({
       deleteState,
       reorderStates,
     }
-  }, [role, currentUser, isLoggedIn, users, orders, states, statesLoading, activeClientOrderId])
+  }, [role, currentUser, isLoggedIn, users, orders, states, statesLoading, usersLoading, activeClientOrderId])
 
   return <StoreContext.Provider value={value}>{children}</StoreContext.Provider>
 }

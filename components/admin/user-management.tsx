@@ -46,7 +46,7 @@ const ROLE_BADGE: Record<Role, string> = {
 }
 
 export function UserManagement() {
-  const { users, addUser, updateUser, toggleUserActive } = useStore()
+  const { users, addUser, updateUser, toggleUserActive, usersLoading } = useStore()
   const [open, setOpen] = useState(false)
   const [editing, setEditing] = useState<User | null>(null)
   const [name, setName] = useState("")
@@ -136,6 +136,11 @@ export function UserManagement() {
         </Button>
       </CardHeader>
       <CardContent>
+        {usersLoading ? (
+          <div className="flex items-center justify-center py-12 text-muted-foreground text-sm">
+            Cargando usuarios…
+          </div>
+        ) : (
         <Table>
           <TableHeader>
             <TableRow>
@@ -178,6 +183,7 @@ export function UserManagement() {
             ))}
           </TableBody>
         </Table>
+        )}
       </CardContent>
 
       <Dialog open={open} onOpenChange={setOpen}>
