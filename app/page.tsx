@@ -1,9 +1,12 @@
 import { StoreProvider } from "@/lib/store"
 import { AppShell } from "@/components/app-shell"
+import { getSessionAction } from "@/app/actions/auth"
 
-export default function Page() {
+export default async function Page() {
+  const initialSession = await getSessionAction()
+
   return (
-    <StoreProvider>
+    <StoreProvider initialSession={initialSession}>
       <AppShell />
     </StoreProvider>
   )

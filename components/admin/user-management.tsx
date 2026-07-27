@@ -35,13 +35,13 @@ import type { Role, User } from "@/lib/types"
 
 const ROLE_LABELS: Record<Role, string> = {
   admin: "Administrador",
-  empleado: "Empleado",
+  colaborador: "Colaborador",
   cliente: "Cliente",
 }
 
 const ROLE_BADGE: Record<Role, string> = {
   admin: "bg-primary/15 text-primary border-primary/30",
-  empleado: "bg-sky-500/15 text-sky-300 border-sky-500/30",
+  colaborador: "bg-sky-500/15 text-sky-300 border-sky-500/30",
   cliente: "bg-zinc-500/15 text-zinc-300 border-zinc-500/30",
 }
 
@@ -52,7 +52,7 @@ export function UserManagement() {
   const [name, setName] = useState("")
   const [email, setEmail] = useState("")
   const [phone, setPhone] = useState("")
-  const [role, setRole] = useState<Role>("empleado")
+  const [role, setRole] = useState<Role>("colaborador")
   const [isCorporate, setIsCorporate] = useState(false)
   const [companyName, setCompanyName] = useState("")
   const [companyLogo, setCompanyLogo] = useState("")
@@ -62,7 +62,7 @@ export function UserManagement() {
     setName("")
     setEmail("")
     setPhone("")
-    setRole("empleado")
+    setRole("colaborador")
     setIsCorporate(false)
     setCompanyName("")
     setCompanyLogo("")
@@ -208,7 +208,7 @@ export function UserManagement() {
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="empleado">Empleado</SelectItem>
+                  <SelectItem value="colaborador">Colaborador</SelectItem>
                   <SelectItem value="admin">Administrador</SelectItem>
                   <SelectItem value="cliente">Cliente</SelectItem>
                 </SelectContent>

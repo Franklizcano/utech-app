@@ -1,6 +1,6 @@
 "use client"
 
-import { createContext, useContext, useMemo, useState, type ReactNode } from "react"
+import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from "react"
 import {
   type AppNotification,
   type BudgetItem,
@@ -13,6 +13,14 @@ import {
   DEFAULT_STATES,
   getStatusLabel,
 } from "@/lib/types"
+import { type AuthUser, logoutAction } from "@/app/actions/auth"
+import {
+  fetchOrderStates,
+  insertOrderState,
+  updateOrderStateRemote,
+  deleteOrderStateRemote,
+  reorderOrderStatesRemote,
+} from "@/lib/queries/order-states"
 
 let counter = 100
 function uid(prefix = "id") {
@@ -24,12 +32,6 @@ function now() {
   return new Date().toISOString()
 }
 
-function daysAgo(days: number) {
-  const d = new Date()
-  d.setDate(d.getDate() - days)
-  return d.toISOString()
-}
-
 export function formatCurrency(value: number) {
   return new Intl.NumberFormat("es-AR", {
     style: "currency",
@@ -39,10 +41,10 @@ export function formatCurrency(value: number) {
 }
 
 const initialUsers: User[] = [
-  { id: "u_admin", name: "Lucía Fernández", email: "lucia@tecnofix.com", phone: "+54 11 2222-8888", role: "admin", active: true, createdAt: daysAgo(120) },
-  { id: "u_emp1", name: "Martín Gómez", email: "martin@tecnofix.com", phone: "+54 11 3333-4444", role: "empleado", active: true, createdAt: daysAgo(90) },
-  { id: "u_emp2", name: "Sofía Ruiz", email: "sofia@tecnofix.com", phone: "+54 11 4444-5555", role: "empleado", active: true, createdAt: daysAgo(45) },
-  { id: "u_emp3", name: "Diego Páez", email: "diego@tecnofix.com", phone: "+54 11 5555-6666", role: "empleado", active: false, createdAt: daysAgo(20) },
+  { id: "u_admin", name: "Lucía Fernández", email: "lucia@tecnofix.com", phone: "+54 11 2222-8888", role: "admin", active: true, createdAt: "2026-03-08T12:00:00.000Z" },
+  { id: "u_emp1", name: "Martín Gómez", email: "martin@tecnofix.com", phone: "+54 11 3333-4444", role: "colaborador", active: true, createdAt: "2026-04-07T12:00:00.000Z" },
+  { id: "u_emp2", name: "Sofía Ruiz", email: "sofia@tecnofix.com", phone: "+54 11 4444-5555", role: "colaborador", active: true, createdAt: "2026-05-22T12:00:00.000Z" },
+  { id: "u_emp3", name: "Diego Páez", email: "diego@tecnofix.com", phone: "+54 11 5555-6666", role: "colaborador", active: false, createdAt: "2026-06-16T12:00:00.000Z" },
 ]
 
 const initialOrders: Order[] = [
@@ -60,21 +62,21 @@ const initialOrders: Order[] = [
     status: "esperando_repuestos",
     assignedTo: "Martín Gómez",
     budget: [
-      { id: uid("bi"), description: "Cambio de módulo HDMI PS5", amount: 28000 },
-      { id: uid("bi"), description: "Mano de obra (microsoldadura)", amount: 22000 },
-      { id: uid("bi"), description: "Limpieza y pasta térmica", amount: 6000 },
+      { id: "bi_001", description: "Cambio de módulo HDMI PS5", amount: 28000 },
+      { id: "bi_002", description: "Mano de obra (microsoldadura)", amount: 22000 },
+      { id: "bi_003", description: "Limpieza y pasta térmica", amount: 6000 },
     ],
     timeline: [
-      { id: uid("ev"), status: "recibido", note: "Equipo ingresado en mostrador.", date: daysAgo(6) },
-      { id: uid("ev"), status: "en_diagnostico", note: "Se confirma puerto HDMI dañado.", date: daysAgo(5) },
-      { id: uid("ev"), status: "esperando_repuestos", note: "Se encarga módulo HDMI original.", date: daysAgo(3) },
+      { id: "ev_001", status: "recibido", note: "Equipo ingresado en mostrador.", date: "2026-06-30T12:00:00.000Z" },
+      { id: "ev_002", status: "en_diagnostico", note: "Se confirma puerto HDMI dañado.", date: "2026-07-01T12:00:00.000Z" },
+      { id: "ev_003", status: "esperando_repuestos", note: "Se encarga módulo HDMI original.", date: "2026-07-03T12:00:00.000Z" },
     ],
     notifications: [
-      { id: uid("nt"), message: "Tu PS5 fue recibida. Te avisaremos con el diagnóstico.", date: daysAgo(6), read: true },
-      { id: uid("nt"), message: "Presupuesto cargado. Total estimado disponible en tu portal.", date: daysAgo(5), read: true },
-      { id: uid("nt"), message: "Estamos esperando el repuesto (módulo HDMI).", date: daysAgo(3), read: false },
+      { id: "nt_001", message: "Tu PS5 fue recibida. Te avisaremos con el diagnóstico.", date: "2026-06-30T12:00:00.000Z", read: true },
+      { id: "nt_002", message: "Presupuesto cargado. Total estimado disponible en tu portal.", date: "2026-07-01T12:00:00.000Z", read: true },
+      { id: "nt_003", message: "Estamos esperando el repuesto (módulo HDMI).", date: "2026-07-03T12:00:00.000Z", read: false },
     ],
-    createdAt: daysAgo(6),
+    createdAt: "2026-06-30T12:00:00.000Z",
   },
   {
     id: "o_2",
@@ -90,20 +92,20 @@ const initialOrders: Order[] = [
     status: "listo",
     assignedTo: "Sofía Ruiz",
     budget: [
-      { id: uid("bi"), description: "Cambio de pasta térmica", amount: 9000 },
-      { id: uid("bi"), description: "Limpieza interna de disipador", amount: 7000 },
-      { id: uid("bi"), description: "Mano de obra", amount: 12000 },
+      { id: "bi_004", description: "Cambio de pasta térmica", amount: 9000 },
+      { id: "bi_005", description: "Limpieza interna de disipador", amount: 7000 },
+      { id: "bi_006", description: "Mano de obra", amount: 12000 },
     ],
     timeline: [
-      { id: uid("ev"), status: "recibido", note: "Ingreso del equipo.", date: daysAgo(4) },
-      { id: uid("ev"), status: "en_diagnostico", note: "Temperaturas muy altas en CPU.", date: daysAgo(3) },
-      { id: uid("ev"), status: "en_reparacion", note: "Limpieza y cambio de pasta.", date: daysAgo(2) },
-      { id: uid("ev"), status: "listo", note: "Probado 2hs sin apagarse. Listo para retirar.", date: daysAgo(1) },
+      { id: "ev_004", status: "recibido", note: "Ingreso del equipo.", date: "2026-07-02T12:00:00.000Z" },
+      { id: "ev_005", status: "en_diagnostico", note: "Temperaturas muy altas en CPU.", date: "2026-07-03T12:00:00.000Z" },
+      { id: "ev_006", status: "en_reparacion", note: "Limpieza y cambio de pasta.", date: "2026-07-04T12:00:00.000Z" },
+      { id: "ev_007", status: "listo", note: "Probado 2hs sin apagarse. Listo para retirar.", date: "2026-07-05T12:00:00.000Z" },
     ],
     notifications: [
-      { id: uid("nt"), message: "Tu notebook está lista para retirar.", date: daysAgo(1), read: false },
+      { id: "nt_004", message: "Tu notebook está lista para retirar.", date: "2026-07-05T12:00:00.000Z", read: false },
     ],
-    createdAt: daysAgo(4),
+    createdAt: "2026-07-02T12:00:00.000Z",
   },
   {
     id: "o_3",
@@ -120,13 +122,13 @@ const initialOrders: Order[] = [
     assignedTo: "Martín Gómez",
     budget: [],
     timeline: [
-      { id: uid("ev"), status: "recibido", note: "Equipo ingresado.", date: daysAgo(1) },
-      { id: uid("ev"), status: "en_diagnostico", note: "Revisando fuente y placa madre.", date: daysAgo(1) },
+      { id: "ev_008", status: "recibido", note: "Equipo ingresado.", date: "2026-07-05T12:00:00.000Z" },
+      { id: "ev_009", status: "en_diagnostico", note: "Revisando fuente y placa madre.", date: "2026-07-05T14:00:00.000Z" },
     ],
     notifications: [
-      { id: uid("nt"), message: "Recibimos tu PC, estamos haciendo el diagnóstico.", date: daysAgo(1), read: false },
+      { id: "nt_005", message: "Recibimos tu PC, estamos haciendo el diagnóstico.", date: "2026-07-05T12:00:00.000Z", read: false },
     ],
-    createdAt: daysAgo(1),
+    createdAt: "2026-07-05T12:00:00.000Z",
   },
 ]
 
@@ -145,13 +147,15 @@ export interface NewOrderInput {
 interface StoreValue {
   role: Role
   setRole: (role: Role) => void
+  currentUser: AuthUser | null
   isLoggedIn: boolean
-  login: (role: Role) => void
+  login: (user: AuthUser) => void
   logout: () => void
   users: User[]
   orders: Order[]
   employees: User[]
   states: OrderState[]
+  statesLoading: boolean
   // cliente
   activeClientOrderId: string | null
   setActiveClientOrderId: (id: string | null) => void
@@ -175,23 +179,49 @@ interface StoreValue {
 
 const StoreContext = createContext<StoreValue | null>(null)
 
-export function StoreProvider({ children }: { children: ReactNode }) {
-  const [role, setRole] = useState<Role>("empleado")
-  const [isLoggedIn, setIsLoggedIn] = useState(false)
+export function StoreProvider({
+  children,
+  initialSession = null,
+}: {
+  children: ReactNode
+  initialSession?: AuthUser | null
+}) {
+  const [role, setRole] = useState<Role>(initialSession?.role ?? "colaborador")
+  const [currentUser, setCurrentUser] = useState<AuthUser | null>(initialSession)
+  const [isLoggedIn, setIsLoggedIn] = useState(initialSession !== null)
   const [users, setUsers] = useState<User[]>(initialUsers)
   const [orders, setOrders] = useState<Order[]>(initialOrders)
   const [states, setStates] = useState<OrderState[]>(DEFAULT_STATES)
+  const [statesLoading, setStatesLoading] = useState(true)
   const [activeClientOrderId, setActiveClientOrderId] = useState<string | null>(null)
 
-  const value = useMemo<StoreValue>(() => {
-    const employees = users.filter((u) => u.role === "empleado" || u.role === "admin")
+  // Carga los estados de orden reales desde Supabase al montar el provider.
+  useEffect(() => {
+    let cancelled = false
+    fetchOrderStates().then((remoteStates) => {
+      if (cancelled) return
+      if (remoteStates.length > 0) {
+        setStates(remoteStates)
+      }
+      setStatesLoading(false)
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [])
 
-    function login(selectedRole: Role) {
-      setRole(selectedRole)
+  const value = useMemo<StoreValue>(() => {
+    const employees = users.filter((u) => u.role === "colaborador" || u.role === "admin")
+
+    function login(user: AuthUser) {
+      setCurrentUser(user)
+      setRole(user.role)
       setIsLoggedIn(true)
     }
 
     function logout() {
+      logoutAction()
+      setCurrentUser(null)
       setIsLoggedIn(false)
       setActiveClientOrderId(null)
     }
@@ -318,34 +348,53 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     function addState(label: string, color: string) {
       const maxPosition = Math.max(0, ...states.map((s) => s.position))
       const newState: OrderState = { id: uid("st"), label, color, position: maxPosition + 1 }
+      // Actualización optimista para UI instantánea
       setStates((prev) => [...prev, newState])
+      insertOrderState(newState).then((saved) => {
+        if (!saved) {
+          // Revertir si falló la persistencia
+          setStates((prev) => prev.filter((s) => s.id !== newState.id))
+        }
+      })
     }
 
     function updateState(id: string, label: string, color: string) {
       setStates((prev) => prev.map((s) => (s.id === id ? { ...s, label, color } : s)))
+      updateOrderStateRemote(id, label, color).then((ok) => {
+        if (!ok) console.error(`No se pudo persistir la actualización del estado "${id}" en la base de datos.`)
+      })
     }
 
     function deleteState(id: string) {
-      setStates((prev) => {
-        // No permitir eliminar si es el único estado
-        if (prev.length <= 1) return prev
-        return prev.filter((s) => s.id !== id)
+      // No permitir eliminar si es el único estado
+      if (states.length <= 1) return
+      const previousStates = states
+      setStates((prev) => prev.filter((s) => s.id !== id))
+      deleteOrderStateRemote(id).then((ok) => {
+        if (!ok) {
+          // Revertir si falló (ej: hay órdenes que referencian este estado)
+          setStates(previousStates)
+        }
       })
     }
 
     function reorderStates(ids: string[]) {
-      setStates((prev) => {
-        const newStates = ids.map((id, idx) => {
-          const state = prev.find((s) => s.id === id)
+      const newStates = ids
+        .map((id, idx) => {
+          const state = states.find((s) => s.id === id)
           return state ? { ...state, position: idx } : null
-        }).filter(Boolean) as OrderState[]
-        return newStates
+        })
+        .filter(Boolean) as OrderState[]
+      setStates(newStates)
+      reorderOrderStatesRemote(newStates.map((s) => ({ id: s.id, position: s.position }))).then((ok) => {
+        if (!ok) console.error("No se pudo persistir el reordenamiento de estados en la base de datos.")
       })
     }
 
     return {
       role,
       setRole,
+      currentUser,
       isLoggedIn,
       login,
       logout,
@@ -353,6 +402,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       orders,
       employees,
       states,
+      statesLoading,
       activeClientOrderId,
       setActiveClientOrderId,
       addOrder,
@@ -370,7 +420,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       deleteState,
       reorderStates,
     }
-  }, [role, isLoggedIn, users, orders, states, activeClientOrderId])
+  }, [role, currentUser, isLoggedIn, users, orders, states, statesLoading, activeClientOrderId])
 
   return <StoreContext.Provider value={value}>{children}</StoreContext.Provider>
 }

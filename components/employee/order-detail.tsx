@@ -80,11 +80,9 @@ export function OrderDetail({ order }: { order: Order }) {
         <div className="flex items-center gap-2">
           <StatusBadge status={order.status} />
           <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="ghost" size="icon" className="h-8 w-8">
-                <MoreVertical className="h-4 w-4" />
-                <span className="sr-only">Abrir menú de acciones</span>
-              </Button>
+            <DropdownMenuTrigger render={<Button variant="ghost" size="icon" className="h-8 w-8" />}>
+              <MoreVertical className="h-4 w-4" />
+              <span className="sr-only">Abrir menú de acciones</span>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
               <DropdownMenuItem onClick={() => setReassignOpen(true)}>
