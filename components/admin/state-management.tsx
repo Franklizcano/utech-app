@@ -126,11 +126,9 @@ export function StateManagement() {
           </p>
         </div>
         <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-          <DialogTrigger asChild>
-            <Button onClick={() => handleOpenDialog()} className="gap-2">
-              <Plus className="h-4 w-4" />
-              Nuevo estado
-            </Button>
+          <DialogTrigger onClick={() => handleOpenDialog()} render={<Button className="gap-2" />}>
+            <Plus className="h-4 w-4" />
+            Nuevo estado
           </DialogTrigger>
           <DialogContent>
             <DialogHeader>
