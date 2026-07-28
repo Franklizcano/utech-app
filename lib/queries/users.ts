@@ -109,3 +109,13 @@ export async function toggleUserActiveRemote(id: string, active: boolean): Promi
   return true
 }
 
+export async function deleteUserRemote(id: string): Promise<boolean> {
+  const supabase = getSupabaseClient()
+  const { error } = await supabase.from("users").delete().eq("id", id)
+  if (error) {
+    console.error("Error al eliminar usuario:", error.message)
+    return false
+  }
+  return true
+}
+
