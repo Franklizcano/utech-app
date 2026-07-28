@@ -26,6 +26,7 @@ import {
   insertUserRemote,
   updateUserRemote,
   toggleUserActiveRemote,
+  deleteUserRemote,
 } from "@/lib/queries/users"
 
 let counter = 100
@@ -176,6 +177,7 @@ interface StoreValue {
   addUser: (input: { name: string; email: string; phone: string; role: Role; isCorporate?: boolean; companyName?: string; companyLogo?: string }) => void
   updateUser: (id: string, input: { name: string; email: string; phone: string; role: Role; active: boolean; isCorporate?: boolean; companyName?: string; companyLogo?: string }) => void
   toggleUserActive: (id: string) => void
+  deleteUser: (id: string) => void
   markNotificationsRead: (orderId: string) => void
   // estado management
   addState: (label: string, color: string) => void
@@ -377,12 +379,23 @@ export function StoreProvider({
     function toggleUserActive(id: string) {
       const previousUsers = users
       const user = users.find((u) => u.id === id)
-      const newActive = !user?.active ?? false
+      const newActive = !(user?.active ?? false)
       setUsers((prev) => prev.map((u) => (u.id === id ? { ...u, active: newActive } : u)))
       toggleUserActiveRemote(id, newActive).then((ok) => {
         if (!ok) {
           setUsers(previousUsers)
           console.error(`No se pudo persistir el cambio de estado del usuario "${id}" en la base de datos.`)
+        }
+      })
+    }
+
+    function deleteUser(id: string) {
+      const previousUsers = users
+      setUsers((prev) => prev.filter((u) => u.id !== id))
+      deleteUserRemote(id).then((ok) => {
+        if (!ok) {
+          setUsers(previousUsers)
+          console.error(`No se pudo eliminar el usuario "${id}" en la base de datos.`)
         }
       })
     }
@@ -465,6 +478,7 @@ export function StoreProvider({
       addUser,
       updateUser,
       toggleUserActive,
+      deleteUser,
       markNotificationsRead,
       addState,
       updateState,
