@@ -1,9 +1,10 @@
 "use client"
 
-import { useState } from "react"
-import { Plus, Inbox } from "lucide-react"
+import { useState, useMemo } from "react"
+import { Plus, Inbox, Search } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
+import { Input } from "@/components/ui/input"
 import {
   Dialog,
   DialogContent,
@@ -16,12 +17,27 @@ import { OrderForm } from "@/components/employee/order-form"
 import { OrderDetail } from "@/components/employee/order-detail"
 import { useStore, formatCurrency } from "@/lib/store"
 import { budgetTotal } from "@/lib/types"
-import { cn } from "@/lib/utils"
+import { cn, normalizeOrderCode } from "@/lib/utils"
 
 export function ServiceWorkspace() {
   const { orders } = useStore()
   const [selectedId, setSelectedId] = useState<string | null>(orders[0]?.id ?? null)
   const [dialogOpen, setDialogOpen] = useState(false)
+  const [searchQuery, setSearchQuery] = useState("")
+
+  // Filtrar órdenes por código o nombre de cliente
+  const filteredOrders = useMemo(() => {
+    if (!searchQuery.trim()) return orders
+
+    const normalizedQuery = normalizeOrderCode(searchQuery.trim())
+    const lowerQuery = searchQuery.trim().toLowerCase()
+
+    return orders.filter((order) => {
+      const matchesCode = normalizeOrderCode(order.code).includes(normalizedQuery)
+      const matchesClient = order.clientName.toLowerCase().includes(lowerQuery)
+      return matchesCode || matchesClient
+    })
+  }, [orders, searchQuery])
 
   const selected = orders.find((o) => o.id === selectedId) ?? null
 
@@ -41,37 +57,57 @@ export function ServiceWorkspace() {
       <div className="grid gap-5 lg:grid-cols-[340px_1fr]">
         {/* Lista de pedidos */}
         <div className="space-y-3">
-          {orders.map((order) => {
-            const total = budgetTotal(order)
-            const isActive = order.id === selectedId
-            return (
-              <button
-                key={order.id}
-                type="button"
-                onClick={() => setSelectedId(order.id)}
-                className={cn(
-                  "w-full rounded-lg border bg-card p-4 text-left transition-colors",
-                  isActive
-                    ? "border-primary/60 ring-1 ring-primary/40"
-                    : "border-border hover:border-primary/30 hover:bg-secondary/40",
-                )}
-              >
-                <div className="flex items-center justify-between gap-2">
-                  <span className="font-medium text-foreground">{order.clientName}</span>
-                  <span className="font-mono text-xs text-muted-foreground">{order.code}</span>
-                </div>
-                <p className="mt-0.5 truncate text-sm text-muted-foreground">
-                  {order.deviceBrand} {order.deviceModel}
-                </p>
-                <div className="mt-3 flex items-center justify-between gap-2">
-                  <StatusBadge status={order.status} />
-                  {total > 0 && (
-                    <span className="text-xs font-medium tabular-nums text-foreground">{formatCurrency(total)}</span>
+          {/* Buscador */}
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+            <Input
+              type="text"
+              placeholder="Buscar por código o cliente..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="pl-9"
+            />
+          </div>
+
+          {/* Lista filtrada */}
+          {filteredOrders.length === 0 ? (
+            <div className="flex flex-col items-center justify-center gap-2 rounded-lg border border-dashed border-border py-8 text-center">
+              <Search className="size-8 text-muted-foreground" />
+              <p className="text-sm text-muted-foreground">No se encontraron órdenes</p>
+            </div>
+          ) : (
+            filteredOrders.map((order) => {
+              const total = budgetTotal(order)
+              const isActive = order.id === selectedId
+              return (
+                <button
+                  key={order.id}
+                  type="button"
+                  onClick={() => setSelectedId(order.id)}
+                  className={cn(
+                    "w-full rounded-lg border bg-card p-4 text-left transition-colors",
+                    isActive
+                      ? "border-primary/60 ring-1 ring-primary/40"
+                      : "border-border hover:border-primary/30 hover:bg-secondary/40",
                   )}
-                </div>
-              </button>
-            )
-          })}
+                >
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="font-medium text-foreground">{order.clientName}</span>
+                    <span className="font-mono text-xs text-muted-foreground">{order.code}</span>
+                  </div>
+                  <p className="mt-0.5 truncate text-sm text-muted-foreground">
+                    {order.deviceBrand} {order.deviceModel}
+                  </p>
+                  <div className="mt-3 flex items-center justify-between gap-2">
+                    <StatusBadge status={order.status} />
+                    {total > 0 && (
+                      <span className="text-xs font-medium tabular-nums text-foreground">{formatCurrency(total)}</span>
+                    )}
+                  </div>
+                </button>
+              )
+            })
+          )}
         </div>
 
         {/* Detalle */}

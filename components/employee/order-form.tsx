@@ -18,7 +18,7 @@ import type { DeviceType } from "@/lib/types"
 
 const DEVICE_TYPES: DeviceType[] = ["PC", "Notebook", "PlayStation", "Xbox", "Nintendo", "Otro"]
 
-export function OrderForm({ onCreated }: { onCreated?: (orderId: string) => void }) {
+export function OrderForm({ onCreatedAction }: { onCreatedAction?: (orderId: string) => void }) {
   const { addOrder, employees, users } = useStore()
   const activeEmployees = employees.filter((e) => e.active)
   const clients = users.filter((u) => u.role === "cliente")
@@ -43,14 +43,14 @@ export function OrderForm({ onCreated }: { onCreated?: (orderId: string) => void
     let clientName: string
     let clientPhone: string
     let clientEmail: string
-    let useClientId: string
-    
+    let useClientId: string | null
+
     if (isUsingOccasional) {
       if (!occasionalName.trim() || !occasionalPhone.trim() || !occasionalEmail.trim() || !fault) return
       clientName = occasionalName
       clientPhone = occasionalPhone
       clientEmail = occasionalEmail
-      useClientId = "" // Sin clientId para cliente ocasional
+      useClientId = null // null para cliente ocasional
     } else {
       if (!clientId || !fault) return
       if (!selectedClient) return
@@ -80,7 +80,7 @@ export function OrderForm({ onCreated }: { onCreated?: (orderId: string) => void
     setOccasionalName("")
     setOccasionalPhone("")
     setOccasionalEmail("")
-    onCreated?.(order.id)
+    onCreatedAction?.(order.id)
   }
 
   return (
@@ -121,7 +121,7 @@ export function OrderForm({ onCreated }: { onCreated?: (orderId: string) => void
               ) : (
                 <>
                   <Label>Seleccionar cliente *</Label>
-                  <Select value={clientId} onValueChange={setClientId}>
+                  <Select value={clientId} onValueChange={(v) => setClientId(v || "")}>
                     <SelectTrigger>
                       <SelectValue />
                     </SelectTrigger>
@@ -260,7 +260,7 @@ export function OrderForm({ onCreated }: { onCreated?: (orderId: string) => void
         {activeEmployees.length > 0 && (
           <div className="space-y-2 sm:max-w-xs">
             <Label>Técnico asignado</Label>
-            <Select value={assignedTo} onValueChange={setAssignedTo}>
+            <Select value={assignedTo} onValueChange={(v) => setAssignedTo(v || "")}>
               <SelectTrigger>
                 <SelectValue />
               </SelectTrigger>

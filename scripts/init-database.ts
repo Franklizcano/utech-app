@@ -41,22 +41,20 @@ async function initializeDatabase() {
       
       try {
         // Usar la API de ejecución SQL directa
-        const { error } = await supabase.rpc('exec_sql_query', {
+        const result = await supabase.rpc('exec_sql_query', {
           sql_query: statement + ';'
-        }).catch(() => {
-          // Si RPC no existe, intentar de otra manera
-          return { error: null }
         })
 
-        if (error) {
+        if (result.error) {
           console.warn(`⚠️  [${executedCount}] ${preview}...`)
-          console.warn(`    Error: ${error.message}\n`)
+          console.warn(`    Error: ${result.error.message}\n`)
           errorCount++
         } else {
           console.log(`✓ [${executedCount}] ${preview}...`)
           successCount++
         }
       } catch (err) {
+        // Si RPC no existe o hay otro error, continuar con el siguiente statement
         console.warn(`⚠️  [${executedCount}] ${preview}...`)
         console.warn(`    Error: ${err instanceof Error ? err.message : 'Unknown error'}\n`)
         errorCount++
