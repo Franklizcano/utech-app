@@ -28,6 +28,16 @@ import {
   toggleUserActiveRemote,
   deleteUserRemote,
 } from "@/lib/queries/users"
+import {
+  fetchOrders,
+  insertOrderRemote,
+  updateOrderStatusRemote,
+  updateOrderAssigneeRemote,
+  insertBudgetItemRemote,
+  deleteBudgetItemRemote,
+  insertNotificationRemote,
+  markNotificationsReadRemote,
+} from "@/lib/queries/orders"
 
 let counter = 100
 function uid(prefix = "id") {
@@ -54,93 +64,10 @@ const initialUsers: User[] = [
   { id: "u_emp3", name: "Diego Páez", email: "diego@tecnofix.com", phone: "+54 11 5555-6666", role: "colaborador", active: false, createdAt: "2026-06-16T12:00:00.000Z" },
 ]
 
-const initialOrders: Order[] = [
-  {
-    id: "o_1",
-    code: "TF-1024",
-    clientId: "c_1",
-    clientName: "Juan Pérez",
-    clientPhone: "+54 11 5555-1234",
-    clientEmail: "juan.perez@mail.com",
-    deviceType: "PlayStation",
-    deviceBrand: "Sony",
-    deviceModel: "PS5 Slim",
-    fault: "No da imagen por HDMI, se escucha el ventilador pero la TV no detecta señal.",
-    status: "esperando_repuestos",
-    assignedTo: "Martín Gómez",
-    budget: [
-      { id: "bi_001", description: "Cambio de módulo HDMI PS5", amount: 28000 },
-      { id: "bi_002", description: "Mano de obra (microsoldadura)", amount: 22000 },
-      { id: "bi_003", description: "Limpieza y pasta térmica", amount: 6000 },
-    ],
-    timeline: [
-      { id: "ev_001", status: "recibido", note: "Equipo ingresado en mostrador.", date: "2026-06-30T12:00:00.000Z" },
-      { id: "ev_002", status: "en_diagnostico", note: "Se confirma puerto HDMI dañado.", date: "2026-07-01T12:00:00.000Z" },
-      { id: "ev_003", status: "esperando_repuestos", note: "Se encarga módulo HDMI original.", date: "2026-07-03T12:00:00.000Z" },
-    ],
-    notifications: [
-      { id: "nt_001", message: "Tu PS5 fue recibida. Te avisaremos con el diagnóstico.", date: "2026-06-30T12:00:00.000Z", read: true },
-      { id: "nt_002", message: "Presupuesto cargado. Total estimado disponible en tu portal.", date: "2026-07-01T12:00:00.000Z", read: true },
-      { id: "nt_003", message: "Estamos esperando el repuesto (módulo HDMI).", date: "2026-07-03T12:00:00.000Z", read: false },
-    ],
-    createdAt: "2026-06-30T12:00:00.000Z",
-  },
-  {
-    id: "o_2",
-    code: "TF-1025",
-    clientId: "c_2",
-    clientName: "María López",
-    clientPhone: "+54 11 4444-9876",
-    clientEmail: "maria.lopez@mail.com",
-    deviceType: "Notebook",
-    deviceBrand: "Lenovo",
-    deviceModel: "IdeaPad 3",
-    fault: "Se apaga sola al rato de encender. Posible sobrecalentamiento.",
-    status: "listo",
-    assignedTo: "Sofía Ruiz",
-    budget: [
-      { id: "bi_004", description: "Cambio de pasta térmica", amount: 9000 },
-      { id: "bi_005", description: "Limpieza interna de disipador", amount: 7000 },
-      { id: "bi_006", description: "Mano de obra", amount: 12000 },
-    ],
-    timeline: [
-      { id: "ev_004", status: "recibido", note: "Ingreso del equipo.", date: "2026-07-02T12:00:00.000Z" },
-      { id: "ev_005", status: "en_diagnostico", note: "Temperaturas muy altas en CPU.", date: "2026-07-03T12:00:00.000Z" },
-      { id: "ev_006", status: "en_reparacion", note: "Limpieza y cambio de pasta.", date: "2026-07-04T12:00:00.000Z" },
-      { id: "ev_007", status: "listo", note: "Probado 2hs sin apagarse. Listo para retirar.", date: "2026-07-05T12:00:00.000Z" },
-    ],
-    notifications: [
-      { id: "nt_004", message: "Tu notebook está lista para retirar.", date: "2026-07-05T12:00:00.000Z", read: false },
-    ],
-    createdAt: "2026-07-02T12:00:00.000Z",
-  },
-  {
-    id: "o_3",
-    code: "TF-1026",
-    clientId: "c_3",
-    clientName: "Carlos Díaz",
-    clientPhone: "+54 11 3333-2211",
-    clientEmail: "carlos.diaz@mail.com",
-    deviceType: "PC",
-    deviceBrand: "Armada",
-    deviceModel: "Gamer Ryzen 5",
-    fault: "No enciende. No hay luces ni ventiladores al apretar el botón.",
-    status: "en_diagnostico",
-    assignedTo: "Martín Gómez",
-    budget: [],
-    timeline: [
-      { id: "ev_008", status: "recibido", note: "Equipo ingresado.", date: "2026-07-05T12:00:00.000Z" },
-      { id: "ev_009", status: "en_diagnostico", note: "Revisando fuente y placa madre.", date: "2026-07-05T14:00:00.000Z" },
-    ],
-    notifications: [
-      { id: "nt_005", message: "Recibimos tu PC, estamos haciendo el diagnóstico.", date: "2026-07-05T12:00:00.000Z", read: false },
-    ],
-    createdAt: "2026-07-05T12:00:00.000Z",
-  },
-]
+const initialOrders: Order[] = []
 
 export interface NewOrderInput {
-  clientId: string
+  clientId: string | null
   clientName: string
   clientPhone: string
   clientEmail: string
@@ -164,6 +91,7 @@ interface StoreValue {
   states: OrderState[]
   statesLoading: boolean
   usersLoading: boolean
+  ordersLoading: boolean
   // cliente
   activeClientOrderId: string | null
   setActiveClientOrderId: (id: string | null) => void
@@ -203,6 +131,7 @@ export function StoreProvider({
   const [states, setStates] = useState<OrderState[]>(DEFAULT_STATES)
   const [statesLoading, setStatesLoading] = useState(true)
   const [usersLoading, setUsersLoading] = useState(true)
+  const [ordersLoading, setOrdersLoading] = useState(true)
   const [activeClientOrderId, setActiveClientOrderId] = useState<string | null>(null)
 
   // Carga los estados de orden reales desde Supabase al montar el provider.
@@ -235,6 +164,21 @@ export function StoreProvider({
     }
   }, [])
 
+  // Carga las órdenes reales desde Supabase al montar el provider.
+  useEffect(() => {
+    let cancelled = false
+    fetchOrders().then((remoteOrders) => {
+      if (cancelled) return
+      if (remoteOrders.length > 0) {
+        setOrders(remoteOrders)
+      }
+      setOrdersLoading(false)
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
   const value = useMemo<StoreValue>(() => {
     const employees = users.filter((u) => u.role === "colaborador" || u.role === "admin")
 
@@ -252,10 +196,11 @@ export function StoreProvider({
     }
 
     function addOrder(input: NewOrderInput): Order {
-      const code = `TF-${1027 + orders.length}`
-      const newOrder: Order = {
-        id: uid("o"),
-        code,
+      const tempId = uid("o")
+      const tempCode = `TF-TEMP-${tempId}`
+      const tempOrder: Order = {
+        id: tempId,
+        code: tempCode,
         clientId: input.clientId,
         clientName: input.clientName,
         clientPhone: input.clientPhone,
@@ -273,15 +218,42 @@ export function StoreProvider({
         ],
         createdAt: now(),
       }
-      setOrders((prev) => [newOrder, ...prev])
-      return newOrder
+      // Actualización optimista
+      setOrders((prev) => [tempOrder, ...prev])
+
+      // Persistir en la base de datos
+      insertOrderRemote({
+        clientId: input.clientId,
+        clientName: input.clientName,
+        clientPhone: input.clientPhone,
+        clientEmail: input.clientEmail,
+        deviceType: input.deviceType,
+        deviceBrand: input.deviceBrand,
+        deviceModel: input.deviceModel,
+        fault: input.fault,
+        assignedTo: input.assignedTo,
+      }).then((saved) => {
+        if (!saved) {
+          // Revertir si falló la persistencia
+          setOrders((prev) => prev.filter((o) => o.id !== tempId))
+          console.error("No se pudo crear la orden en la base de datos.")
+        } else {
+          // Reemplazar la orden temporal con la real (UUID de la DB)
+          setOrders((prev) => prev.map((o) => (o.id === tempId ? saved : o)))
+        }
+      })
+
+      return tempOrder
     }
 
     function advanceStatus(orderId: string, status: OrderStatus, note?: string) {
+      const statusLabel = getStatusLabel(status, states)
+      const previousOrders = orders
+
+      // Actualización optimista
       setOrders((prev) =>
         prev.map((o) => {
           if (o.id !== orderId) return o
-          const statusLabel = getStatusLabel(status, states)
           return {
             ...o,
             status,
@@ -293,9 +265,21 @@ export function StoreProvider({
           }
         }),
       )
+
+      // Persistir en la base de datos
+      updateOrderStatusRemote(orderId, status, statusLabel, note).then((ok) => {
+        if (!ok) {
+          // Revertir si falló
+          setOrders(previousOrders)
+          console.error(`No se pudo actualizar el estado de la orden "${orderId}" en la base de datos.`)
+        }
+      })
     }
 
     function reassignOrder(orderId: string, newAssignee: string) {
+      const previousOrders = orders
+
+      // Actualización optimista
       setOrders((prev) =>
         prev.map((o) => {
           if (o.id !== orderId) return o
@@ -309,33 +293,86 @@ export function StoreProvider({
           }
         }),
       )
+
+      // Persistir en la base de datos
+      updateOrderAssigneeRemote(orderId, newAssignee).then((ok) => {
+        if (!ok) {
+          // Revertir si falló
+          setOrders(previousOrders)
+          console.error(`No se pudo reasignar la orden "${orderId}" en la base de datos.`)
+        }
+      })
     }
 
     function addBudgetItem(orderId: string, description: string, amount: number) {
-      const item: BudgetItem = { id: uid("bi"), description, amount }
-      setOrders((prev) => prev.map((o) => (o.id === orderId ? { ...o, budget: [...o.budget, item] } : o)))
+      const tempItem: BudgetItem = { id: uid("bi"), description, amount }
+
+      // Actualización optimista
+      setOrders((prev) => prev.map((o) => (o.id === orderId ? { ...o, budget: [...o.budget, tempItem] } : o)))
+
+      // Persistir en la base de datos
+      insertBudgetItemRemote(orderId, description, amount).then((saved) => {
+        if (!saved) {
+          // Revertir si falló
+          setOrders((prev) => prev.map((o) => (o.id === orderId ? { ...o, budget: o.budget.filter((b) => b.id !== tempItem.id) } : o)))
+          console.error(`No se pudo agregar el item de presupuesto a la orden "${orderId}" en la base de datos.`)
+        } else {
+          // Reemplazar el item temporal con el real (UUID de la DB)
+          setOrders((prev) => prev.map((o) => (o.id === orderId ? { ...o, budget: o.budget.map((b) => b.id === tempItem.id ? saved : b) } : o)))
+        }
+      })
     }
 
     function removeBudgetItem(orderId: string, itemId: string) {
+      const previousOrders = orders
+
+      // Actualización optimista
       setOrders((prev) =>
         prev.map((o) => (o.id === orderId ? { ...o, budget: o.budget.filter((b) => b.id !== itemId) } : o)),
       )
+
+      // Persistir en la base de datos
+      deleteBudgetItemRemote(itemId).then((ok) => {
+        if (!ok) {
+          // Revertir si falló
+          setOrders(previousOrders)
+          console.error(`No se pudo eliminar el item de presupuesto "${itemId}" en la base de datos.`)
+        }
+      })
     }
 
     function sendBudgetNotification(orderId: string) {
+      const order = orders.find((o) => o.id === orderId)
+      if (!order) return
+
+      const total = order.budget.reduce((s, b) => s + b.amount, 0)
+      const message = `Presupuesto actualizado disponible en tu portal. Total: ${formatCurrency(total)}.`
+      const tempNotif: AppNotification = {
+        id: uid("nt"),
+        message,
+        date: now(),
+        read: false,
+      }
+
+      // Actualización optimista
       setOrders((prev) =>
         prev.map((o) => {
           if (o.id !== orderId) return o
-          const total = o.budget.reduce((s, b) => s + b.amount, 0)
-          const note: AppNotification = {
-            id: uid("nt"),
-            message: `Presupuesto actualizado disponible en tu portal. Total: ${formatCurrency(total)}.`,
-            date: now(),
-            read: false,
-          }
-          return { ...o, notifications: [...o.notifications, note] }
+          return { ...o, notifications: [...o.notifications, tempNotif] }
         }),
       )
+
+      // Persistir en la base de datos
+      insertNotificationRemote(orderId, message).then((saved) => {
+        if (!saved) {
+          // Revertir si falló
+          setOrders((prev) => prev.map((o) => (o.id === orderId ? { ...o, notifications: o.notifications.filter((n) => n.id !== tempNotif.id) } : o)))
+          console.error(`No se pudo crear la notificación de presupuesto para la orden "${orderId}" en la base de datos.`)
+        } else {
+          // Reemplazar la notificación temporal con la real
+          setOrders((prev) => prev.map((o) => (o.id === orderId ? { ...o, notifications: o.notifications.map((n) => n.id === tempNotif.id ? saved : n) } : o)))
+        }
+      })
     }
 
     function addUser(input: { name: string; email: string; phone: string; role: Role; isCorporate?: boolean; companyName?: string; companyLogo?: string }) {
@@ -401,11 +438,23 @@ export function StoreProvider({
     }
 
     function markNotificationsRead(orderId: string) {
+      const previousOrders = orders
+
+      // Actualización optimista
       setOrders((prev) =>
         prev.map((o) =>
           o.id === orderId ? { ...o, notifications: o.notifications.map((n) => ({ ...n, read: true })) } : o,
         ),
       )
+
+      // Persistir en la base de datos
+      markNotificationsReadRemote(orderId).then((ok) => {
+        if (!ok) {
+          // Revertir si falló
+          setOrders(previousOrders)
+          console.error(`No se pudo marcar las notificaciones como leídas para la orden "${orderId}" en la base de datos.`)
+        }
+      })
     }
 
     function addState(label: string, color: string) {
@@ -467,6 +516,7 @@ export function StoreProvider({
       states,
       statesLoading,
       usersLoading,
+      ordersLoading,
       activeClientOrderId,
       setActiveClientOrderId,
       addOrder,
@@ -485,7 +535,7 @@ export function StoreProvider({
       deleteState,
       reorderStates,
     }
-  }, [role, currentUser, isLoggedIn, users, orders, states, statesLoading, usersLoading, activeClientOrderId])
+  }, [role, currentUser, isLoggedIn, users, orders, states, statesLoading, usersLoading, ordersLoading, activeClientOrderId])
 
   return <StoreContext.Provider value={value}>{children}</StoreContext.Provider>
 }

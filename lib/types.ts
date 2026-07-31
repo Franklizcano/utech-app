@@ -72,7 +72,7 @@ export interface Order {
   id: string
   code: string
   // Cliente
-  clientId: string // Referencia al usuario cliente
+  clientId: string | null // Referencia al usuario cliente (null para ocasionales)
   clientName: string
   clientPhone: string
   clientEmail: string
