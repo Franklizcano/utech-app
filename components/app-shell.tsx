@@ -1,13 +1,23 @@
 "use client"
 
-import { Cpu, ShieldCheck, Wrench, UserRound, LogOut } from "lucide-react"
+import { useState } from "react"
+import { Cpu, ShieldCheck, Wrench, UserRound, LogOut, KeyRound, ChevronDown } from "lucide-react"
 import { useStore } from "@/lib/store"
 import { ServiceWorkspace } from "@/components/service-workspace"
 import { ClientPortal } from "@/components/client/client-portal"
 import { AdminView } from "@/components/admin/admin-view"
 import { LoginScreen } from "@/components/login-screen"
+import { ChangePasswordDialog } from "@/components/change-password-dialog"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuGroup,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
 import type { Role } from "@/lib/types"
-import { cn } from "@/lib/utils"
 
 const ROLE_SUBTITLE: Record<Role, string> = {
   admin: "Panel completo: operaciones, usuarios y estadísticas",
@@ -23,6 +33,7 @@ const ROLE_ICON: Record<Role, typeof ShieldCheck> = {
 
 export function AppShell() {
   const { role, currentUser, isLoggedIn, logout } = useStore()
+  const [passwordDialogOpen, setPasswordDialogOpen] = useState(false)
 
   if (!isLoggedIn) {
     return <LoginScreen />
@@ -47,23 +58,44 @@ export function AppShell() {
           </div>
 
           <div className="flex items-center gap-3">
-            <div className="flex items-center gap-2 rounded-lg border border-border bg-card px-3 py-1.5">
-              <RoleIcon className="size-4 text-primary" />
-              <div className="flex flex-col">
-                <span className="text-sm font-medium text-foreground leading-tight">{displayName}</span>
-                <span className="text-[10px] text-muted-foreground leading-tight">{roleLabel}</span>
-              </div>
-            </div>
+            <DropdownMenu>
+              <DropdownMenuTrigger
+                render={
+                  <button
+                    type="button"
+                    className="inline-flex items-center gap-2 rounded-lg border border-border bg-card px-3 py-1.5 text-left transition-colors hover:border-primary/40 hover:bg-muted"
+                    aria-label="Abrir menú de usuario"
+                  />
+                }
+              >
+                <RoleIcon className="size-4 text-primary" />
+                <span className="flex flex-col">
+                  <span className="text-sm font-medium leading-tight text-foreground">{displayName}</span>
+                  <span className="text-[10px] leading-tight text-muted-foreground">{roleLabel}</span>
+                </span>
+                <ChevronDown className="size-4 text-muted-foreground" />
+              </DropdownMenuTrigger>
 
-            <button
-              type="button"
-              onClick={logout}
-              className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-card px-3 py-1.5 text-sm text-muted-foreground transition-colors hover:border-destructive/50 hover:text-destructive"
-              aria-label="Cerrar sesión"
-            >
-              <LogOut className="size-4" />
-              <span className="hidden sm:inline">Salir</span>
-            </button>
+              <DropdownMenuContent align="end" className="w-56">
+                <DropdownMenuGroup>
+                  <DropdownMenuLabel>
+                    <span className="block truncate text-foreground">{displayName}</span>
+                    <span className="block text-[11px] font-normal">{roleLabel}</span>
+                  </DropdownMenuLabel>
+                </DropdownMenuGroup>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onClick={() => setPasswordDialogOpen(true)}>
+                  <KeyRound />
+                  Cambiar contraseña
+                </DropdownMenuItem>
+                <DropdownMenuItem variant="destructive" onClick={logout}>
+                  <LogOut />
+                  Cerrar sesión
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+
+            <ChangePasswordDialog open={passwordDialogOpen} onOpenChange={setPasswordDialogOpen} />
           </div>
         </div>
       </header>
