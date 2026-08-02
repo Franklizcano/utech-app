@@ -33,6 +33,7 @@ CREATE TABLE IF NOT EXISTS users (
   email VARCHAR(255) NOT NULL UNIQUE,
   phone VARCHAR(20) NOT NULL,
   role TEXT NOT NULL REFERENCES roles(id),
+  password_hash TEXT NOT NULL DEFAULT '',
   active BOOLEAN DEFAULT true,
   -- Campos corporativos (solo para clientes)
   is_corporate BOOLEAN DEFAULT false,

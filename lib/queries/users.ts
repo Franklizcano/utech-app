@@ -30,36 +30,6 @@ export async function fetchUsers(): Promise<User[]> {
   return (data ?? []).map(rowToUser)
 }
 
-export async function insertUserRemote(input: {
-  name: string
-  email: string
-  phone: string
-  role: Role
-  isCorporate?: boolean
-  companyName?: string
-  companyLogo?: string
-}): Promise<User | null> {
-  const supabase = getSupabaseClient()
-  const { data, error } = await supabase
-    .from("users")
-    .insert({
-      name: input.name,
-      email: input.email,
-      phone: input.phone,
-      role: input.role,
-      active: true,
-      is_corporate: input.isCorporate ?? false,
-      company_name: input.companyName ?? null,
-      company_logo: input.companyLogo ?? null,
-    })
-    .select("id, name, email, phone, role, active, is_corporate, company_name, company_logo, created_at")
-    .single()
-  if (error) {
-    console.error("Error al crear usuario:", error.message)
-    return null
-  }
-  return rowToUser(data as Record<string, unknown>)
-}
 
 export async function updateUserRemote(
   id: string,

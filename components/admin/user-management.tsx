@@ -1,7 +1,7 @@
 "use client"
 
 import { useState } from "react"
-import { UserPlus, Pencil, ShieldCheck, Trash2 } from "lucide-react"
+import { UserPlus, Pencil, ShieldCheck, Trash2, AlertCircle, Loader2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -67,6 +67,10 @@ export function UserManagement() {
   const [isCorporate, setIsCorporate] = useState(false)
   const [companyName, setCompanyName] = useState("")
   const [companyLogo, setCompanyLogo] = useState("")
+  const [password, setPassword] = useState("")
+  const [passwordConfirmation, setPasswordConfirmation] = useState("")
+  const [formError, setFormError] = useState<string | null>(null)
+  const [saving, setSaving] = useState(false)
 
   function openCreate() {
     setEditing(null)
@@ -77,6 +81,9 @@ export function UserManagement() {
     setIsCorporate(false)
     setCompanyName("")
     setCompanyLogo("")
+    setPassword("")
+    setPasswordConfirmation("")
+    setFormError(null)
     setOpen(true)
   }
 
@@ -89,6 +96,9 @@ export function UserManagement() {
     setIsCorporate(user.isCorporate ?? false)
     setCompanyName(user.companyName || "")
     setCompanyLogo(user.companyLogo || "")
+    setPassword("")
+    setPasswordConfirmation("")
+    setFormError(null)
     setOpen(true)
   }
 
@@ -102,11 +112,27 @@ export function UserManagement() {
     reader.readAsDataURL(file)
   }
 
-  function handleSave(e: React.FormEvent) {
+  async function handleSave(e: React.FormEvent) {
     e.preventDefault()
-    if (!name.trim() || !email.trim() || !phone.trim()) return
-    if (role === "cliente" && isCorporate && !companyName.trim()) return
-    
+    setFormError(null)
+    if (saving) return
+    if (!name.trim() || !email.trim() || !phone.trim()) {
+      setFormError("Completá nombre, email y teléfono.")
+      return
+    }
+    if (role === "cliente" && isCorporate && !companyName.trim()) {
+      setFormError("Completá el nombre de la empresa.")
+      return
+    }
+    if (!editing && password.length < 8) {
+      setFormError("La contraseña debe tener al menos 8 caracteres.")
+      return
+    }
+    if (!editing && password !== passwordConfirmation) {
+      setFormError("Las contraseñas no coinciden.")
+      return
+    }
+
     const userData = {
       name,
       email,
@@ -121,12 +147,21 @@ export function UserManagement() {
       }),
     }
 
-    if (editing) {
-      updateUser(editing.id, { ...userData, active: editing.active })
-    } else {
-      addUser(userData)
+    setSaving(true)
+    try {
+      if (editing) {
+        updateUser(editing.id, { ...userData, active: editing.active })
+      } else {
+        const result = await addUser({ ...userData, password })
+        if (!result.success) {
+          setFormError(result.error ?? "No se pudo crear el usuario.")
+          return
+        }
+      }
+      setOpen(false)
+    } finally {
+      setSaving(false)
     }
-    setOpen(false)
   }
 
   return (
@@ -250,6 +285,36 @@ export function UserManagement() {
               <Label htmlFor="u-phone">Teléfono</Label>
               <Input id="u-phone" type="tel" value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="+54 11 0000-0000" required />
             </div>
+            {!editing && (
+              <div className="space-y-3 rounded-lg border border-border bg-secondary/20 p-3">
+                <div className="space-y-2">
+                  <Label htmlFor="u-password">Contraseña inicial</Label>
+                  <Input
+                    id="u-password"
+                    type="password"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    placeholder="Mínimo 8 caracteres"
+                    minLength={8}
+                    autoComplete="new-password"
+                    required
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="u-password-confirmation">Repetir contraseña</Label>
+                  <Input
+                    id="u-password-confirmation"
+                    type="password"
+                    value={passwordConfirmation}
+                    onChange={(e) => setPasswordConfirmation(e.target.value)}
+                    placeholder="Repetí la contraseña inicial"
+                    minLength={8}
+                    autoComplete="new-password"
+                    required
+                  />
+                </div>
+              </div>
+            )}
             <div className="space-y-2">
               <Label>Rol</Label>
               <Select value={role} onValueChange={(v) => setRole(v as Role)}>
@@ -316,11 +381,21 @@ export function UserManagement() {
               </>
             )}
 
+            {formError && (
+              <div className="flex items-start gap-2 rounded-lg border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive">
+                <AlertCircle className="mt-0.5 size-4 shrink-0" />
+                <span>{formError}</span>
+              </div>
+            )}
+
             <DialogFooter>
-              <Button type="button" variant="outline" onClick={() => setOpen(false)}>
+              <Button type="button" variant="outline" onClick={() => setOpen(false)} disabled={saving}>
                 Cancelar
               </Button>
-              <Button type="submit">{editing ? "Guardar cambios" : "Crear usuario"}</Button>
+              <Button type="submit" disabled={saving}>
+                {saving && <Loader2 className="size-4 animate-spin" />}
+                {editing ? "Guardar cambios" : "Crear usuario"}
+              </Button>
             </DialogFooter>
           </form>
         </DialogContent>

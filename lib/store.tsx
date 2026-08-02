@@ -13,7 +13,7 @@ import {
   DEFAULT_STATES,
   getStatusLabel,
 } from "@/lib/types"
-import { type AuthUser, logoutAction } from "@/app/actions/auth"
+import { createUserWithPasswordAction, type AuthUser, type CreateUserResult, logoutAction } from "@/app/actions/auth"
 import {
   fetchOrderStates,
   insertOrderState,
@@ -23,7 +23,6 @@ import {
 } from "@/lib/queries/order-states"
 import {
   fetchUsers,
-  insertUserRemote,
   updateUserRemote,
   toggleUserActiveRemote,
   deleteUserRemote,
@@ -102,7 +101,7 @@ interface StoreValue {
   addBudgetItem: (orderId: string, description: string, amount: number) => void
   removeBudgetItem: (orderId: string, itemId: string) => void
   sendBudgetNotification: (orderId: string) => void
-  addUser: (input: { name: string; email: string; phone: string; role: Role; isCorporate?: boolean; companyName?: string; companyLogo?: string }) => void
+  addUser: (input: { name: string; email: string; phone: string; role: Role; password: string; isCorporate?: boolean; companyName?: string; companyLogo?: string }) => Promise<CreateUserResult>
   updateUser: (id: string, input: { name: string; email: string; phone: string; role: Role; active: boolean; isCorporate?: boolean; companyName?: string; companyLogo?: string }) => void
   toggleUserActive: (id: string) => void
   deleteUser: (id: string) => void
@@ -375,7 +374,7 @@ export function StoreProvider({
       })
     }
 
-    function addUser(input: { name: string; email: string; phone: string; role: Role; isCorporate?: boolean; companyName?: string; companyLogo?: string }) {
+    async function addUser(input: { name: string; email: string; phone: string; role: Role; password: string; isCorporate?: boolean; companyName?: string; companyLogo?: string }): Promise<CreateUserResult> {
       const tempId = uid("u")
       const tempUser: User = {
         id: tempId,
@@ -391,15 +390,23 @@ export function StoreProvider({
       }
       // Actualización optimista
       setUsers((prev) => [...prev, tempUser])
-      insertUserRemote(input).then((saved) => {
-        if (!saved) {
+
+      try {
+        const result = await createUserWithPasswordAction(input)
+        if (!result.success || !result.user) {
           // Revertir si falló la persistencia
           setUsers((prev) => prev.filter((u) => u.id !== tempId))
-        } else {
-          // Reemplazar el usuario temporal con el real (UUID de la DB)
-          setUsers((prev) => prev.map((u) => (u.id === tempId ? saved : u)))
+          return result
         }
-      })
+
+        // Reemplazar el usuario temporal con el real (UUID de la DB)
+        setUsers((prev) => prev.map((u) => (u.id === tempId ? result.user! : u)))
+        return result
+      } catch (error) {
+        setUsers((prev) => prev.filter((u) => u.id !== tempId))
+        console.error("No se pudo crear el usuario en la base de datos:", error)
+        return { success: false, error: "No se pudo conectar con el servidor." }
+      }
     }
 
     function updateUser(id: string, input: { name: string; email: string; phone: string; role: Role; active: boolean; isCorporate?: boolean; companyName?: string; companyLogo?: string }) {
