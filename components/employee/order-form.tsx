@@ -116,7 +116,7 @@ export function OrderForm({ onCreatedAction }: { onCreatedAction?: (orderId: str
             <div className="space-y-2">
               {clients.length === 0 ? (
                 <div className="rounded-lg border border-dashed border-border bg-secondary/30 p-4 text-center text-sm text-muted-foreground">
-                  No hay clientes registrados. Crea uno en la gestión de usuarios o selecciona "Cliente ocasional".
+                  No hay clientes registrados. Crea uno en la gestión de usuarios o selecciona &quot;Cliente ocasional&quot;.
                 </div>
               ) : (
                 <>

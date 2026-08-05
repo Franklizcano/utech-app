@@ -24,11 +24,9 @@ function ClientLogin() {
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
-    const match = orders.find(
-      (o) => o.code.toLowerCase() === code.trim().toLowerCase() || o.clientEmail.toLowerCase() === code.trim().toLowerCase(),
-    )
+    const match = orders.find((o) => o.code.toLowerCase() === code.trim().toLowerCase())
     if (!match) {
-      setError("No encontramos ninguna orden con ese código o email.")
+      setError("No encontramos una orden asociada a tu cuenta con ese código.")
       return
     }
     setError("")
@@ -49,7 +47,7 @@ function ClientLogin() {
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="space-y-2">
-              <Label htmlFor="code">Código de orden o email</Label>
+               <Label htmlFor="code">Código de tu orden</Label>
               <Input
                 id="code"
                 value={code}
@@ -64,11 +62,6 @@ function ClientLogin() {
               Ver mi reparación
             </Button>
           </form>
-          <div className="mt-4 rounded-md border border-dashed border-border px-3 py-2 text-center text-xs text-muted-foreground">
-            Códigos de prueba: <span className="font-mono text-foreground">TF-1024</span>,{" "}
-            <span className="font-mono text-foreground">TF-1025</span>,{" "}
-            <span className="font-mono text-foreground">TF-1026</span>
-          </div>
         </CardContent>
       </Card>
     </div>

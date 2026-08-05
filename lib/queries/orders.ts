@@ -1,6 +1,6 @@
 import { customAlphabet } from "nanoid"
 import { getSupabaseClient } from "@/lib/supabase"
-import type { Order, OrderStatus, BudgetItem, TimelineEvent, AppNotification } from "@/lib/types"
+import type { Order, OrderStatus, BudgetItem, TimelineEvent, AppNotification, OrderDetailsInput } from "@/lib/types"
 import { formatOrderCode } from "@/lib/utils"
 
 /**
@@ -72,75 +72,6 @@ export function generateOrderCode(): string {
   const id = nanoidGenerator()
   // Formatear con guion: TF-XXXXX
   return formatOrderCode(`TF${id}`)
-}
-
-/**
- * Obtiene todas las órdenes con sus relaciones (budget_items, timeline_events, notifications)
- */
-export async function fetchOrders(): Promise<Order[]> {
-  const supabase = getSupabaseClient()
-  try {
-    // Traer todas las órdenes
-    const { data: ordersData, error: ordersError } = await supabase
-      .from("orders")
-      .select("*")
-      .order("created_at", { ascending: false })
-
-    if (ordersError) {
-      console.error("Error fetching orders:", ordersError)
-      return []
-    }
-
-    if (!ordersData || ordersData.length === 0) {
-      return []
-    }
-
-    // Traer todas las relaciones en paralelo
-    const orderIds = ordersData.map((o) => o.id)
-
-    const [budgetResult, timelineResult, notificationsResult] = await Promise.all([
-      supabase.from("budget_items").select("*").in("order_id", orderIds),
-      supabase.from("timeline_events").select("*").in("order_id", orderIds).order("event_date", { ascending: true }),
-      supabase.from("notifications").select("*").in("order_id", orderIds).order("notification_date", { ascending: true }),
-    ])
-
-    // Agrupar por order_id
-    const budgetMap = new Map<string, BudgetItem[]>()
-    const timelineMap = new Map<string, TimelineEvent[]>()
-    const notificationsMap = new Map<string, AppNotification[]>()
-
-    budgetResult.data?.forEach((item) => {
-      const orderId = item.order_id
-      if (!budgetMap.has(orderId)) budgetMap.set(orderId, [])
-      budgetMap.get(orderId)!.push(rowToBudgetItem(item))
-    })
-
-    timelineResult.data?.forEach((event) => {
-      const orderId = event.order_id
-      if (!timelineMap.has(orderId)) timelineMap.set(orderId, [])
-      timelineMap.get(orderId)!.push(rowToTimelineEvent(event))
-    })
-
-    notificationsResult.data?.forEach((notif) => {
-      const orderId = notif.order_id
-      if (!notificationsMap.has(orderId)) notificationsMap.set(orderId, [])
-      notificationsMap.get(orderId)!.push(rowToNotification(notif))
-    })
-
-    // Construir órdenes completas
-    const orders = ordersData.map((row) => {
-      const order = rowToOrder(row)
-      order.budget = budgetMap.get(row.id) || []
-      order.timeline = timelineMap.get(row.id) || []
-      order.notifications = notificationsMap.get(row.id) || []
-      return order
-    })
-
-    return orders
-  } catch (error) {
-    console.error("Error in fetchOrders:", error)
-    return []
-  }
 }
 
 /**
@@ -344,6 +275,35 @@ export async function updateOrderAssigneeRemote(
 }
 
 /**
+ * Actualiza los datos de reparación de una orden sin modificar información del cliente.
+ */
+export async function updateOrderDetailsRemote(orderId: string, input: OrderDetailsInput): Promise<boolean> {
+  const supabase = getSupabaseClient()
+  try {
+    const { error } = await supabase
+      .from("orders")
+      .update({
+        device_type: input.deviceType,
+        device_brand: input.deviceBrand,
+        device_model: input.deviceModel,
+        fault: input.fault,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", orderId)
+
+    if (error) {
+      console.error("Error updating order details:", error)
+      return false
+    }
+
+    return true
+  } catch (error) {
+    console.error("Error in updateOrderDetailsRemote:", error)
+    return false
+  }
+}
+
+/**
  * Agrega un item de presupuesto a una orden
  */
 export async function insertBudgetItemRemote(
@@ -428,38 +388,6 @@ export async function insertNotificationRemote(
     return null
   }
 }
-
-/**
- * Marca todas las notificaciones de una orden como leídas
- */
-export async function markNotificationsReadRemote(orderId: string): Promise<boolean> {
-  const supabase = getSupabaseClient()
-  try {
-    const { error } = await supabase
-      .from("notifications")
-      .update({ read: true })
-      .eq("order_id", orderId)
-      .eq("read", false)
-
-    if (error) {
-      console.error("Error marking notifications as read:", error)
-      return false
-    }
-
-    return true
-  } catch (error) {
-    console.error("Error in markNotificationsReadRemote:", error)
-    return false
-  }
-}
-
-
-
-
-
-
-
-
 
 
 

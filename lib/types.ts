@@ -90,6 +90,13 @@ export interface Order {
   createdAt: string
 }
 
+export interface OrderDetailsInput {
+  deviceType: DeviceType
+  deviceBrand: string
+  deviceModel: string
+  fault: string
+}
+
 export function budgetTotal(order: Order): number {
   return order.budget.reduce((sum, item) => sum + item.amount, 0)
 }

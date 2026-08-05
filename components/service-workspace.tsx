@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useMemo } from "react"
-import { Plus, Inbox, Search } from "lucide-react"
+import { Plus, Inbox, Loader2, Search } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
@@ -20,7 +20,7 @@ import { budgetTotal } from "@/lib/types"
 import { cn, normalizeOrderCode } from "@/lib/utils"
 
 export function ServiceWorkspace() {
-  const { orders } = useStore()
+  const { orders, ordersLoading } = useStore()
   const [selectedId, setSelectedId] = useState<string | null>(orders[0]?.id ?? null)
   const [dialogOpen, setDialogOpen] = useState(false)
   const [searchQuery, setSearchQuery] = useState("")
@@ -39,7 +39,7 @@ export function ServiceWorkspace() {
     })
   }, [orders, searchQuery])
 
-  const selected = orders.find((o) => o.id === selectedId) ?? null
+  const selected = orders.find((o) => o.id === selectedId) ?? (!ordersLoading ? orders[0] ?? null : null)
 
   return (
     <div className="space-y-5">
@@ -48,7 +48,7 @@ export function ServiceWorkspace() {
           <h2 className="text-xl font-semibold text-foreground">Pedidos</h2>
           <p className="text-sm text-muted-foreground">{orders.length} órdenes de reparación en el sistema</p>
         </div>
-        <Button className="gap-2" onClick={() => setDialogOpen(true)}>
+        <Button className="gap-2" onClick={() => setDialogOpen(true)} disabled={ordersLoading}>
           <Plus className="size-4" />
           Nuevo pedido
         </Button>
@@ -65,12 +65,18 @@ export function ServiceWorkspace() {
               placeholder="Buscar por código o cliente..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
+              disabled={ordersLoading}
               className="pl-9"
             />
           </div>
 
           {/* Lista filtrada */}
-          {filteredOrders.length === 0 ? (
+          {ordersLoading ? (
+            <div role="status" aria-live="polite" className="flex flex-col items-center justify-center gap-2 rounded-lg border border-dashed border-border py-8 text-center">
+              <Loader2 className="size-8 animate-spin text-primary" />
+              <p className="text-sm text-muted-foreground">Cargando órdenes…</p>
+            </div>
+          ) : filteredOrders.length === 0 ? (
             <div className="flex flex-col items-center justify-center gap-2 rounded-lg border border-dashed border-border py-8 text-center">
               <Search className="size-8 text-muted-foreground" />
               <p className="text-sm text-muted-foreground">No se encontraron órdenes</p>
@@ -78,7 +84,7 @@ export function ServiceWorkspace() {
           ) : (
             filteredOrders.map((order) => {
               const total = budgetTotal(order)
-              const isActive = order.id === selectedId
+              const isActive = order.id === selected?.id
               return (
                 <button
                   key={order.id}
@@ -96,7 +102,7 @@ export function ServiceWorkspace() {
                     <span className="font-mono text-xs text-muted-foreground">{order.code}</span>
                   </div>
                   <p className="mt-0.5 truncate text-sm text-muted-foreground">
-                    {order.deviceBrand} {order.deviceModel}
+                    {order.deviceType} · {order.deviceBrand} {order.deviceModel}
                   </p>
                   <div className="mt-3 flex items-center justify-between gap-2">
                     <StatusBadge status={order.status} />
@@ -114,7 +120,7 @@ export function ServiceWorkspace() {
         <Card>
           <CardContent className="pt-6">
             {selected ? (
-              <OrderDetail order={selected} />
+              <OrderDetail key={selected.id} order={selected} />
             ) : (
               <div className="flex flex-col items-center justify-center gap-3 py-16 text-center">
                 <Inbox className="size-10 text-muted-foreground" />
@@ -132,7 +138,7 @@ export function ServiceWorkspace() {
             <DialogDescription>Cargá los datos del cliente, el equipo y la falla reportada.</DialogDescription>
           </DialogHeader>
           <OrderForm
-            onCreated={(id) => {
+            onCreatedAction={(id: string) => {
               setSelectedId(id)
               setDialogOpen(false)
             }}

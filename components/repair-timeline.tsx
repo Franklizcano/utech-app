@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useSyncExternalStore } from "react"
 import { Check } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { useStore } from "@/lib/store"
@@ -16,12 +16,13 @@ function formatDate(iso: string) {
 }
 
 export function RepairTimeline({ order }: { order: Order }) {
-  const [mounted, setMounted] = useState(false)
+  const mounted = useSyncExternalStore(
+    () => () => {},
+    () => true,
+    () => false,
+  )
   const { states } = useStore()
 
-  useEffect(() => {
-    setMounted(true)
-  }, [])
 
   // Pasos visibles del flujo (sin "entregado" salvo que el equipo ya fue entregado)
   const statusFlow = getStatusFlow(states)

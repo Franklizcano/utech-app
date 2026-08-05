@@ -1,10 +1,11 @@
 "use client"
 
 import { useState } from "react"
-import { Plus, Trash2, Send, ArrowRight, Phone, Mail, MoreVertical } from "lucide-react"
+import { Plus, Trash2, Send, ArrowRight, Phone, Mail, MoreVertical, Pencil, X, Check } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import { Textarea } from "@/components/ui/textarea"
 import { Separator } from "@/components/ui/separator"
 import {
   Select,
@@ -23,19 +24,31 @@ import { StatusBadge } from "@/components/status-badge"
 import { RepairTimeline } from "@/components/repair-timeline"
 import { ReassignDialog } from "@/components/employee/reassign-dialog"
 import { useStore, formatCurrency } from "@/lib/store"
-import { budgetTotal, getStatusFlow, getStatusLabel, type Order, type OrderStatus } from "@/lib/types"
+import { budgetTotal, getStatusFlow, getStatusLabel, type DeviceType, type Order, type OrderStatus } from "@/lib/types"
+
+const DEVICE_TYPES: DeviceType[] = ["PC", "Notebook", "PlayStation", "Xbox", "Nintendo", "Otro"]
 
 export function OrderDetail({ order }: { order: Order }) {
-  const { addBudgetItem, removeBudgetItem, advanceStatus, sendBudgetNotification, states, users } = useStore()
+  const { addBudgetItem, removeBudgetItem, advanceStatus, sendBudgetNotification, updateOrderDetails, states, users } = useStore()
   const [desc, setDesc] = useState("")
   const [amount, setAmount] = useState("")
   const [nextStatus, setNextStatus] = useState<OrderStatus>(order.status)
   const [statusNote, setStatusNote] = useState("")
   const [reassignOpen, setReassignOpen] = useState(false)
+  const [editingDetails, setEditingDetails] = useState(false)
+  const [draftDeviceType, setDraftDeviceType] = useState<DeviceType>(order.deviceType)
+  const [draftDeviceBrand, setDraftDeviceBrand] = useState(order.deviceBrand)
+  const [draftDeviceModel, setDraftDeviceModel] = useState(order.deviceModel)
+  const [draftFault, setDraftFault] = useState(order.fault)
 
   const total = budgetTotal(order)
   const statusFlow = getStatusFlow(states)
   const client = users.find((u) => u.id === order.clientId)
+  const detailsChanged =
+    draftDeviceType !== order.deviceType ||
+    draftDeviceBrand !== order.deviceBrand ||
+    draftDeviceModel !== order.deviceModel ||
+    draftFault !== order.fault
 
   function handleAddItem(e: React.FormEvent) {
     e.preventDefault()
@@ -50,6 +63,35 @@ export function OrderDetail({ order }: { order: Order }) {
     if (nextStatus === order.status) return
     advanceStatus(order.id, nextStatus, statusNote.trim() || undefined)
     setStatusNote("")
+  }
+
+  function handleStartEditingDetails() {
+    setDraftDeviceType(order.deviceType)
+    setDraftDeviceBrand(order.deviceBrand)
+    setDraftDeviceModel(order.deviceModel)
+    setDraftFault(order.fault)
+    setEditingDetails(true)
+  }
+
+  function handleCancelEditingDetails() {
+    setDraftDeviceType(order.deviceType)
+    setDraftDeviceBrand(order.deviceBrand)
+    setDraftDeviceModel(order.deviceModel)
+    setDraftFault(order.fault)
+    setEditingDetails(false)
+  }
+
+  function handleSaveDetails() {
+    const fault = draftFault.trim()
+    if (!fault || !detailsChanged) return
+
+    updateOrderDetails(order.id, {
+      deviceType: draftDeviceType,
+      deviceBrand: draftDeviceBrand.trim(),
+      deviceModel: draftDeviceModel.trim(),
+      fault,
+    })
+    setEditingDetails(false)
   }
 
   return (
@@ -71,9 +113,90 @@ export function OrderDetail({ order }: { order: Order }) {
               {client?.isCorporate && client?.companyName && (
                 <p className="mt-0.5 text-sm text-muted-foreground">{client.companyName}</p>
               )}
-              <p className="mt-1 text-sm text-muted-foreground">
-                {order.deviceType} · {order.deviceBrand} {order.deviceModel}
-              </p>
+              {editingDetails ? (
+                <div className="mt-3 space-y-2">
+                  <div className="grid gap-2 sm:grid-cols-3">
+                    <div className="space-y-1">
+                      <Label htmlFor="order-device-type" className="text-xs">
+                        Tipo
+                      </Label>
+                      <Select value={draftDeviceType} onValueChange={(value) => setDraftDeviceType(value as DeviceType)}>
+                        <SelectTrigger id="order-device-type" className="w-full">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {DEVICE_TYPES.map((type) => (
+                            <SelectItem key={type} value={type}>
+                              {type}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-1">
+                      <Label htmlFor="order-device-brand" className="text-xs">
+                        Marca
+                      </Label>
+                      <Input
+                        id="order-device-brand"
+                        value={draftDeviceBrand}
+                        onChange={(e) => setDraftDeviceBrand(e.target.value)}
+                        placeholder="Ej: Sony"
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <Label htmlFor="order-device-model" className="text-xs">
+                        Modelo
+                      </Label>
+                      <Input
+                        id="order-device-model"
+                        value={draftDeviceModel}
+                        onChange={(e) => setDraftDeviceModel(e.target.value)}
+                        placeholder="Ej: PS5 Slim"
+                      />
+                    </div>
+                  </div>
+                  <div className="flex justify-end gap-1">
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon-sm"
+                      onClick={handleCancelEditingDetails}
+                      aria-label="Cancelar edición de datos de reparación"
+                      title="Cancelar"
+                    >
+                      <X />
+                    </Button>
+                    <Button
+                      type="button"
+                      size="icon-sm"
+                      onClick={handleSaveDetails}
+                      disabled={!detailsChanged || !draftFault.trim()}
+                      aria-label="Guardar datos de reparación"
+                      title="Aplicar cambios"
+                    >
+                      <Check />
+                    </Button>
+                  </div>
+                </div>
+              ) : (
+                <div className="mt-1 flex items-center gap-2 text-sm text-muted-foreground">
+                  <span>
+                    {order.deviceType} · {order.deviceBrand} {order.deviceModel}
+                  </span>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon-sm"
+                    className="size-6"
+                    onClick={handleStartEditingDetails}
+                    aria-label="Editar datos de reparación"
+                    title="Editar datos de reparación"
+                  >
+                    <Pencil />
+                  </Button>
+                </div>
+              )}
             </div>
           </div>
         </div>
@@ -109,7 +232,18 @@ export function OrderDetail({ order }: { order: Order }) {
 
       <div className="rounded-lg border border-border bg-secondary/30 p-4">
         <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Falla reportada</p>
-        <p className="mt-1 text-sm text-foreground">{order.fault}</p>
+        {editingDetails ? (
+          <Textarea
+            id="order-fault"
+            value={draftFault}
+            onChange={(e) => setDraftFault(e.target.value)}
+            className="mt-2"
+            rows={3}
+            aria-label="Falla reportada"
+          />
+        ) : (
+          <p className="mt-1 text-sm text-foreground">{order.fault}</p>
+        )}
       </div>
 
       <ReassignDialog order={order} open={reassignOpen} onOpenChange={setReassignOpen} />

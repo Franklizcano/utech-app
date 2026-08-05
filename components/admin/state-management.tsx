@@ -245,7 +245,7 @@ export function StateManagement() {
           <AlertDialogHeader>
             <AlertDialogTitle>Eliminar estado</AlertDialogTitle>
             <AlertDialogDescription>
-              ¿Estás seguro que deseas eliminar "{deleteTarget?.label}"? Esta acción no se puede deshacer.
+              ¿Estás seguro que deseas eliminar &quot;{deleteTarget?.label}&quot;? Esta acción no se puede deshacer.
               {states.length === 1 && " No puedes eliminar el único estado disponible."}
             </AlertDialogDescription>
           </AlertDialogHeader>

@@ -2,7 +2,7 @@
 
 import { cookies } from "next/headers"
 import bcrypt from "bcryptjs"
-import { getSupabaseClient } from "@/lib/supabase"
+import { getSupabaseServerClient } from "@/lib/supabase"
 import type { Role, User } from "@/lib/types"
 
 const MIN_PASSWORD_LENGTH = 8
@@ -77,7 +77,7 @@ export async function loginAction(email: string, password: string): Promise<Logi
       return { success: false, error: "Email y contraseña son requeridos." }
     }
 
-    const supabase = getSupabaseClient()
+    const supabase = getSupabaseServerClient()
 
     const { data, error } = await supabase
       .from("users")
@@ -157,7 +157,7 @@ export async function createUserWithPasswordAction(
       return { success: false, error: "El nombre de la empresa es requerido." }
     }
 
-    const supabase = getSupabaseClient()
+    const supabase = getSupabaseServerClient()
     const passwordHash = await bcrypt.hash(input.password, 10)
     const { data, error } = await supabase
       .from("users")
@@ -210,7 +210,7 @@ export async function changePasswordAction(
       return { success: false, error: "La nueva contraseña debe ser diferente de la actual." }
     }
 
-    const supabase = getSupabaseClient()
+    const supabase = getSupabaseServerClient()
     const { data, error: fetchError } = await supabase
       .from("users")
       .select("password_hash")
@@ -259,3 +259,4 @@ export async function getSessionAction(): Promise<AuthUser | null> {
     return null
   }
 }
+

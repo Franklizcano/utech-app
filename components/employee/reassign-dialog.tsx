@@ -61,7 +61,12 @@ export function ReassignDialog({ order, open, onOpenChange }: ReassignDialogProp
             <label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
               Nuevo técnico
             </label>
-            <Select value={newAssignee} onValueChange={setNewAssignee}>
+            <Select
+              value={newAssignee}
+              onValueChange={(value) => {
+                if (value !== null) setNewAssignee(value)
+              }}
+            >
               <SelectTrigger>
                 <SelectValue />
               </SelectTrigger>

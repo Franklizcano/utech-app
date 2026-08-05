@@ -1,11 +1,14 @@
 "use client"
 
 import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from "react"
+import { fetchOrdersAction, markNotificationsReadAction } from "@/app/actions/orders"
+import { fetchUsersAction } from "@/app/actions/users"
 import {
   type AppNotification,
   type BudgetItem,
   type DeviceType,
   type Order,
+  type OrderDetailsInput,
   type OrderStatus,
   type OrderState,
   type Role,
@@ -22,21 +25,27 @@ import {
   reorderOrderStatesRemote,
 } from "@/lib/queries/order-states"
 import {
-  fetchUsers,
   updateUserRemote,
   toggleUserActiveRemote,
   deleteUserRemote,
 } from "@/lib/queries/users"
 import {
-  fetchOrders,
   insertOrderRemote,
   updateOrderStatusRemote,
   updateOrderAssigneeRemote,
+  updateOrderDetailsRemote,
   insertBudgetItemRemote,
   deleteBudgetItemRemote,
   insertNotificationRemote,
-  markNotificationsReadRemote,
 } from "@/lib/queries/orders"
+import {
+  clearOrdersCache,
+  getOrdersCache,
+  getOrdersCacheKey,
+  isOrdersCacheStale,
+  revalidateOrdersCache,
+  setOrdersCache,
+} from "@/lib/order-cache"
 
 let counter = 100
 function uid(prefix = "id") {
@@ -64,6 +73,12 @@ const initialUsers: User[] = [
 ]
 
 const initialOrders: Order[] = []
+const DEFAULT_ORDERS_CACHE_TTL_SECONDS = 60
+const configuredOrdersCacheTtlSeconds = Number(process.env.NEXT_PUBLIC_ORDERS_CACHE_TTL_SECONDS)
+const ORDERS_CACHE_TTL_MS =
+  Number.isFinite(configuredOrdersCacheTtlSeconds) && configuredOrdersCacheTtlSeconds > 0
+    ? configuredOrdersCacheTtlSeconds * 1000
+    : DEFAULT_ORDERS_CACHE_TTL_SECONDS * 1000
 
 export interface NewOrderInput {
   clientId: string | null
@@ -98,6 +113,7 @@ interface StoreValue {
   addOrder: (input: NewOrderInput) => Order
   advanceStatus: (orderId: string, status: OrderStatus, note?: string) => void
   reassignOrder: (orderId: string, newAssignee: string) => void
+  updateOrderDetails: (orderId: string, input: OrderDetailsInput) => void
   addBudgetItem: (orderId: string, description: string, amount: number) => void
   removeBudgetItem: (orderId: string, itemId: string) => void
   sendBudgetNotification: (orderId: string) => void
@@ -125,13 +141,14 @@ export function StoreProvider({
   const [role, setRole] = useState<Role>(initialSession?.role ?? "colaborador")
   const [currentUser, setCurrentUser] = useState<AuthUser | null>(initialSession)
   const [isLoggedIn, setIsLoggedIn] = useState(initialSession !== null)
-  const [users, setUsers] = useState<User[]>(initialUsers)
-  const [orders, setOrders] = useState<Order[]>(initialOrders)
+  const [users, setUsers] = useState<User[]>(initialSession?.role === "cliente" ? [] : initialUsers)
+  const [orders, setOrdersState] = useState<Order[]>(initialOrders)
   const [states, setStates] = useState<OrderState[]>(DEFAULT_STATES)
   const [statesLoading, setStatesLoading] = useState(true)
   const [usersLoading, setUsersLoading] = useState(true)
   const [ordersLoading, setOrdersLoading] = useState(true)
   const [activeClientOrderId, setActiveClientOrderId] = useState<string | null>(null)
+  const ordersCacheKey = currentUser && isLoggedIn ? getOrdersCacheKey(currentUser.id, currentUser.role) : null
 
   // Carga los estados de orden reales desde Supabase al montar el provider.
   useEffect(() => {
@@ -148,38 +165,103 @@ export function StoreProvider({
     }
   }, [])
 
-  // Carga los usuarios reales desde Supabase al montar el provider.
+  // Carga los usuarios reales solo para personal autorizado.
   useEffect(() => {
     let cancelled = false
-    fetchUsers().then((remoteUsers) => {
-      if (cancelled) return
-      if (remoteUsers.length > 0) {
-        setUsers(remoteUsers)
+    if (!currentUser || !isLoggedIn || currentUser.role === "cliente") {
+      Promise.resolve().then(() => {
+        if (cancelled) return
+        setUsers(currentUser?.role === "cliente" ? [] : initialUsers)
+        setUsersLoading(false)
+      })
+      return () => {
+        cancelled = true
       }
+    }
+
+    Promise.resolve().then(() => {
+      if (!cancelled) setUsersLoading(true)
+    })
+    fetchUsersAction().then((remoteUsers) => {
+      if (cancelled) return
+      setUsers(remoteUsers)
+      setUsersLoading(false)
+    }).catch((error: unknown) => {
+      if (cancelled) return
+      console.error("No se pudieron cargar los usuarios:", error)
       setUsersLoading(false)
     })
     return () => {
       cancelled = true
     }
-  }, [])
+  }, [currentUser, isLoggedIn])
 
-  // Carga las órdenes reales desde Supabase al montar el provider.
+  // Carga solo las órdenes autorizadas para la sesión actual y reutiliza la caché fresca.
   useEffect(() => {
     let cancelled = false
-    fetchOrders().then((remoteOrders) => {
-      if (cancelled) return
-      if (remoteOrders.length > 0) {
-        setOrders(remoteOrders)
+    if (!currentUser || !isLoggedIn || !ordersCacheKey) {
+      Promise.resolve().then(() => {
+        if (cancelled) return
+        setOrdersState([])
+        setOrdersLoading(false)
+      })
+      return () => {
+        cancelled = true
       }
-      setOrdersLoading(false)
+    }
+
+    const cachedOrders = getOrdersCache(ordersCacheKey)
+    Promise.resolve().then(() => {
+      if (cancelled) return
+      if (cachedOrders) {
+        setOrdersState(cachedOrders)
+        setOrdersLoading(false)
+      } else {
+        setOrdersLoading(true)
+      }
     })
+
+    const refreshOrders = () => {
+      revalidateOrdersCache(ordersCacheKey, fetchOrdersAction).then((remoteOrders) => {
+        if (cancelled) return
+        setOrdersState(remoteOrders)
+        setOrdersLoading(false)
+      }).catch((error: unknown) => {
+        if (cancelled) return
+        console.error("No se pudieron cargar las órdenes:", error)
+        setOrdersLoading(false)
+      })
+    }
+
+    if (isOrdersCacheStale(ordersCacheKey, ORDERS_CACHE_TTL_MS)) {
+      refreshOrders()
+    }
+
+    const intervalId = window.setInterval(refreshOrders, ORDERS_CACHE_TTL_MS)
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === "visible" && isOrdersCacheStale(ordersCacheKey, ORDERS_CACHE_TTL_MS)) {
+        refreshOrders()
+      }
+    }
+    document.addEventListener("visibilitychange", handleVisibilityChange)
+
     return () => {
       cancelled = true
+      window.clearInterval(intervalId)
+      document.removeEventListener("visibilitychange", handleVisibilityChange)
     }
-  }, [])
+  }, [currentUser, isLoggedIn, ordersCacheKey])
 
   const value = useMemo<StoreValue>(() => {
     const employees = users.filter((u) => u.role === "colaborador" || u.role === "admin")
+
+    function setOrders(updater: Order[] | ((previous: Order[]) => Order[])) {
+      setOrdersState((previous) => {
+        const next = typeof updater === "function" ? updater(previous) : updater
+        if (ordersCacheKey) setOrdersCache(ordersCacheKey, next)
+        return next
+      })
+    }
 
     function login(user: AuthUser) {
       setCurrentUser(user)
@@ -189,9 +271,11 @@ export function StoreProvider({
 
     function logout() {
       logoutAction()
+      if (ordersCacheKey) clearOrdersCache(ordersCacheKey)
       setCurrentUser(null)
       setIsLoggedIn(false)
       setActiveClientOrderId(null)
+      setOrdersState([])
     }
 
     function addOrder(input: NewOrderInput): Order {
@@ -299,6 +383,22 @@ export function StoreProvider({
           // Revertir si falló
           setOrders(previousOrders)
           console.error(`No se pudo reasignar la orden "${orderId}" en la base de datos.`)
+        }
+      })
+    }
+
+    function updateOrderDetails(orderId: string, input: OrderDetailsInput) {
+      const previousOrders = orders
+
+      // Actualización optimista
+      setOrders((prev) => prev.map((o) => (o.id === orderId ? { ...o, ...input } : o)))
+
+      // Persistir en la base de datos
+      updateOrderDetailsRemote(orderId, input).then((ok) => {
+        if (!ok) {
+          // Revertir si falló
+          setOrders(previousOrders)
+          console.error(`No se pudieron actualizar los datos de reparación de la orden "${orderId}" en la base de datos.`)
         }
       })
     }
@@ -455,7 +555,7 @@ export function StoreProvider({
       )
 
       // Persistir en la base de datos
-      markNotificationsReadRemote(orderId).then((ok) => {
+      markNotificationsReadAction(orderId).then((ok) => {
         if (!ok) {
           // Revertir si falló
           setOrders(previousOrders)
@@ -529,6 +629,7 @@ export function StoreProvider({
       addOrder,
       advanceStatus,
       reassignOrder,
+      updateOrderDetails,
       addBudgetItem,
       removeBudgetItem,
       sendBudgetNotification,
@@ -542,7 +643,7 @@ export function StoreProvider({
       deleteState,
       reorderStates,
     }
-  }, [role, currentUser, isLoggedIn, users, orders, states, statesLoading, usersLoading, ordersLoading, activeClientOrderId])
+  }, [role, currentUser, isLoggedIn, users, orders, states, statesLoading, usersLoading, ordersLoading, activeClientOrderId, ordersCacheKey])
 
   return <StoreContext.Provider value={value}>{children}</StoreContext.Provider>
 }
