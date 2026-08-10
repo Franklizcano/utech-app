@@ -2,7 +2,7 @@
 
 import { useCallback, useState } from "react"
 import { Inbox, Loader2, Plus } from "lucide-react"
-import { claimOrderAction, fetchAvailableOrdersAction } from "@/app/actions/orders"
+import { assignOrderAction, claimOrderAction, fetchAvailableOrdersAction } from "@/app/actions/orders"
 import { StatusBadge } from "@/components/status-badge"
 import { Button } from "@/components/ui/button"
 import {
@@ -12,6 +12,13 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
 import { useStore } from "@/lib/store"
 import type { Order } from "@/lib/types"
 
@@ -25,11 +32,13 @@ function formatDate(iso: string) {
 }
 
 export function UnassignedOrdersInbox() {
-  const { ordersLoading, refreshOrders } = useStore()
+  const { currentUser, employees, ordersLoading, refreshOrders } = useStore()
   const [open, setOpen] = useState(false)
   const [availableOrders, setAvailableOrders] = useState<Order[]>([])
   const [loading, setLoading] = useState(false)
   const [claimingOrderId, setClaimingOrderId] = useState<string | null>(null)
+  const [assigningOrderId, setAssigningOrderId] = useState<string | null>(null)
+  const [selectedAssignees, setSelectedAssignees] = useState<Record<string, string>>({})
   const [error, setError] = useState("")
 
   const refreshInbox = useCallback(async () => {
@@ -70,6 +79,34 @@ export function UnassignedOrdersInbox() {
       setError("No se pudo tomar la orden. Intentá nuevamente.")
     } finally {
       setClaimingOrderId(null)
+    }
+  }
+
+  async function handleAssign(orderId: string) {
+    const collaboratorId = selectedAssignees[orderId]
+    if (!collaboratorId) return
+
+    setError("")
+    setAssigningOrderId(orderId)
+    try {
+      const assigned = await assignOrderAction(orderId, collaboratorId)
+      if (!assigned) {
+        setError("La orden ya fue tomada o el colaborador seleccionado no está disponible.")
+        await refreshInbox()
+        return
+      }
+
+      setSelectedAssignees((current) => {
+        const next = { ...current }
+        delete next[orderId]
+        return next
+      })
+      await Promise.all([refreshInbox(), refreshOrders()])
+    } catch (assignError) {
+      console.error("No se pudo asignar la orden:", assignError)
+      setError("No se pudo asignar la orden. Intentá nuevamente.")
+    } finally {
+      setAssigningOrderId(null)
     }
   }
 
@@ -123,12 +160,54 @@ export function UnassignedOrdersInbox() {
                   <Button
                     type="button"
                     className="mt-4 w-full gap-2"
-                    disabled={claimingOrderId !== null || ordersLoading}
+                    disabled={claimingOrderId !== null || assigningOrderId !== null || ordersLoading}
                     onClick={() => void handleClaim(order.id)}
                   >
                     {claimingOrderId === order.id ? <Loader2 className="size-4 animate-spin" /> : <Plus className="size-4" />}
                     {claimingOrderId === order.id ? "Tomando..." : "Tomar orden"}
                   </Button>
+                  {currentUser?.role === "admin" && (
+                    <div className="mt-3 space-y-2 border-t border-border pt-3">
+                      <p className="text-xs font-medium text-muted-foreground">Asignar a un colaborador</p>
+                      {employees.filter((employee) => employee.role === "colaborador" && employee.active).length === 0 ? (
+                        <p className="text-xs text-muted-foreground">No hay colaboradores activos disponibles.</p>
+                      ) : (
+                        <>
+                          <Select
+                            value={selectedAssignees[order.id] ?? ""}
+                            onValueChange={(value) => {
+                              if (value) {
+                                setSelectedAssignees((current) => ({ ...current, [order.id]: value }))
+                              }
+                            }}
+                          >
+                            <SelectTrigger>
+                              <SelectValue placeholder="Seleccionar colaborador" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {employees
+                                .filter((employee) => employee.role === "colaborador" && employee.active)
+                                .map((employee) => (
+                                  <SelectItem key={employee.id} value={employee.id}>
+                                    {employee.name}
+                                  </SelectItem>
+                                ))}
+                            </SelectContent>
+                          </Select>
+                          <Button
+                            type="button"
+                            variant="secondary"
+                            className="w-full gap-2"
+                            disabled={!selectedAssignees[order.id] || claimingOrderId !== null || assigningOrderId !== null || ordersLoading}
+                            onClick={() => void handleAssign(order.id)}
+                          >
+                            {assigningOrderId === order.id && <Loader2 className="size-4 animate-spin" />}
+                            {assigningOrderId === order.id ? "Asignando..." : "Asignar orden"}
+                          </Button>
+                        </>
+                      )}
+                    </div>
+                  )}
                 </div>
               ))}
             </div>

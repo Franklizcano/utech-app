@@ -106,6 +106,27 @@ export async function claimOrderAction(orderId: string): Promise<boolean> {
   return claimOrderServer(orderId, session.name)
 }
 
+export async function assignOrderAction(orderId: string, collaboratorId: string): Promise<boolean> {
+  const session = await getSessionAction()
+  if (!session || !session.active || session.role !== "admin" || !orderId || !collaboratorId) return false
+
+  const supabase = getSupabaseServerClient()
+  const { data: collaborator, error } = await supabase
+    .from("users")
+    .select("name")
+    .eq("id", collaboratorId)
+    .eq("role", "colaborador")
+    .eq("active", true)
+    .maybeSingle()
+
+  if (error || !collaborator) {
+    if (error) console.error("Error al validar el colaborador destino:", error.message)
+    return false
+  }
+
+  return claimOrderServer(orderId, collaborator.name as string)
+}
+
 export async function fetchOrdersAction() {
   const session = await getSessionAction()
   if (!session || !session.active) {
