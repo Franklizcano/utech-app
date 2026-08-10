@@ -28,10 +28,11 @@ interface ReassignDialogProps {
 
 export function ReassignDialog({ order, open, onOpenChange }: ReassignDialogProps) {
   const { reassignOrder, employees } = useStore()
-  const [newAssignee, setNewAssignee] = useState(order.assignedTo)
+  const [newAssignee, setNewAssignee] = useState<string>(order.assignedTo ?? "")
 
   function handleReassign() {
     if (newAssignee === order.assignedTo) return
+    if (!newAssignee) return
     reassignOrder(order.id, newAssignee)
     onOpenChange(false)
   }
@@ -54,7 +55,7 @@ export function ReassignDialog({ order, open, onOpenChange }: ReassignDialogProp
         <div className="space-y-4 py-4">
           <div className="rounded-lg border border-border bg-secondary/20 p-3">
             <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Técnico actual</p>
-            <p className="mt-1 text-sm font-medium text-foreground">{order.assignedTo}</p>
+            <p className="mt-1 text-sm font-medium text-foreground">{order.assignedTo ?? "Sin asignar"}</p>
           </div>
 
           <div className="space-y-2">
@@ -84,7 +85,7 @@ export function ReassignDialog({ order, open, onOpenChange }: ReassignDialogProp
             <div className="flex items-center gap-2 rounded-md bg-accent/10 px-3 py-2">
               <div className="size-1.5 rounded-full bg-accent" />
               <p className="text-xs text-accent">
-                Se cambiará de <span className="font-medium">{order.assignedTo}</span> a{" "}
+                Se cambiará de <span className="font-medium">{order.assignedTo ?? "Sin asignar"}</span> a{" "}
                 <span className="font-medium">{newAssignee}</span>
               </p>
             </div>

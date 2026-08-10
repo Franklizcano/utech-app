@@ -5,6 +5,7 @@ import { Cpu, ArrowRight, Loader2, Mail, Lock, AlertCircle } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { useStore } from "@/lib/store"
 import { loginAction } from "@/app/actions/auth"
+import { OccasionalTicketLookup } from "@/components/occasional-ticket-lookup"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 
@@ -54,7 +55,7 @@ export function LoginScreen() {
         style={{ background: "radial-gradient(ellipse, var(--color-primary) 0%, transparent 70%)" }}
       />
 
-      <div className="relative z-10 flex w-full max-w-sm flex-col items-center gap-8">
+      <div className="relative z-10 flex w-full max-w-md flex-col items-center gap-8">
         {/* Brand */}
         <div className="flex flex-col items-center gap-4 text-center">
           <div className="flex size-14 items-center justify-center rounded-2xl border border-border bg-card shadow-lg">
@@ -69,7 +70,7 @@ export function LoginScreen() {
         {/* Login form */}
         <form
           onSubmit={handleSubmit}
-          className="w-full rounded-xl border border-border bg-card p-6 shadow-lg space-y-5"
+          className="w-full space-y-5 rounded-xl border border-border bg-card p-6 shadow-lg"
         >
           <div className="text-center mb-1">
             <p className="text-base font-medium text-foreground">Iniciá sesión</p>
@@ -150,8 +151,10 @@ export function LoginScreen() {
           </button>
         </form>
 
+        <OccasionalTicketLookup />
+
         <p className="text-xs text-muted-foreground/60">
-          Acceso solo para usuarios registrados
+          El acceso de gestión es solo para usuarios registrados
         </p>
       </div>
     </div>

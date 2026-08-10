@@ -13,6 +13,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog"
 import { StatusBadge } from "@/components/status-badge"
+import { UnassignedOrdersInbox } from "@/components/unassigned-orders-inbox"
 import { OrderForm } from "@/components/employee/order-form"
 import { OrderDetail } from "@/components/employee/order-detail"
 import { useStore, formatCurrency } from "@/lib/store"
@@ -53,6 +54,8 @@ export function ServiceWorkspace() {
           Nuevo pedido
         </Button>
       </div>
+
+      <UnassignedOrdersInbox />
 
       <div className="grid gap-5 lg:grid-cols-[340px_1fr]">
         {/* Lista de pedidos */}
