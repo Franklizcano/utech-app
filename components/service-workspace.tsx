@@ -21,7 +21,7 @@ import { budgetTotal } from "@/lib/types"
 import { cn, normalizeOrderCode } from "@/lib/utils"
 
 export function ServiceWorkspace() {
-  const { orders, ordersLoading } = useStore()
+  const { role, orders, ordersLoading } = useStore()
   const [selectedId, setSelectedId] = useState<string | null>(orders[0]?.id ?? null)
   const [dialogOpen, setDialogOpen] = useState(false)
   const [searchQuery, setSearchQuery] = useState("")
@@ -100,19 +100,28 @@ export function ServiceWorkspace() {
                       : "border-border hover:border-primary/30 hover:bg-secondary/40",
                   )}
                 >
-                  <div className="flex items-center justify-between gap-2">
-                    <span className="font-medium text-foreground">{order.clientName}</span>
-                    <span className="font-mono text-xs text-muted-foreground">{order.code}</span>
-                  </div>
-                  <p className="mt-0.5 truncate text-sm text-muted-foreground">
-                    {order.deviceType} · {order.deviceBrand} {order.deviceModel}
-                  </p>
-                  <div className="mt-3 flex items-center justify-between gap-2">
-                    <StatusBadge status={order.status} />
-                    {total > 0 && (
-                      <span className="text-xs font-medium tabular-nums text-foreground">{formatCurrency(total)}</span>
-                    )}
-                  </div>
+                  {role === "colaborador" ? (
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="font-mono text-sm font-medium text-foreground">{order.code}</span>
+                      <StatusBadge status={order.status} />
+                    </div>
+                  ) : (
+                    <>
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="font-medium text-foreground">{order.clientName}</span>
+                        <span className="font-mono text-xs text-muted-foreground">{order.code}</span>
+                      </div>
+                      <p className="mt-0.5 truncate text-sm text-muted-foreground">
+                        {order.deviceType} · {order.deviceBrand} {order.deviceModel}
+                      </p>
+                      <div className="mt-3 flex items-center justify-between gap-2">
+                        <StatusBadge status={order.status} />
+                        {total > 0 && (
+                          <span className="text-xs font-medium tabular-nums text-foreground">{formatCurrency(total)}</span>
+                        )}
+                      </div>
+                    </>
+                  )}
                 </button>
               )
             })

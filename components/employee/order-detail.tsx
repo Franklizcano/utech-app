@@ -1,7 +1,7 @@
 "use client"
 
 import { useState } from "react"
-import { Plus, Trash2, Send, ArrowRight, Phone, Mail, MoreVertical, Pencil, X, Check } from "lucide-react"
+import { Plus, Trash2, Send, ArrowRight, Phone, Mail, UserRound, MoreVertical, Pencil, X, Check } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -228,6 +228,9 @@ export function OrderDetail({ order }: { order: Order }) {
             <Mail className="size-3.5" /> {order.clientEmail}
           </span>
         )}
+        <span className="inline-flex items-center gap-1.5">
+          <UserRound className="size-3.5" /> Colaborador: {order.assignedTo ?? "Sin asignar"}
+        </span>
       </div>
 
       <div className="rounded-lg border border-border bg-secondary/30 p-4">

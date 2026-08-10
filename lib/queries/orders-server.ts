@@ -283,6 +283,8 @@ export async function fetchOrdersForUser(userId: string, role: Role, assignedTo?
 
   if (role === "cliente") {
     ordersQuery = ordersQuery.eq("client_id", userId)
+  } else if (role === "admin") {
+    ordersQuery = ordersQuery.not("assigned_to", "is", null)
   } else if (role === "colaborador") {
     if (!assignedTo) return []
 
