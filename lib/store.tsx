@@ -1,13 +1,13 @@
 "use client"
 
 import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from "react"
-import { fetchOrdersAction, markNotificationsReadAction } from "@/app/actions/orders"
+import { createOrderAction, fetchOrdersAction, markNotificationsReadAction } from "@/app/actions/orders"
 import { fetchUsersAction } from "@/app/actions/users"
 import {
   type AppNotification,
   type BudgetItem,
-  type DeviceType,
   type Order,
+  type OrderCreationInput,
   type OrderDetailsInput,
   type OrderStatus,
   type OrderState,
@@ -30,7 +30,6 @@ import {
   deleteUserRemote,
 } from "@/lib/queries/users"
 import {
-  insertOrderRemote,
   updateOrderStatusRemote,
   updateOrderAssigneeRemote,
   updateOrderDetailsRemote,
@@ -80,17 +79,7 @@ const ORDERS_CACHE_TTL_MS =
     ? configuredOrdersCacheTtlSeconds * 1000
     : DEFAULT_ORDERS_CACHE_TTL_SECONDS * 1000
 
-export interface NewOrderInput {
-  clientId: string | null
-  clientName: string
-  clientPhone: string
-  clientEmail: string
-  deviceType: DeviceType
-  deviceBrand: string
-  deviceModel: string
-  fault: string
-  assignedTo: string
-}
+export type NewOrderInput = OrderCreationInput
 
 interface StoreValue {
   role: Role
@@ -106,9 +95,7 @@ interface StoreValue {
   statesLoading: boolean
   usersLoading: boolean
   ordersLoading: boolean
-  // cliente
-  activeClientOrderId: string | null
-  setActiveClientOrderId: (id: string | null) => void
+  refreshOrders: () => Promise<void>
   // acciones
   addOrder: (input: NewOrderInput) => Order
   advanceStatus: (orderId: string, status: OrderStatus, note?: string) => void
@@ -147,7 +134,6 @@ export function StoreProvider({
   const [statesLoading, setStatesLoading] = useState(true)
   const [usersLoading, setUsersLoading] = useState(true)
   const [ordersLoading, setOrdersLoading] = useState(true)
-  const [activeClientOrderId, setActiveClientOrderId] = useState<string | null>(null)
   const ordersCacheKey = currentUser && isLoggedIn ? getOrdersCacheKey(currentUser.id, currentUser.role) : null
 
   // Carga los estados de orden reales desde Supabase al montar el provider.
@@ -274,7 +260,6 @@ export function StoreProvider({
       if (ordersCacheKey) clearOrdersCache(ordersCacheKey)
       setCurrentUser(null)
       setIsLoggedIn(false)
-      setActiveClientOrderId(null)
       setOrdersState([])
     }
 
@@ -293,7 +278,7 @@ export function StoreProvider({
         deviceModel: input.deviceModel,
         fault: input.fault,
         status: "recibido",
-        assignedTo: input.assignedTo,
+        assignedTo: input.assignedTo?.trim() || null,
         budget: [],
         timeline: [{ id: uid("ev"), status: "recibido", note: "Equipo ingresado en el sistema.", date: now() }],
         notifications: [
@@ -305,25 +290,18 @@ export function StoreProvider({
       setOrders((prev) => [tempOrder, ...prev])
 
       // Persistir en la base de datos
-      insertOrderRemote({
-        clientId: input.clientId,
-        clientName: input.clientName,
-        clientPhone: input.clientPhone,
-        clientEmail: input.clientEmail,
-        deviceType: input.deviceType,
-        deviceBrand: input.deviceBrand,
-        deviceModel: input.deviceModel,
-        fault: input.fault,
-        assignedTo: input.assignedTo,
-      }).then((saved) => {
-        if (!saved) {
+      createOrderAction(input).then((result) => {
+        if (!result.success || !result.order) {
           // Revertir si falló la persistencia
           setOrders((prev) => prev.filter((o) => o.id !== tempId))
-          console.error("No se pudo crear la orden en la base de datos.")
+          console.error(result.error ?? "No se pudo crear la orden en la base de datos.")
         } else {
           // Reemplazar la orden temporal con la real (UUID de la DB)
-          setOrders((prev) => prev.map((o) => (o.id === tempId ? saved : o)))
+          setOrders((prev) => prev.map((o) => (o.id === tempId ? result.order! : o)))
         }
+      }).catch((error: unknown) => {
+        setOrders((prev) => prev.filter((o) => o.id !== tempId))
+        console.error("No se pudo crear la orden en la base de datos:", error)
       })
 
       return tempOrder
@@ -564,6 +542,18 @@ export function StoreProvider({
       })
     }
 
+    async function refreshOrders() {
+      if (!ordersCacheKey) return
+
+      try {
+        const remoteOrders = await revalidateOrdersCache(ordersCacheKey, fetchOrdersAction)
+        setOrdersState(remoteOrders)
+        setOrdersLoading(false)
+      } catch (error: unknown) {
+        console.error("No se pudieron actualizar las órdenes:", error)
+      }
+    }
+
     function addState(label: string, color: string) {
       const maxPosition = Math.max(0, ...states.map((s) => s.position))
       const newState: OrderState = { id: uid("st"), label, color, position: maxPosition + 1 }
@@ -624,8 +614,7 @@ export function StoreProvider({
       statesLoading,
       usersLoading,
       ordersLoading,
-      activeClientOrderId,
-      setActiveClientOrderId,
+      refreshOrders,
       addOrder,
       advanceStatus,
       reassignOrder,
@@ -643,7 +632,7 @@ export function StoreProvider({
       deleteState,
       reorderStates,
     }
-  }, [role, currentUser, isLoggedIn, users, orders, states, statesLoading, usersLoading, ordersLoading, activeClientOrderId, ordersCacheKey])
+  }, [role, currentUser, isLoggedIn, users, orders, states, statesLoading, usersLoading, ordersLoading, ordersCacheKey])
 
   return <StoreContext.Provider value={value}>{children}</StoreContext.Provider>
 }
