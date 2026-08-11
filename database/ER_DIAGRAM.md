@@ -27,9 +27,7 @@
 │ phone                               │
 │ role (FK→roles.id)                  │
 │ active                              │
-│ is_corporate                        │
-│ company_name                        │
-│ company_logo                        │
+│ company_id (FK→companies.id, NULL)  │
 │ created_at                          │
 │ updated_at                          │
 └────────┬────────────────────────────┘
@@ -101,6 +99,17 @@
 └──────────────────────┘
 ```
 
+### COMPANIES
+```
+Tabla principal: companies
+├─ id (UUID) - Primary Key
+├─ name (VARCHAR UNIQUE) - Nombre de la empresa
+├─ logo (TEXT) - URL del logo
+├─ user_limit (INTEGER) - Cupo de usuarios corporativos
+├─ created_at (TIMESTAMP) - Creación
+└─ updated_at (TIMESTAMP) - Última actualización
+```
+
 ---
 
 ## Relaciones Detalladas
@@ -115,24 +124,29 @@
 - client_id puede ser NULL (cliente ocasional)
 - Relación: ON DELETE SET NULL (orden sin cliente)
 
-### 3. **ORDER_STATES → ORDERS** (1:N)
+### 3. **COMPANIES → USERS** (1:N opcional)
+- Una empresa puede tener muchos usuarios corporativos
+- `users.company_id` puede ser NULL para usuarios independientes
+- Relación: ON DELETE SET NULL
+
+### 4. **ORDER_STATES → ORDERS** (1:N)
 - Un estado puede aplicarse a muchas órdenes
 - Estados son predefinidos (recibido → entregado)
 - Relación: No eliminable mientras existan órdenes
 
-### 4. **ORDERS → BUDGET_ITEMS** (1:N)
+### 5. **ORDERS → BUDGET_ITEMS** (1:N)
 - Una orden puede tener múltiples items de presupuesto
 - Relación: ON DELETE CASCADE (eliminar orden elimina items)
 
-### 5. **ORDERS → TIMELINE_EVENTS** (1:N)
+### 6. **ORDERS → TIMELINE_EVENTS** (1:N)
 - Una orden puede tener múltiples eventos en su historial
 - Relación: ON DELETE CASCADE (eliminar orden elimina eventos)
 
-### 6. **ORDER_STATES → TIMELINE_EVENTS** (1:N)
+### 7. **ORDER_STATES → TIMELINE_EVENTS** (1:N)
 - Un estado puede estar en múltiples eventos históricos
 - Relación: No eliminable mientras existan eventos
 
-### 7. **ORDERS → NOTIFICATIONS** (1:N)
+### 8. **ORDERS → NOTIFICATIONS** (1:N)
 - Una orden puede tener múltiples notificaciones
 - Relación: ON DELETE CASCADE (eliminar orden elimina notificaciones)
 
@@ -143,6 +157,7 @@
 | De | A | Tipo | Notas |
 |---|---|---|---|
 | ROLES | USERS | 1:N | Un rol múltiples usuarios |
+| COMPANIES | USERS | 1:N opcional | `company_id` NULL para usuarios independientes |
 | USERS | ORDERS | 1:N | Un cliente múltiples órdenes (nullable) |
 | ORDER_STATES | ORDERS | 1:N | Un estado múltiples órdenes |
 | ORDER_STATES | TIMELINE_EVENTS | 1:N | Un estado múltiples eventos |
@@ -173,9 +188,18 @@ Tabla principal: users
 ├─ phone (VARCHAR) - Teléfono
 ├─ role (FK→roles.id) - Rol del usuario
 ├─ active (BOOLEAN) - ¿Usuario activo?
-├─ is_corporate (BOOLEAN) - ¿Es empresa?
-├─ company_name (VARCHAR) - Nombre de empresa
-├─ company_logo (TEXT) - URL del logo
+├─ company_id (FK→companies.id, nullable) - Empresa a la que pertenece
+├─ created_at (TIMESTAMP) - Creación
+└─ updated_at (TIMESTAMP) - Última actualización
+```
+
+### COMPANIES
+```
+Tabla principal: companies
+├─ id (UUID) - Primary Key
+├─ name (VARCHAR UNIQUE) - Nombre de la empresa
+├─ logo (TEXT) - URL del logo
+├─ user_limit (INTEGER) - Cupo máximo de usuarios
 ├─ created_at (TIMESTAMP) - Creación
 └─ updated_at (TIMESTAMP) - Última actualización
 ```
@@ -303,7 +327,11 @@ Durante la reparación:
 Tabla: users
 ├─ idx_users_email (email)
 ├─ idx_users_role (role)
-└─ idx_users_active (active)
+├─ idx_users_active (active)
+└─ idx_users_company_id (company_id)
+
+Tabla: companies
+└─ name (UNIQUE)
 
 Tabla: orders
 ├─ idx_orders_code (code)
@@ -331,6 +359,7 @@ Tabla: notifications
 ### Foreign Keys
 ```
 users.role → roles.id (RESTRICT)
+users.company_id → companies.id (SET NULL)
 orders.client_id → users.id (SET NULL)
 orders.status → order_states.id (RESTRICT)
 budget_items.order_id → orders.id (CASCADE)

@@ -35,10 +35,6 @@ CREATE TABLE IF NOT EXISTS users (
   role TEXT NOT NULL REFERENCES roles(id),
   password_hash TEXT NOT NULL DEFAULT '',
   active BOOLEAN DEFAULT true,
-  -- Campos corporativos (solo para clientes)
-  is_corporate BOOLEAN DEFAULT false,
-  company_name VARCHAR(255),
-  company_logo TEXT, -- URL o data URI
   created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
@@ -46,6 +42,19 @@ CREATE TABLE IF NOT EXISTS users (
 CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);
 CREATE INDEX IF NOT EXISTS idx_users_role ON users(role);
 CREATE INDEX IF NOT EXISTS idx_users_active ON users(active);
+
+-- Empresas: administración independiente de clientes corporativos.
+CREATE TABLE IF NOT EXISTS companies (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  name VARCHAR(255) NOT NULL UNIQUE,
+  logo TEXT,
+  user_limit INTEGER NOT NULL DEFAULT 1 CHECK (user_limit >= 0),
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+ALTER TABLE users ADD COLUMN IF NOT EXISTS company_id UUID REFERENCES companies(id) ON DELETE SET NULL;
+CREATE INDEX IF NOT EXISTS idx_users_company_id ON users(company_id);
 
 -- ============================================
 -- Tabla: order_states (Estados de Órdenes)
@@ -158,8 +167,8 @@ SELECT
   o.client_name,
   o.client_email,
   o.client_phone,
-  u.is_corporate,
-  u.company_name,
+  c.name AS company_name,
+  c.logo AS company_logo,
   o.device_type,
   o.device_brand,
   o.device_model,
@@ -172,9 +181,10 @@ SELECT
   o.updated_at
 FROM orders o
 LEFT JOIN users u ON o.client_id = u.id
+LEFT JOIN companies c ON u.company_id = c.id
 LEFT JOIN order_states os ON o.status = os.id
 LEFT JOIN budget_items bi ON o.id = bi.order_id
-GROUP BY o.id, u.id, os.id;
+GROUP BY o.id, u.id, c.id, os.id;
 
 -- Vista: Últimas notificaciones de cada orden
 CREATE OR REPLACE VIEW v_latest_notifications AS

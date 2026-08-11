@@ -64,9 +64,6 @@ export function UserManagement() {
   const [email, setEmail] = useState("")
   const [phone, setPhone] = useState("")
   const [role, setRole] = useState<Role>("colaborador")
-  const [isCorporate, setIsCorporate] = useState(false)
-  const [companyName, setCompanyName] = useState("")
-  const [companyLogo, setCompanyLogo] = useState("")
   const [password, setPassword] = useState("")
   const [passwordConfirmation, setPasswordConfirmation] = useState("")
   const [formError, setFormError] = useState<string | null>(null)
@@ -78,9 +75,6 @@ export function UserManagement() {
     setEmail("")
     setPhone("")
     setRole("colaborador")
-    setIsCorporate(false)
-    setCompanyName("")
-    setCompanyLogo("")
     setPassword("")
     setPasswordConfirmation("")
     setFormError(null)
@@ -93,23 +87,10 @@ export function UserManagement() {
     setEmail(user.email)
     setPhone(user.phone || "")
     setRole(user.role)
-    setIsCorporate(user.isCorporate ?? false)
-    setCompanyName(user.companyName || "")
-    setCompanyLogo(user.companyLogo || "")
     setPassword("")
     setPasswordConfirmation("")
     setFormError(null)
     setOpen(true)
-  }
-
-  function handleLogoUpload(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0]
-    if (!file) return
-    const reader = new FileReader()
-    reader.onload = (event) => {
-      setCompanyLogo(event.target?.result as string)
-    }
-    reader.readAsDataURL(file)
   }
 
   async function handleSave(e: React.FormEvent) {
@@ -118,10 +99,6 @@ export function UserManagement() {
     if (saving) return
     if (!name.trim() || !email.trim() || !phone.trim()) {
       setFormError("Completá nombre, email y teléfono.")
-      return
-    }
-    if (role === "cliente" && isCorporate && !companyName.trim()) {
-      setFormError("Completá el nombre de la empresa.")
       return
     }
     if (!editing && password.length < 8) {
@@ -138,13 +115,6 @@ export function UserManagement() {
       email,
       phone,
       role,
-      ...(role === "cliente" && {
-        isCorporate,
-        ...(isCorporate && {
-          companyName: companyName || undefined,
-          companyLogo: companyLogo || undefined,
-        }),
-      }),
     }
 
     setSaving(true)
@@ -198,7 +168,7 @@ export function UserManagement() {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {users.map((user) => (
+            {users.filter((user) => !user.companyId).map((user) => (
               <TableRow key={user.id}>
                 <TableCell className="font-medium text-foreground">{user.name}</TableCell>
                 <TableCell className="text-muted-foreground">{user.email}</TableCell>
@@ -211,7 +181,7 @@ export function UserManagement() {
                   <button
                     type="button"
                     onClick={() => toggleUserActive(user.id)}
-                    className="inline-flex items-center gap-1.5 text-sm"
+                    className="inline-flex items-center gap-1.5 rounded-md border border-transparent px-2 py-1 text-sm transition-all hover:-translate-y-0.5 hover:border-border hover:bg-secondary hover:shadow-sm active:translate-y-0 active:shadow-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                   >
                     <span className={`size-2 rounded-full ${user.active ? "bg-emerald-400" : "bg-zinc-500"}`} />
                     <span className={user.active ? "text-foreground" : "text-muted-foreground"}>
@@ -328,58 +298,6 @@ export function UserManagement() {
                 </SelectContent>
               </Select>
             </div>
-
-            {role === "cliente" && (
-              <>
-                <div className="space-y-2">
-                  <Label className="flex items-center gap-2">
-                    <input
-                      type="checkbox"
-                      checked={isCorporate}
-                      onChange={(e) => setIsCorporate(e.target.checked)}
-                      className="rounded border-input"
-                    />
-                    <span>Es cliente corporativo</span>
-                  </Label>
-                </div>
-
-                {isCorporate && (
-                  <div className="space-y-3 rounded-lg border border-border bg-secondary/20 p-3">
-                    <div className="space-y-2">
-                      <Label htmlFor="u-company">Nombre de la empresa *</Label>
-                      <Input
-                        id="u-company"
-                        value={companyName}
-                        onChange={(e) => setCompanyName(e.target.value)}
-                        placeholder="Ej: Tech Solutions S.A."
-                        required={isCorporate}
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="u-logo">Logo de la empresa</Label>
-                      <Input
-                        id="u-logo"
-                        type="file"
-                        accept="image/*"
-                        onChange={handleLogoUpload}
-                      />
-                      {companyLogo && (
-                        <div className="flex items-center gap-2 mt-2">
-                          <img src={companyLogo} alt="logo" className="h-10 w-10 rounded object-contain" />
-                          <button
-                            type="button"
-                            onClick={() => setCompanyLogo("")}
-                            className="text-xs text-muted-foreground hover:text-foreground"
-                          >
-                            Remover
-                          </button>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                )}
-              </>
-            )}
 
             {formError && (
               <div className="flex items-start gap-2 rounded-lg border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive">

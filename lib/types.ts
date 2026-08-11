@@ -34,6 +34,11 @@ export function getStatusColor(statusId: OrderStatus, states: OrderState[]): str
   return states.find((s) => s.id === statusId)?.color ?? "#6b7280"
 }
 
+export interface CompanySummary {
+  name: string
+  logo?: string
+}
+
 export interface User {
   id: string
   name: string
@@ -41,10 +46,17 @@ export interface User {
   phone: string
   role: Role
   active: boolean
-  // Campos corporativos (solo para clientes)
-  isCorporate?: boolean
-  companyName?: string
-  companyLogo?: string // URL o data URI
+  companyId?: string
+  company?: CompanySummary
+  createdAt: string
+}
+
+export interface Company {
+  id: string
+  name: string
+  logo?: string
+  userLimit: number
+  userCount: number
   createdAt: string
 }
 

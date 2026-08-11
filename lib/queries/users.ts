@@ -9,9 +9,7 @@ export async function updateUserRemote(
     phone: string
     role: Role
     active: boolean
-    isCorporate?: boolean
-    companyName?: string
-    companyLogo?: string
+    companyId?: string
   },
 ): Promise<boolean> {
   const supabase = getSupabaseClient()
@@ -23,9 +21,7 @@ export async function updateUserRemote(
       phone: input.phone,
       role: input.role,
       active: input.active,
-      is_corporate: input.isCorporate ?? false,
-      company_name: input.companyName ?? null,
-      company_logo: input.companyLogo ?? null,
+      company_id: input.companyId ?? null,
       updated_at: new Date().toISOString(),
     })
     .eq("id", id)

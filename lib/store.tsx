@@ -104,8 +104,8 @@ interface StoreValue {
   addBudgetItem: (orderId: string, description: string, amount: number) => void
   removeBudgetItem: (orderId: string, itemId: string) => void
   sendBudgetNotification: (orderId: string) => void
-  addUser: (input: { name: string; email: string; phone: string; role: Role; password: string; isCorporate?: boolean; companyName?: string; companyLogo?: string }) => Promise<CreateUserResult>
-  updateUser: (id: string, input: { name: string; email: string; phone: string; role: Role; active: boolean; isCorporate?: boolean; companyName?: string; companyLogo?: string }) => void
+  addUser: (input: { name: string; email: string; phone: string; role: Role; password: string; companyId?: string }) => Promise<CreateUserResult>
+  updateUser: (id: string, input: { name: string; email: string; phone: string; role: Role; active: boolean; companyId?: string }) => void
   toggleUserActive: (id: string) => void
   deleteUser: (id: string) => void
   markNotificationsRead: (orderId: string) => void
@@ -452,7 +452,7 @@ export function StoreProvider({
       })
     }
 
-    async function addUser(input: { name: string; email: string; phone: string; role: Role; password: string; isCorporate?: boolean; companyName?: string; companyLogo?: string }): Promise<CreateUserResult> {
+    async function addUser(input: { name: string; email: string; phone: string; role: Role; password: string; companyId?: string }): Promise<CreateUserResult> {
       const tempId = uid("u")
       const tempUser: User = {
         id: tempId,
@@ -461,9 +461,7 @@ export function StoreProvider({
         phone: input.phone,
         role: input.role,
         active: true,
-        isCorporate: input.isCorporate,
-        companyName: input.companyName,
-        companyLogo: input.companyLogo,
+        companyId: input.companyId,
         createdAt: now(),
       }
       // Actualización optimista
@@ -487,7 +485,7 @@ export function StoreProvider({
       }
     }
 
-    function updateUser(id: string, input: { name: string; email: string; phone: string; role: Role; active: boolean; isCorporate?: boolean; companyName?: string; companyLogo?: string }) {
+    function updateUser(id: string, input: { name: string; email: string; phone: string; role: Role; active: boolean; companyId?: string }) {
       const previousUsers = users
       setUsers((prev) => prev.map((u) => (u.id === id ? { ...u, ...input } : u)))
       updateUserRemote(id, input).then((ok) => {

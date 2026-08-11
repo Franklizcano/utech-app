@@ -15,6 +15,7 @@ import {
 } from "@/components/ui/select"
 import { useStore } from "@/lib/store"
 import type { DeviceType } from "@/lib/types"
+import Image from "next/image"
 
 const DEVICE_TYPES: DeviceType[] = ["PC", "Notebook", "PlayStation", "Xbox", "Nintendo", "Otro"]
 
@@ -138,20 +139,22 @@ export function OrderForm({ onCreatedAction }: { onCreatedAction?: (orderId: str
 
               {selectedClient && (
                 <div className="rounded-lg border border-border bg-secondary/20 p-4 space-y-3">
-                  {selectedClient.isCorporate && selectedClient.companyLogo && (
+                  {selectedClient.companyId && selectedClient.company ? (
                     <div className="flex items-center gap-3">
-                      <img
-                        src={selectedClient.companyLogo}
-                        alt={selectedClient.companyName}
+                      {selectedClient.company.logo && <Image
+                        src={selectedClient.company.logo}
+                        alt={selectedClient.company.name}
+                        width={48}
+                        height={48}
+                        unoptimized
                         className="h-12 w-12 rounded object-contain"
-                      />
+                      />}
                       <div>
-                        <p className="text-sm font-medium text-foreground">{selectedClient.companyName}</p>
+                        <p className="text-sm font-medium text-foreground">{selectedClient.company.name}</p>
                         <p className="text-xs text-muted-foreground">Contacto: {selectedClient.name}</p>
                       </div>
                     </div>
-                  )}
-                  {!selectedClient.isCorporate && (
+                  ) : (
                     <div>
                       <p className="text-sm font-medium text-foreground">{selectedClient.name}</p>
                     </div>
