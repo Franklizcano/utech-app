@@ -1,5 +1,9 @@
 # CHANGELOG
 
+### [0.1.7] - 2026-08-11
+- Improve user interface.
+- Added finished orders inbox.
+
 ### [0.1.6] - 2026-08-11
 - Added company management functionality.
 - Added company user management functionality into company management view.

@@ -14,6 +14,7 @@ import {
   type Role,
   type User,
   DEFAULT_STATES,
+  FINAL_ORDER_STATUS,
   getStatusLabel,
 } from "@/lib/types"
 import { createUserWithPasswordAction, type AuthUser, type CreateUserResult, logoutAction } from "@/app/actions/auth"
@@ -313,9 +314,10 @@ export function StoreProvider({
 
       // Actualización optimista
       setOrders((prev) =>
-        prev.map((o) => {
-          if (o.id !== orderId) return o
-          return {
+        prev.flatMap((o) => {
+          if (o.id !== orderId) return [o]
+          if (status === FINAL_ORDER_STATUS) return []
+          return [{
             ...o,
             status,
             timeline: [...o.timeline, { id: uid("ev"), status, note, date: now() }],
@@ -323,7 +325,7 @@ export function StoreProvider({
               ...o.notifications,
               { id: uid("nt"), message: `Estado actualizado: ${statusLabel}.${note ? ` ${note}` : ""}`, date: now(), read: false },
             ],
-          }
+          }]
         }),
       )
 

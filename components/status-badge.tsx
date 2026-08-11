@@ -19,9 +19,10 @@ export function StatusBadge({ status, className }: { status: OrderStatus; classN
   return (
     <span
       className={cn(
-        "inline-flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 text-xs font-medium whitespace-nowrap",
+        "inline-flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 text-xs font-medium whitespace-nowrap transition-[background-color,border-color,box-shadow] duration-200",
         className,
       )}
+      aria-label={`Estado: ${label}`}
       style={{
         backgroundColor: `rgba(${r}, ${g}, ${b}, 0.15)`,
         borderColor: `rgba(${r}, ${g}, ${b}, 0.3)`,
@@ -29,7 +30,7 @@ export function StatusBadge({ status, className }: { status: OrderStatus; classN
       }}
     >
       <span
-        className="size-1.5 rounded-full"
+        className="size-1.5 rounded-full shadow-[0_0_8px_currentColor]"
         style={{ backgroundColor: color }}
         aria-hidden="true"
       />

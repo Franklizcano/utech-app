@@ -1,19 +1,11 @@
 import { Analytics } from '@vercel/analytics/next'
 import type { Metadata, Viewport } from 'next'
-import { Geist, Geist_Mono } from 'next/font/google'
 import './globals.css'
 
-const geistSans = Geist({ variable: '--font-geist-sans', subsets: ['latin'] })
-const geistMono = Geist_Mono({
-  variable: '--font-geist-mono',
-  subsets: ['latin'],
-})
-
 export const metadata: Metadata = {
-  title: 'UTech — Gestión de Servicio Técnico',
+  title: 'UTech',
   description:
-    'Plataforma de gestión para servicio técnico de PCs y consolas: pedidos, presupuestos y seguimiento en tiempo real.',
-  generator: 'v0.app',
+    'Plataforma de gestión de tu orden en tiempo real.',
   icons: {
     icon: [
       {
@@ -35,7 +27,7 @@ export const metadata: Metadata = {
 
 export const viewport: Viewport = {
   colorScheme: 'dark',
-  themeColor: '#181226',
+  themeColor: '#171526',
 }
 
 export default function RootLayout({
@@ -46,7 +38,7 @@ export default function RootLayout({
   return (
     <html
       lang="es"
-      className={`dark ${geistSans.variable} ${geistMono.variable}`}
+      className="dark"
       suppressHydrationWarning
     >
       <body className="bg-background font-sans antialiased">

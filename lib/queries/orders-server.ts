@@ -1,5 +1,5 @@
 import { getSupabaseServerClient } from "@/lib/supabase"
-import type { AppNotification, BudgetItem, OccasionalTicketStatus, Order, OrderCreationInput, OrderStatus, TimelineEvent, Role } from "@/lib/types"
+import { FINAL_ORDER_STATUS, type AppNotification, type BudgetItem, type OccasionalTicketStatus, type Order, type OrderCreationInput, type OrderStatus, type TimelineEvent, type Role } from "@/lib/types"
 import { formatOrderCode } from "@/lib/utils"
 import { customAlphabet } from "nanoid"
 
@@ -284,8 +284,36 @@ export async function fetchOrdersForUser(userId: string, role: Role, assignedTo?
   if (role === "cliente") {
     ordersQuery = ordersQuery.eq("client_id", userId)
   } else if (role === "admin") {
-    ordersQuery = ordersQuery.not("assigned_to", "is", null)
+    ordersQuery = ordersQuery.not("assigned_to", "is", null).neq("status", FINAL_ORDER_STATUS)
   } else if (role === "colaborador") {
+    if (!assignedTo) return []
+
+    const lastMonth = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString()
+    ordersQuery = ordersQuery.eq("assigned_to", assignedTo).neq("status", FINAL_ORDER_STATUS).gte("updated_at", lastMonth)
+  }
+
+  const { data: ordersData, error: ordersError } = await ordersQuery
+
+  if (ordersError) {
+    console.error("Error al traer órdenes autorizadas:", ordersError.message)
+    throw new Error("No se pudieron cargar las órdenes.")
+  }
+
+  return hydrateOrders((ordersData ?? []) as Array<Record<string, unknown>>, supabase)
+}
+
+export async function fetchCompletedOrdersForUser(userId: string, role: Role, assignedTo?: string): Promise<Order[]> {
+  if (!userId || !["admin", "colaborador"].includes(role)) return []
+
+  const supabase = getSupabaseServerClient()
+  let ordersQuery = supabase
+    .from("orders")
+    .select("*")
+    .eq("status", FINAL_ORDER_STATUS)
+    .not("assigned_to", "is", null)
+    .order("updated_at", { ascending: false })
+
+  if (role === "colaborador") {
     if (!assignedTo) return []
 
     const lastMonth = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString()
@@ -295,8 +323,8 @@ export async function fetchOrdersForUser(userId: string, role: Role, assignedTo?
   const { data: ordersData, error: ordersError } = await ordersQuery
 
   if (ordersError) {
-    console.error("Error al traer órdenes autorizadas:", ordersError.message)
-    throw new Error("No se pudieron cargar las órdenes.")
+    console.error("Error al traer órdenes finalizadas:", ordersError.message)
+    throw new Error("No se pudieron cargar las órdenes finalizadas.")
   }
 
   return hydrateOrders((ordersData ?? []) as Array<Record<string, unknown>>, supabase)

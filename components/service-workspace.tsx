@@ -14,6 +14,7 @@ import {
 } from "@/components/ui/dialog"
 import { StatusBadge } from "@/components/status-badge"
 import { UnassignedOrdersInbox } from "@/components/unassigned-orders-inbox"
+import { CompletedOrdersInbox } from "@/components/completed-orders-inbox"
 import { OrderForm } from "@/components/employee/order-form"
 import { OrderDetail } from "@/components/employee/order-detail"
 import { useStore, formatCurrency } from "@/lib/store"
@@ -43,10 +44,10 @@ export function ServiceWorkspace() {
   const selected = orders.find((o) => o.id === selectedId) ?? (!ordersLoading ? orders[0] ?? null : null)
 
   return (
-    <div className="space-y-5">
+    <div className="animate-utech-enter space-y-5">
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-xl font-semibold text-foreground">Pedidos</h2>
+          <h2 className="text-xl font-semibold tracking-tight text-foreground">Pedidos</h2>
           <p className="text-sm text-muted-foreground">{orders.length} órdenes de reparación en el sistema</p>
         </div>
         <Button className="gap-2" onClick={() => setDialogOpen(true)} disabled={ordersLoading}>
@@ -55,7 +56,10 @@ export function ServiceWorkspace() {
         </Button>
       </div>
 
-      <UnassignedOrdersInbox />
+      <div className="flex flex-wrap items-center gap-2">
+        <UnassignedOrdersInbox />
+        <CompletedOrdersInbox onSelectOrderAction={setSelectedId} />
+      </div>
 
       <div className="grid gap-5 lg:grid-cols-[340px_1fr]">
         {/* Lista de pedidos */}
@@ -94,7 +98,7 @@ export function ServiceWorkspace() {
                   type="button"
                   onClick={() => setSelectedId(order.id)}
                   className={cn(
-                    "w-full rounded-lg border bg-card p-4 text-left transition-colors",
+                    "w-full rounded-xl border bg-card p-4 text-left transition-[background-color,border-color,box-shadow,transform] duration-200 hover:-translate-y-0.5 hover:shadow-lg hover:shadow-black/10",
                     isActive
                       ? "border-primary/60 ring-1 ring-primary/40"
                       : "border-border hover:border-primary/30 hover:bg-secondary/40",

@@ -44,7 +44,7 @@ export function OccasionalTicketLookup() {
           Consultá tu ticket
         </CardTitle>
         <CardDescription>
-          Disponible para clientes ocasionales. Ingresá el código de seguimiento para ver su estado.
+          Ingresá el código de seguimiento para ver el estado de tu orden.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
