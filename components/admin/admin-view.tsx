@@ -10,7 +10,7 @@ import { CompanyManagement } from "@/components/admin/company-management"
 
 export function AdminView() {
   return (
-    <Tabs defaultValue="operaciones" className="space-y-6">
+    <Tabs defaultValue="operaciones" className="animate-utech-enter space-y-6">
       <TabsList>
         <TabsTrigger value="operaciones" className="gap-2">
           <LayoutGrid className="size-4" />

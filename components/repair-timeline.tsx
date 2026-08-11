@@ -38,11 +38,15 @@ export function RepairTimeline({ order }: { order: Order }) {
         const isLast = index === steps.length - 1
 
         return (
-          <li key={step} className="relative flex gap-4 pl-1">
+          <li
+            key={step}
+            className="animate-utech-enter relative flex gap-4 pl-1"
+            style={{ animationDelay: `${index * 35}ms` }}
+          >
             {!isLast && (
               <span
                 className={cn(
-                  "absolute left-[15px] top-8 h-[calc(100%+0px)] w-px",
+                  "absolute left-3.75 top-8 h-[calc(100%+0px)] w-px",
                   completed ? "bg-primary/60" : "bg-border",
                 )}
                 aria-hidden="true"

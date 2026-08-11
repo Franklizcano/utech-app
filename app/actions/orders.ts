@@ -5,6 +5,7 @@ import { getSupabaseServerClient } from "@/lib/supabase"
 import {
   claimOrderServer,
   fetchAvailableOrdersForCollaborator,
+  fetchCompletedOrdersForUser,
   fetchOccasionalTicketStatus,
   fetchOrdersForUser,
   insertOrderServer,
@@ -134,6 +135,13 @@ export async function fetchOrdersAction() {
   }
 
   return fetchOrdersForUser(session.id, session.role, session.name)
+}
+
+export async function fetchCompletedOrdersAction(): Promise<Order[]> {
+  const session = await getSessionAction()
+  if (!session || !session.active || !["admin", "colaborador"].includes(session.role)) return []
+
+  return fetchCompletedOrdersForUser(session.id, session.role, session.name)
 }
 
 export async function lookupOccasionalTicketAction(code: string): Promise<OccasionalTicketLookupResult> {

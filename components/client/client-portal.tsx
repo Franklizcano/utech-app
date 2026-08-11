@@ -28,7 +28,7 @@ function ClientOrderDetail({ order }: { order: Order }) {
   const notifications = [...order.notifications].reverse()
 
   return (
-    <div className="space-y-6">
+    <div className="animate-utech-enter space-y-6">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div>
           <div className="flex flex-wrap items-center gap-2">
@@ -159,10 +159,10 @@ export function ClientPortal() {
   }
 
   return (
-    <div className="space-y-5">
+    <div className="animate-utech-enter space-y-5">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h2 className="text-xl font-semibold text-foreground">Mis órdenes</h2>
+          <h2 className="text-xl font-semibold tracking-tight text-foreground">Mis órdenes</h2>
           <p className="text-sm text-muted-foreground">
             {orders.length} {orders.length === 1 ? "orden asociada" : "órdenes asociadas"} a tu cuenta
           </p>
@@ -207,7 +207,7 @@ export function ClientPortal() {
                 variant="ghost"
                 onClick={() => handleSelectOrder(order.id)}
                 className={cn(
-                  "h-auto w-full justify-start rounded-lg border bg-card p-4 text-left hover:bg-secondary/40",
+                  "h-auto w-full justify-start rounded-xl border bg-card p-4 text-left transition-[background-color,border-color,box-shadow,transform] duration-200 hover:-translate-y-0.5 hover:bg-secondary/40 hover:shadow-lg hover:shadow-black/10",
                   order.id === selectedOrder?.id ? "border-primary/60 ring-1 ring-primary/40" : "border-border",
                 )}
               >

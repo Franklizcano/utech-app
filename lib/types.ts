@@ -4,6 +4,8 @@ export type DeviceType = "PC" | "Notebook" | "PlayStation" | "Xbox" | "Nintendo"
 
 export type OrderStatus = string
 
+export const FINAL_ORDER_STATUS: OrderStatus = "entregado"
+
 export interface OrderState {
   id: string
   label: string

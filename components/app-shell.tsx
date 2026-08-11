@@ -19,12 +19,6 @@ import {
 } from "@/components/ui/dropdown-menu"
 import type { Role } from "@/lib/types"
 
-const ROLE_SUBTITLE: Record<Role, string> = {
-  admin: "Panel completo: operaciones, usuarios y estadísticas",
-  colaborador: "Carga de pedidos y armado de presupuestos",
-  cliente: "Portal de seguimiento de tu reparación",
-}
-
 const ROLE_ICON: Record<Role, typeof ShieldCheck> = {
   admin: ShieldCheck,
   colaborador: Wrench,
@@ -45,15 +39,16 @@ export function AppShell() {
 
   return (
     <div className="min-h-screen bg-background">
-      <header className="sticky top-0 z-30 border-b border-border bg-background/80 backdrop-blur">
+      <header className="sticky top-0 z-30 border-b border-border/70 bg-background/75 backdrop-blur-xl">
         <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-4 px-4 py-3 sm:px-6">
           <div className="flex items-center gap-3">
-            <div className="flex size-9 items-center justify-center rounded-lg bg-primary text-primary-foreground">
+            <div className="relative flex size-9 items-center justify-center overflow-hidden rounded-xl bg-primary text-primary-foreground shadow-lg shadow-primary/20">
+              <span className="absolute inset-0 bg-white/15" aria-hidden="true" />
               <Cpu className="size-5" />
             </div>
             <div>
               <p className="font-semibold leading-tight text-foreground">UTech</p>
-              <p className="text-xs text-muted-foreground">Servicio técnico de PCs y consolas</p>
+              <p className="text-xs text-muted-foreground">Servicio técnico</p>
             </div>
           </div>
 
@@ -63,7 +58,7 @@ export function AppShell() {
                 render={
                   <button
                     type="button"
-                    className="inline-flex items-center gap-2 rounded-lg border border-border bg-card px-3 py-1.5 text-left transition-colors hover:border-primary/40 hover:bg-muted"
+                    className="inline-flex items-center gap-2 rounded-xl border border-border/80 bg-card/70 px-3 py-1.5 text-left shadow-sm transition-[background-color,border-color,box-shadow] duration-200 hover:border-primary/40 hover:bg-muted hover:shadow-md"
                     aria-label="Abrir menú de usuario"
                   />
                 }
@@ -101,16 +96,11 @@ export function AppShell() {
       </header>
 
       <main className="mx-auto max-w-6xl px-4 py-8 sm:px-6">
-        <div className="mb-6">
-          <p className="text-xs font-medium uppercase tracking-wide text-primary">
-            Vista de {role === "admin" ? "administrador" : role === "colaborador" ? "colaborador" : role}
-          </p>
-          <p className="text-sm text-muted-foreground">{ROLE_SUBTITLE[role]}</p>
+        <div className="animate-utech-enter">
+          {role === "admin" && <AdminView />}
+          {role === "colaborador" && <ServiceWorkspace />}
+          {role === "cliente" && <ClientPortal />}
         </div>
-
-        {role === "admin" && <AdminView />}
-        {role === "colaborador" && <ServiceWorkspace />}
-        {role === "cliente" && <ClientPortal />}
       </main>
     </div>
   )
