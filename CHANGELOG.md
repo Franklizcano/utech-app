@@ -1,8 +1,8 @@
 # CHANGELOG
 
 ### [0.1.6] - 2026-08-11
-- Added company manegement functionality.
-- Added company user management functionality.
+- Added company management functionality.
+- Added company user management functionality into company management view.
 - Added company user limit in corporate user management.
 
 ### [0.1.5] - 2026-08-09
