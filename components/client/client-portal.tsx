@@ -1,117 +1,64 @@
 "use client"
 
-import { useState } from "react"
-import { Search, LogOut, Bell, Receipt, Wrench, KeyRound } from "lucide-react"
+import { useMemo, useState } from "react"
+import { Bell, Inbox, Loader2, Plus, Receipt, Search, Wrench } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Separator } from "@/components/ui/separator"
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
 import { StatusBadge } from "@/components/status-badge"
 import { RepairTimeline } from "@/components/repair-timeline"
+import { ClientOrderForm } from "@/components/client/client-order-form"
 import { useStore, formatCurrency } from "@/lib/store"
-import { budgetTotal } from "@/lib/types"
-import { cn } from "@/lib/utils"
+import { budgetTotal, type Order } from "@/lib/types"
+import { cn, normalizeOrderCode } from "@/lib/utils"
 
 function formatDate(iso: string) {
   return new Date(iso).toLocaleDateString("es-AR", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })
 }
-
-function ClientLogin() {
-  const { orders, setActiveClientOrderId, markNotificationsRead } = useStore()
-  const [code, setCode] = useState("")
-  const [error, setError] = useState("")
-
-  function handleSubmit(e: React.FormEvent) {
-    e.preventDefault()
-    const match = orders.find((o) => o.code.toLowerCase() === code.trim().toLowerCase())
-    if (!match) {
-      setError("No encontramos una orden asociada a tu cuenta con ese código.")
-      return
-    }
-    setError("")
-    markNotificationsRead(match.id)
-    setActiveClientOrderId(match.id)
-  }
-
-  return (
-    <div className="mx-auto flex min-h-[60vh] max-w-md flex-col justify-center">
-      <Card>
-        <CardHeader className="text-center">
-          <div className="mx-auto mb-2 flex size-12 items-center justify-center rounded-xl bg-primary/15 text-primary">
-            <KeyRound className="size-6" />
-          </div>
-          <CardTitle>Portal de seguimiento</CardTitle>
-          <p className="text-sm text-muted-foreground">Ingresá el código de tu orden para ver el estado de tu reparación.</p>
-        </CardHeader>
-        <CardContent>
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <div className="space-y-2">
-               <Label htmlFor="code">Código de tu orden</Label>
-              <Input
-                id="code"
-                value={code}
-                onChange={(e) => setCode(e.target.value)}
-                placeholder="Ej: TF-1024"
-                aria-invalid={!!error}
-              />
-              {error && <p className="text-sm text-destructive">{error}</p>}
-            </div>
-            <Button type="submit" className="w-full gap-2">
-              <Search className="size-4" />
-              Ver mi reparación
-            </Button>
-          </form>
-        </CardContent>
-      </Card>
-    </div>
-  )
-}
-
-export function ClientPortal() {
-  const { orders, activeClientOrderId, setActiveClientOrderId } = useStore()
-  const order = orders.find((o) => o.id === activeClientOrderId) ?? null
-
-  if (!order) return <ClientLogin />
-
+function ClientOrderDetail({ order }: { order: Order }) {
   const total = budgetTotal(order)
   const notifications = [...order.notifications].reverse()
 
   return (
-    <div className="mx-auto max-w-3xl space-y-6">
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-        <div className="space-y-2">
-          <p className="text-sm text-muted-foreground">Bienvenido</p>
-          <h2 className="text-2xl font-bold text-foreground">{order.clientName}</h2>
-          <p className="text-sm text-muted-foreground">📞 {order.clientPhone}</p>
-          <p className="text-sm text-foreground">
-            {order.deviceBrand} {order.deviceModel}{" "}
-            <span className="font-mono text-xs text-muted-foreground">· {order.code}</span>
-          </p>
+    <div className="space-y-6">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+        <div>
+          <div className="flex flex-wrap items-center gap-2">
+            <h3 className="text-lg font-semibold text-foreground">{order.deviceBrand} {order.deviceModel}</h3>
+            <span className="rounded-md bg-secondary px-2 py-0.5 font-mono text-xs text-secondary-foreground">{order.code}</span>
+          </div>
+          <p className="mt-1 text-sm text-muted-foreground">{order.deviceType} · Creado el {formatDate(order.createdAt)}</p>
+          <p className="mt-1 text-sm text-muted-foreground">📞 {order.clientPhone}</p>
         </div>
-        <Button variant="outline" size="sm" className="gap-2 self-start" onClick={() => setActiveClientOrderId(null)}>
-          <LogOut className="size-4" />
-          Salir
-        </Button>
+        <StatusBadge status={order.status} className="self-start text-sm" />
       </div>
 
       <Card>
-        <CardContent className="flex flex-col items-center justify-center gap-4 sm:flex-row sm:justify-between">
-          <div className="flex items-center gap-3">
-            <div className="flex size-10 items-center justify-center rounded-lg bg-primary/15 text-primary">
-              <Wrench className="size-5" />
-            </div>
-            <div>
-              <p className="text-xs text-muted-foreground">Estado actual</p>
-              <p className="font-medium text-foreground">Reparación en curso</p>
-            </div>
+        <CardContent className="flex items-center gap-3">
+          <div className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-primary/15 text-primary">
+            <Wrench className="size-5" />
           </div>
-          <StatusBadge status={order.status} className="text-sm" />
+          <div>
+            <p className="text-xs text-muted-foreground">Estado actual</p>
+            <p className="font-medium text-foreground">Seguimiento de reparación</p>
+          </div>
         </CardContent>
       </Card>
 
-      <div className="grid gap-6 md:grid-cols-2">
-        {/* Timeline */}
+      <div className="rounded-lg border border-border bg-secondary/30 p-4">
+        <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Falla reportada</p>
+        <p className="mt-1 text-sm text-foreground">{order.fault}</p>
+      </div>
+
+      <div className="grid gap-6 lg:grid-cols-2">
         <Card>
           <CardHeader>
             <CardTitle className="text-base">Seguimiento</CardTitle>
@@ -122,7 +69,6 @@ export function ClientPortal() {
         </Card>
 
         <div className="space-y-6">
-          {/* Presupuesto */}
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2 text-base">
@@ -153,7 +99,6 @@ export function ClientPortal() {
             </CardContent>
           </Card>
 
-          {/* Notificaciones */}
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2 text-base">
@@ -162,22 +107,155 @@ export function ClientPortal() {
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-3">
-              {notifications.map((n) => (
-                <div
-                  key={n.id}
-                  className={cn(
-                    "rounded-md border p-3",
-                    n.read ? "border-border bg-card" : "border-primary/30 bg-primary/5",
-                  )}
-                >
-                  <p className="text-sm text-foreground">{n.message}</p>
-                  <p className="mt-1 text-xs text-muted-foreground">{formatDate(n.date)}</p>
-                </div>
-              ))}
+              {notifications.length === 0 ? (
+                <p className="text-sm text-muted-foreground">Todavía no tenés notificaciones.</p>
+              ) : (
+                notifications.map((notification) => (
+                  <div
+                    key={notification.id}
+                    className={cn(
+                      "rounded-md border p-3",
+                      notification.read ? "border-border bg-card" : "border-primary/30 bg-primary/5",
+                    )}
+                  >
+                    <p className="text-sm text-foreground">{notification.message}</p>
+                    <p className="mt-1 text-xs text-muted-foreground">{formatDate(notification.date)}</p>
+                  </div>
+                ))
+              )}
             </CardContent>
           </Card>
         </div>
       </div>
+    </div>
+  )
+}
+
+export function ClientPortal() {
+  const { orders, ordersLoading, markNotificationsRead } = useStore()
+  const [selectedOrderId, setSelectedOrderId] = useState<string | null>(null)
+  const [searchQuery, setSearchQuery] = useState("")
+  const [dialogOpen, setDialogOpen] = useState(false)
+
+  const filteredOrders = useMemo(() => {
+    const query = searchQuery.trim()
+    if (!query) return orders
+
+    const normalizedCode = normalizeOrderCode(query)
+    const lowerQuery = query.toLowerCase()
+    return orders.filter((order) => {
+      const matchesCode = normalizeOrderCode(order.code).includes(normalizedCode)
+      const matchesDevice = `${order.deviceBrand} ${order.deviceModel}`.toLowerCase().includes(lowerQuery)
+      const matchesStatus = order.status.toLowerCase().includes(lowerQuery)
+      return matchesCode || matchesDevice || matchesStatus
+    })
+  }, [orders, searchQuery])
+
+  const selectedOrder = orders.find((order) => order.id === selectedOrderId) ?? orders[0] ?? null
+
+  function handleSelectOrder(orderId: string) {
+    setSelectedOrderId(orderId)
+    markNotificationsRead(orderId)
+  }
+
+  return (
+    <div className="space-y-5">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <h2 className="text-xl font-semibold text-foreground">Mis órdenes</h2>
+          <p className="text-sm text-muted-foreground">
+            {orders.length} {orders.length === 1 ? "orden asociada" : "órdenes asociadas"} a tu cuenta
+          </p>
+        </div>
+        <Button className="gap-2" onClick={() => setDialogOpen(true)} disabled={ordersLoading}>
+          <Plus className="size-4" />
+          Nueva orden
+        </Button>
+      </div>
+
+      <div className="grid gap-5 lg:grid-cols-[340px_1fr]">
+        <div className="space-y-3">
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+            <Input
+              type="search"
+              placeholder="Buscar por código, equipo o estado..."
+              value={searchQuery}
+              onChange={(event) => setSearchQuery(event.target.value)}
+              disabled={ordersLoading}
+              className="pl-9"
+            />
+          </div>
+
+          {ordersLoading ? (
+            <div role="status" aria-live="polite" className="flex flex-col items-center justify-center gap-2 rounded-lg border border-dashed border-border py-8 text-center">
+              <Loader2 className="size-8 animate-spin text-primary" />
+              <p className="text-sm text-muted-foreground">Cargando tus órdenes…</p>
+            </div>
+          ) : filteredOrders.length === 0 ? (
+            <div className="flex flex-col items-center justify-center gap-2 rounded-lg border border-dashed border-border py-8 text-center">
+              <Inbox className="size-8 text-muted-foreground" />
+              <p className="text-sm text-muted-foreground">
+                {orders.length === 0 ? "Todavía no tenés órdenes asociadas." : "No se encontraron órdenes."}
+              </p>
+            </div>
+          ) : (
+            filteredOrders.map((order) => (
+              <Button
+                key={order.id}
+                type="button"
+                variant="ghost"
+                onClick={() => handleSelectOrder(order.id)}
+                className={cn(
+                  "h-auto w-full justify-start rounded-lg border bg-card p-4 text-left hover:bg-secondary/40",
+                  order.id === selectedOrder?.id ? "border-primary/60 ring-1 ring-primary/40" : "border-border",
+                )}
+              >
+                <span className="flex w-full flex-col items-stretch gap-2">
+                  <span className="flex items-center justify-between gap-2">
+                    <span className="font-mono text-xs font-medium text-foreground">{order.code}</span>
+                    <StatusBadge status={order.status} />
+                  </span>
+                  <span className="truncate text-sm text-muted-foreground">
+                    {order.deviceType} · {order.deviceBrand} {order.deviceModel}
+                  </span>
+                  <span className="text-xs text-muted-foreground/70">Creado {formatDate(order.createdAt)}</span>
+                </span>
+              </Button>
+            ))
+          )}
+        </div>
+
+        <Card>
+          <CardContent className="pt-6">
+            {selectedOrder ? (
+              <ClientOrderDetail key={selectedOrder.id} order={selectedOrder} />
+            ) : (
+              <div className="flex flex-col items-center justify-center gap-3 py-16 text-center">
+                <Inbox className="size-10 text-muted-foreground" />
+                <p className="text-sm text-muted-foreground">Seleccioná una orden para ver su detalle.</p>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      </div>
+
+      <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+        <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Nueva orden de reparación</DialogTitle>
+            <DialogDescription>
+              Completá los datos de tu equipo. Un colaborador revisará la solicitud y la tomará para comenzar el trabajo.
+            </DialogDescription>
+          </DialogHeader>
+          <ClientOrderForm
+            onCreatedAction={(id) => {
+              setSelectedOrderId(id)
+              setDialogOpen(false)
+            }}
+          />
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

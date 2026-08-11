@@ -95,11 +95,28 @@ export interface Order {
   fault: string
   // Gestión
   status: OrderStatus
-  assignedTo: string
+  assignedTo: string | null
   budget: BudgetItem[]
   timeline: TimelineEvent[]
   notifications: AppNotification[]
   createdAt: string
+}
+
+export interface OrderCreationInput {
+  clientId: string | null
+  clientName: string
+  clientPhone: string
+  clientEmail: string
+  deviceType: DeviceType
+  deviceBrand: string
+  deviceModel: string
+  fault: string
+  assignedTo: string | null
+}
+
+export interface OccasionalTicketStatus {
+  code: string
+  status: OrderStatus
 }
 
 export interface OrderDetailsInput {

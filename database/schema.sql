@@ -97,7 +97,7 @@ CREATE TABLE IF NOT EXISTS orders (
   fault TEXT NOT NULL, -- Descripción del daño/problema
   -- Gestión de la orden
   status TEXT NOT NULL REFERENCES order_states(id),
-  assigned_to VARCHAR(255) NOT NULL, -- Nombre del empleado asignado
+  assigned_to VARCHAR(255), -- Nombre del empleado asignado; NULL hasta que un colaborador tome la orden
   created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
@@ -107,6 +107,7 @@ CREATE INDEX IF NOT EXISTS idx_orders_client_id ON orders(client_id);
 CREATE INDEX IF NOT EXISTS idx_orders_status ON orders(status);
 CREATE INDEX IF NOT EXISTS idx_orders_assigned_to ON orders(assigned_to);
 CREATE INDEX IF NOT EXISTS idx_orders_created_at ON orders(created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_orders_unassigned ON orders(created_at DESC) WHERE assigned_to IS NULL;
 
 -- ============================================
 -- Tabla: budget_items (Presupuesto)
