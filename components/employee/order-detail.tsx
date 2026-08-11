@@ -25,6 +25,7 @@ import { RepairTimeline } from "@/components/repair-timeline"
 import { ReassignDialog } from "@/components/employee/reassign-dialog"
 import { useStore, formatCurrency } from "@/lib/store"
 import { budgetTotal, getStatusFlow, getStatusLabel, type DeviceType, type Order, type OrderStatus } from "@/lib/types"
+import Image from "next/image"
 
 const DEVICE_TYPES: DeviceType[] = ["PC", "Notebook", "PlayStation", "Xbox", "Nintendo", "Otro"]
 
@@ -100,8 +101,8 @@ export function OrderDetail({ order }: { order: Order }) {
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="flex-1">
           <div className="flex items-center gap-3">
-            {client?.isCorporate && client?.companyLogo && (
-              <img src={client.companyLogo} alt={client.companyName} className="h-12 w-12 rounded object-contain" />
+            {client?.companyId && client.company?.logo && (
+              <Image src={client.company.logo} alt={client.company.name} width={48} height={48} unoptimized className="h-12 w-12 rounded object-contain" />
             )}
             <div>
               <div className="flex items-center gap-2">
@@ -110,8 +111,8 @@ export function OrderDetail({ order }: { order: Order }) {
                   {order.code}
                 </span>
               </div>
-              {client?.isCorporate && client?.companyName && (
-                <p className="mt-0.5 text-sm text-muted-foreground">{client.companyName}</p>
+              {client?.companyId && client.company?.name && (
+                <p className="mt-0.5 text-sm text-muted-foreground">{client.company.name}</p>
               )}
               {editingDetails ? (
                 <div className="mt-3 space-y-2">

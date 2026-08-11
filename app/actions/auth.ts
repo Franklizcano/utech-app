@@ -3,7 +3,7 @@
 import { cookies } from "next/headers"
 import bcrypt from "bcryptjs"
 import { getSupabaseServerClient } from "@/lib/supabase"
-import type { Role, User } from "@/lib/types"
+import type { CompanySummary, Role, User } from "@/lib/types"
 
 const MIN_PASSWORD_LENGTH = 8
 
@@ -12,9 +12,7 @@ type UserInput = {
   email: string
   phone: string
   role: Role
-  isCorporate?: boolean
-  companyName?: string
-  companyLogo?: string
+  companyId?: string
 }
 
 export interface CreateUserResult {
@@ -36,6 +34,7 @@ function validatePassword(password: string): string | null {
 }
 
 function rowToUser(row: Record<string, unknown>): User {
+  const company = Array.isArray(row.company) ? row.company[0] : row.company as { name?: string; logo?: string | null } | undefined
   return {
     id: row.id as string,
     name: row.name as string,
@@ -43,14 +42,13 @@ function rowToUser(row: Record<string, unknown>): User {
     phone: row.phone as string,
     role: row.role as Role,
     active: row.active as boolean,
-    isCorporate: (row.is_corporate as boolean) ?? false,
-    companyName: (row.company_name as string) ?? undefined,
-    companyLogo: (row.company_logo as string) ?? undefined,
+    companyId: (row.company_id as string) ?? undefined,
+    company: company?.name ? { name: company.name, logo: company.logo ?? undefined } : undefined,
     createdAt: row.created_at as string,
   }
 }
 
-const safeUserSelect = "id, name, email, phone, role, active, is_corporate, company_name, company_logo, created_at"
+const safeUserSelect = "id, name, email, phone, role, active, company_id, created_at, company:companies(name, logo)"
 
 export interface AuthUser {
   id: string
@@ -59,9 +57,8 @@ export interface AuthUser {
   phone: string
   role: Role
   active: boolean
-  isCorporate?: boolean
-  companyName?: string
-  companyLogo?: string
+  companyId?: string
+  company?: CompanySummary
   createdAt: string
 }
 
@@ -74,6 +71,7 @@ interface LoginResult {
 export async function loginAction(email: string, password: string): Promise<LoginResult> {
   try {
     if (!email || !password) {
+      console.warn("[auth] login rechazado: faltan credenciales", { hasEmail: Boolean(email), hasPassword: Boolean(password) })
       return { success: false, error: "Email y contraseña son requeridos." }
     }
 
@@ -81,25 +79,29 @@ export async function loginAction(email: string, password: string): Promise<Logi
 
     const { data, error } = await supabase
       .from("users")
-      .select("id, name, email, phone, role, active, is_corporate, company_name, company_logo, password_hash, created_at")
+      .select("id, name, email, phone, role, active, password_hash, company_id, created_at, company:companies(name, logo)")
       .eq("email", email.toLowerCase().trim())
       .single()
 
     if (error || !data) {
+      console.warn("[auth] login rechazado: usuario no encontrado o consulta fallida", { email: email.toLowerCase().trim(), code: error?.code })
       return { success: false, error: "Email o contraseña incorrectos." }
     }
 
     if (!data.active) {
+      console.warn("[auth] login rechazado: cuenta desactivada", { userId: data.id })
       return { success: false, error: "Tu cuenta está desactivada. Contactá al administrador." }
     }
 
     if (!data.password_hash) {
+      console.warn("[auth] login rechazado: cuenta sin contraseña", { userId: data.id })
       return { success: false, error: "Tu cuenta no tiene contraseña configurada." }
     }
 
     const passwordMatch = await bcrypt.compare(password, data.password_hash)
 
     if (!passwordMatch) {
+      console.warn("[auth] login rechazado: contraseña incorrecta", { userId: data.id })
       return { success: false, error: "Email o contraseña incorrectos." }
     }
 
@@ -111,9 +113,10 @@ export async function loginAction(email: string, password: string): Promise<Logi
       phone: data.phone,
       role: data.role as Role,
       active: data.active,
-      isCorporate: data.is_corporate ?? undefined,
-      companyName: data.company_name ?? undefined,
-      companyLogo: data.company_logo ?? undefined,
+      companyId: data.company_id ?? undefined,
+      company: data.company?.[0]
+        ? { name: data.company[0].name, logo: data.company[0].logo ?? undefined }
+        : undefined,
       createdAt: data.created_at,
     }
 
@@ -153,11 +156,28 @@ export async function createUserWithPasswordAction(
     if (!name || !email || !phone) {
       return { success: false, error: "Nombre, email y teléfono son requeridos." }
     }
-    if (input.role === "cliente" && input.isCorporate && !input.companyName?.trim()) {
-      return { success: false, error: "El nombre de la empresa es requerido." }
-    }
+    if (input.companyId && input.role !== "cliente") return { success: false, error: "Solo los clientes pueden pertenecer a una empresa." }
 
     const supabase = getSupabaseServerClient()
+    if (input.companyId) {
+      const { data: company, error: companyError } = await supabase
+        .from("companies")
+        .select("id, name, user_limit")
+        .eq("id", input.companyId)
+        .single()
+
+      if (companyError || !company) return { success: false, error: "La empresa seleccionada no existe." }
+
+      const { count, error: countError } = await supabase
+        .from("users")
+        .select("id", { count: "exact", head: true })
+        .eq("company_id", input.companyId)
+
+      if (countError) return { success: false, error: "No se pudo verificar el cupo de la empresa." }
+      if ((count ?? 0) >= company.user_limit) {
+        return { success: false, error: `La empresa ${company.name} alcanzó su límite de ${company.user_limit} usuarios corporativos.` }
+      }
+    }
     const passwordHash = await bcrypt.hash(input.password, 10)
     const { data, error } = await supabase
       .from("users")
@@ -168,9 +188,7 @@ export async function createUserWithPasswordAction(
         role: input.role,
         active: true,
         password_hash: passwordHash,
-        is_corporate: input.isCorporate ?? false,
-        company_name: input.companyName?.trim() || null,
-        company_logo: input.companyLogo || null,
+        company_id: input.companyId || null,
       })
       .select(safeUserSelect)
       .single()

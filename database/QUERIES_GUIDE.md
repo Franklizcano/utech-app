@@ -15,18 +15,16 @@ RETURNING id, email;
 
 ### Crear un cliente corporativo
 ```sql
-INSERT INTO users (name, email, phone, role, active, is_corporate, company_name, company_logo)
+INSERT INTO users (name, email, phone, role, active, company_id)
 VALUES (
   'Contacto Empresa XYZ',
   'contacto@empresaxyz.com',
   '+54 11 8765-4321',
   'cliente',
   true,
-  true,
-  'Empresa XYZ S.A.',
-  'https://example.com/logo.png'
+  (SELECT id FROM companies WHERE name = 'Empresa XYZ S.A.')
 )
-RETURNING id, company_name;
+RETURNING id, company_id;
 ```
 
 ### Listar todos los empleados activos
@@ -39,8 +37,9 @@ ORDER BY name ASC;
 
 ### Obtener información de un usuario por email
 ```sql
-SELECT id, name, email, phone, role, active, is_corporate, company_name
-FROM users
+SELECT u.id, u.name, u.email, u.phone, u.role, u.active, u.company_id, c.name AS company_name
+FROM users u
+LEFT JOIN companies c ON c.id = u.company_id
 WHERE email = 'juan.perez@mail.com';
 ```
 
@@ -460,8 +459,9 @@ ORDER BY ingresos_totales DESC;
 
 ### Buscar cliente por email o teléfono
 ```sql
-SELECT id, name, email, phone, role, is_corporate, company_name
-FROM users
+SELECT u.id, u.name, u.email, u.phone, u.role, u.company_id, c.name AS company_name
+FROM users u
+LEFT JOIN companies c ON c.id = u.company_id
 WHERE email ILIKE '%juan%' OR phone ILIKE '%5555%'
 LIMIT 10;
 ```

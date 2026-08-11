@@ -44,10 +44,8 @@ phone (VARCHAR)            -- Teléfono de contacto
 role (FK → roles.id)       -- Rol del usuario
 active (BOOLEAN)           -- Estado del usuario
 
--- Campos corporativos (solo clientes)
-is_corporate (BOOLEAN)     -- ¿Es una empresa?
-company_name (VARCHAR)     -- Nombre de la empresa
-company_logo (TEXT)        -- URL o data URI del logo
+-- Relación opcional con una empresa
+company_id (UUID, FK → companies.id) -- Empresa; NULL para usuarios independientes
 
 created_at (TIMESTAMP)     -- Fecha de creación
 updated_at (TIMESTAMP)     -- Fecha de última actualización
@@ -57,10 +55,24 @@ updated_at (TIMESTAMP)     -- Fecha de última actualización
 - `email` - Búsqueda rápida por email
 - `role` - Filtrado por rol
 - `active` - Filtrado por estado activo
+- `company_id` - Usuarios pertenecientes a una empresa
+
+### 3. **companies** - Empresas
+
+Contiene los datos compartidos por los usuarios corporativos. Un usuario pertenece a una empresa cuando `users.company_id` tiene valor; si es `NULL`, es independiente.
+
+```text
+id (UUID, PK)              -- Identificador único
+name (VARCHAR, UNIQUE)     -- Nombre de la empresa
+logo (TEXT)                -- URL o data URI del logo
+user_limit (INTEGER)       -- Cupo máximo de usuarios
+created_at (TIMESTAMP)     -- Fecha de creación
+updated_at (TIMESTAMP)     -- Fecha de última actualización
+```
 
 ---
 
-### 3. **order_states** - Estados del flujo de reparación
+### 4. **order_states** - Estados del flujo de reparación
 
 Define los diferentes estados por los que puede pasar una orden.
 
@@ -231,15 +243,18 @@ SELECT
   o.code,
   o.client_name,
   o.client_email,
+  c.name AS company_name,
+  c.logo AS company_logo,
   o.device_type,
   o.device_brand,
   os.label as status_label,
   COALESCE(SUM(bi.amount), 0) as budget_total
 FROM orders o
 LEFT JOIN users u ON o.client_id = u.id
+LEFT JOIN companies c ON u.company_id = c.id
 LEFT JOIN order_states os ON o.status = os.id
 LEFT JOIN budget_items bi ON o.id = bi.order_id
-GROUP BY o.id, u.id, os.id;
+GROUP BY o.id, u.id, c.id, os.id;
 ```
 
 **Uso:** Reportes rápidos de órdenes con información consolidada.

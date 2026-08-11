@@ -217,20 +217,16 @@ INSERT INTO users (
   phone,
   role,
   active,
-  is_corporate,
-  company_name,
-  company_logo
+  company_id
 ) VALUES (
   'Contacto Empresa',
   'contacto@empresa.com',
   '+54 11 8765-4321',
   'cliente',
   true,
-  true,
-  'Empresa XYZ S.A.',
-  'https://example.com/logo.png'
+  (SELECT id FROM companies WHERE name = 'Empresa XYZ S.A.')
 )
-RETURNING id, company_name;
+RETURNING id, company_id;
 ```
 
 ### Marcar notificación como leída
@@ -373,8 +369,9 @@ ORDER BY dias_promedio DESC;
 
 ### Buscar cliente por email o teléfono
 ```sql
-SELECT id, name, email, phone, role, is_corporate, company_name
-FROM users
+SELECT u.id, u.name, u.email, u.phone, u.role, u.company_id, c.name AS company_name
+FROM users u
+LEFT JOIN companies c ON c.id = u.company_id
 WHERE email ILIKE '%juan%' OR phone ILIKE '%5555%'
 LIMIT 10;
 ```

@@ -1,5 +1,10 @@
 # CHANGELOG
 
+### [0.1.5] - 2026-08-11
+- Added company manegement functionality.
+- Added company user management functionality.
+- Added company user limit in corporate user management.
+
 ### [0.1.4] - 2026-08-05
 - Added loader when fetching data from the database to improve user experience.
 - Added deviceType to order selector.

@@ -13,7 +13,7 @@ export async function fetchUsersAction(): Promise<User[]> {
   const supabase = getSupabaseServerClient()
   const { data, error } = await supabase
     .from("users")
-    .select("id, name, email, phone, role, active, is_corporate, company_name, company_logo, created_at")
+    .select("id, name, email, phone, role, active, company_id, created_at, company:companies(name, logo)")
     .order("created_at", { ascending: true })
 
   if (error) {
@@ -28,9 +28,10 @@ export async function fetchUsersAction(): Promise<User[]> {
     phone: row.phone as string,
     role: row.role as Role,
     active: row.active as boolean,
-    isCorporate: (row.is_corporate as boolean) ?? false,
-    companyName: (row.company_name as string) ?? undefined,
-    companyLogo: (row.company_logo as string) ?? undefined,
+    companyId: (row.company_id as string) ?? undefined,
+    company: Array.isArray(row.company) && row.company[0]
+      ? { name: row.company[0].name as string, logo: (row.company[0].logo as string | null) ?? undefined }
+      : undefined,
     createdAt: row.created_at as string,
   }))
 }
