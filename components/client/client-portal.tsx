@@ -35,7 +35,10 @@ function ClientOrderDetail({ order }: { order: Order }) {
             <h3 className="text-lg font-semibold text-foreground">{order.deviceBrand} {order.deviceModel}</h3>
             <span className="rounded-md bg-secondary px-2 py-0.5 font-mono text-xs text-secondary-foreground">{order.code}</span>
           </div>
-          <p className="mt-1 text-sm text-muted-foreground">{order.deviceType} · Creado el {formatDate(order.createdAt)}</p>
+          <p className="mt-1 text-sm text-muted-foreground">
+            {order.deviceType} · Creado el {formatDate(order.createdAt)}
+            {order.deviceSerial && ` · Serial: ${order.deviceSerial}`}
+          </p>
           <p className="mt-1 text-sm text-muted-foreground">📞 {order.clientPhone}</p>
         </div>
         <StatusBadge status={order.status} className="self-start text-sm" />
@@ -146,8 +149,9 @@ export function ClientPortal() {
     return orders.filter((order) => {
       const matchesCode = normalizeOrderCode(order.code).includes(normalizedCode)
       const matchesDevice = `${order.deviceBrand} ${order.deviceModel}`.toLowerCase().includes(lowerQuery)
+      const matchesSerial = order.deviceSerial?.toLowerCase().includes(lowerQuery) ?? false
       const matchesStatus = order.status.toLowerCase().includes(lowerQuery)
-      return matchesCode || matchesDevice || matchesStatus
+      return matchesCode || matchesDevice || matchesSerial || matchesStatus
     })
   }, [orders, searchQuery])
 
@@ -179,7 +183,7 @@ export function ClientPortal() {
             <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
             <Input
               type="search"
-              placeholder="Buscar por código, equipo o estado..."
+              placeholder="Buscar por código, equipo, serial o estado..."
               value={searchQuery}
               onChange={(event) => setSearchQuery(event.target.value)}
               disabled={ordersLoading}
@@ -218,6 +222,7 @@ export function ClientPortal() {
                   </span>
                   <span className="truncate text-sm text-muted-foreground">
                     {order.deviceType} · {order.deviceBrand} {order.deviceModel}
+                    {order.deviceSerial && ` · Serial: ${order.deviceSerial}`}
                   </span>
                   <span className="text-xs text-muted-foreground/70">Creado {formatDate(order.createdAt)}</span>
                 </span>

@@ -33,6 +33,7 @@ function normalizeOrderDetails(input: OrderCreationInput) {
   const deviceType = normalizeText(input?.deviceType)
   const deviceBrand = normalizeText(input?.deviceBrand)
   const deviceModel = normalizeText(input?.deviceModel)
+  const deviceSerial = normalizeText(input?.deviceSerial) || null
   const fault = normalizeText(input?.fault)
 
   if (!allowedDeviceTypes.includes(deviceType) || !fault) return null
@@ -41,6 +42,7 @@ function normalizeOrderDetails(input: OrderCreationInput) {
     deviceType: deviceType as OrderCreationInput["deviceType"],
     deviceBrand,
     deviceModel,
+    deviceSerial,
     fault,
   }
 }

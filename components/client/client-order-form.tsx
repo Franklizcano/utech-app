@@ -23,6 +23,7 @@ export function ClientOrderForm({ onCreatedAction }: { onCreatedAction?: (orderI
   const [deviceType, setDeviceType] = useState<DeviceType>("PC")
   const [deviceBrand, setDeviceBrand] = useState("")
   const [deviceModel, setDeviceModel] = useState("")
+  const [deviceSerial, setDeviceSerial] = useState("")
   const [fault, setFault] = useState("")
 
   function handleSubmit(event: React.FormEvent) {
@@ -37,6 +38,7 @@ export function ClientOrderForm({ onCreatedAction }: { onCreatedAction?: (orderI
       deviceType,
       deviceBrand: deviceBrand.trim(),
       deviceModel: deviceModel.trim(),
+      deviceSerial: deviceSerial.trim() || null,
       fault: fault.trim(),
       assignedTo: null,
     })
@@ -44,6 +46,7 @@ export function ClientOrderForm({ onCreatedAction }: { onCreatedAction?: (orderI
     setDeviceType("PC")
     setDeviceBrand("")
     setDeviceModel("")
+    setDeviceSerial("")
     setFault("")
     onCreatedAction?.(order.id)
   }
@@ -59,7 +62,7 @@ export function ClientOrderForm({ onCreatedAction }: { onCreatedAction?: (orderI
           <Cpu className="size-4 text-primary" />
           Equipo
         </div>
-        <div className="grid gap-4 sm:grid-cols-3">
+        <div className="grid gap-4 sm:grid-cols-4">
           <div className="space-y-2">
             <Label>Tipo de equipo</Label>
             <Select value={deviceType} onValueChange={(value) => setDeviceType(value as DeviceType)}>
@@ -93,6 +96,16 @@ export function ClientOrderForm({ onCreatedAction }: { onCreatedAction?: (orderI
               onChange={(event) => setDeviceModel(event.target.value)}
               placeholder="Ej: PS5 Slim"
               required
+            />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="client-order-serial">Serial</Label>
+            <Input
+              id="client-order-serial"
+              value={deviceSerial}
+              onChange={(event) => setDeviceSerial(event.target.value)}
+              placeholder="Ej: SN123456789"
+              autoComplete="off"
             />
           </div>
         </div>

@@ -1,7 +1,7 @@
 "use client"
 
 import { useState } from "react"
-import { ClipboardPlus, User2, Cpu, AlertCircle } from "lucide-react"
+import { ClipboardPlus, User2, Cpu, AlertCircle, Search, Check } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -19,6 +19,14 @@ import Image from "next/image"
 
 const DEVICE_TYPES: DeviceType[] = ["PC", "Notebook", "PlayStation", "Xbox", "Nintendo", "Otro"]
 
+function normalizeSearchText(value: string) {
+  return value
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .trim()
+}
+
 export function OrderForm({ onCreatedAction }: { onCreatedAction?: (orderId: string) => void }) {
   const { addOrder, employees, users } = useStore()
   const activeEmployees = employees.filter((e) => e.active)
@@ -26,16 +34,26 @@ export function OrderForm({ onCreatedAction }: { onCreatedAction?: (orderId: str
 
   const [clientType, setClientType] = useState<"registered" | "occasional">("registered")
   const [clientId, setClientId] = useState(clients[0]?.id ?? "")
+  const [clientSearch, setClientSearch] = useState("")
   const [occasionalName, setOccasionalName] = useState("")
   const [occasionalPhone, setOccasionalPhone] = useState("")
   const [occasionalEmail, setOccasionalEmail] = useState("")
   const [deviceType, setDeviceType] = useState<DeviceType>("PC")
   const [deviceBrand, setDeviceBrand] = useState("")
   const [deviceModel, setDeviceModel] = useState("")
+  const [deviceSerial, setDeviceSerial] = useState("")
   const [fault, setFault] = useState("")
   const [assignedTo, setAssignedTo] = useState(activeEmployees[0]?.name ?? "")
 
   const selectedClient = clients.find((c) => c.id === clientId)
+  const normalizedClientSearch = normalizeSearchText(clientSearch)
+  const filteredClients = clients.filter((client) => {
+    if (!normalizedClientSearch) return true
+
+    return [client.name, client.email, client.phone].some((value) =>
+      normalizeSearchText(value).includes(normalizedClientSearch),
+    )
+  })
   const isUsingOccasional = clientType === "occasional"
 
   function handleSubmit(e: React.FormEvent) {
@@ -69,6 +87,7 @@ export function OrderForm({ onCreatedAction }: { onCreatedAction?: (orderId: str
       deviceType,
       deviceBrand,
       deviceModel,
+      deviceSerial: deviceSerial.trim() || null,
       fault,
       assignedTo,
     })
@@ -77,6 +96,7 @@ export function OrderForm({ onCreatedAction }: { onCreatedAction?: (orderId: str
     setDeviceType("PC")
     setDeviceBrand("")
     setDeviceModel("")
+    setDeviceSerial("")
     setFault("")
     setOccasionalName("")
     setOccasionalPhone("")
@@ -121,19 +141,43 @@ export function OrderForm({ onCreatedAction }: { onCreatedAction?: (orderId: str
                 </div>
               ) : (
                 <>
-                  <Label>Seleccionar cliente *</Label>
-                  <Select value={clientId} onValueChange={(v) => setClientId(v || "")}>
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {clients.map((client) => (
-                        <SelectItem key={client.id} value={client.id}>
-                          {client.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                  <Label htmlFor="client-search">Buscar cliente *</Label>
+                  <div className="relative">
+                    <Search className="pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-muted-foreground" />
+                    <Input
+                      id="client-search"
+                      value={clientSearch}
+                      onChange={(e) => setClientSearch(e.target.value)}
+                      placeholder="Buscar por nombre, email o teléfono"
+                      autoComplete="off"
+                      className="pl-9"
+                    />
+                  </div>
+                  <div className="max-h-56 overflow-y-auto rounded-lg border border-border bg-background p-1">
+                    {filteredClients.length === 0 ? (
+                      <p className="p-3 text-center text-sm text-muted-foreground">
+                        No se encontraron clientes con esa búsqueda.
+                      </p>
+                    ) : (
+                      filteredClients.map((client) => (
+                        <button
+                          key={client.id}
+                          type="button"
+                          onClick={() => setClientId(client.id)}
+                          className="flex w-full items-start gap-3 rounded-md px-3 py-2 text-left transition-colors hover:bg-muted focus-visible:bg-muted focus-visible:outline-none"
+                          aria-pressed={client.id === clientId}
+                        >
+                          <span className="min-w-0 flex-1">
+                            <span className="block truncate text-sm font-medium text-foreground">{client.name}</span>
+                            <span className="block truncate text-xs text-muted-foreground">
+                              {client.email} · {client.phone}
+                            </span>
+                          </span>
+                          {client.id === clientId && <Check className="mt-0.5 size-4 shrink-0 text-primary" />}
+                        </button>
+                      ))
+                    )}
+                  </div>
                 </>
               )}
 
@@ -217,7 +261,7 @@ export function OrderForm({ onCreatedAction }: { onCreatedAction?: (orderId: str
           <Cpu className="size-4 text-primary" />
           Equipo
         </div>
-        <div className="grid gap-4 sm:grid-cols-3">
+        <div className="grid gap-4 sm:grid-cols-4">
           <div className="space-y-2">
             <Label>Tipo de equipo</Label>
             <Select value={deviceType} onValueChange={(v) => setDeviceType(v as DeviceType)}>
@@ -240,6 +284,16 @@ export function OrderForm({ onCreatedAction }: { onCreatedAction?: (orderId: str
           <div className="space-y-2">
             <Label htmlFor="model">Modelo</Label>
             <Input id="model" value={deviceModel} onChange={(e) => setDeviceModel(e.target.value)} placeholder="Ej: PS5 Slim" />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="serial">Serial</Label>
+            <Input
+              id="serial"
+              value={deviceSerial}
+              onChange={(e) => setDeviceSerial(e.target.value)}
+              placeholder="Ej: SN123456789"
+              autoComplete="off"
+            />
           </div>
         </div>
       </section>

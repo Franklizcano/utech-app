@@ -277,6 +277,7 @@ export function StoreProvider({
         deviceType: input.deviceType,
         deviceBrand: input.deviceBrand,
         deviceModel: input.deviceModel,
+        deviceSerial: input.deviceSerial,
         fault: input.fault,
         status: "recibido",
         assignedTo: input.assignedTo?.trim() || null,

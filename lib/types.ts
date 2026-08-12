@@ -94,6 +94,7 @@ export interface Order {
   deviceType: DeviceType
   deviceBrand: string
   deviceModel: string
+  deviceSerial: string | null
   fault: string
   // Gestión
   status: OrderStatus
@@ -112,6 +113,7 @@ export interface OrderCreationInput {
   deviceType: DeviceType
   deviceBrand: string
   deviceModel: string
+  deviceSerial: string | null
   fault: string
   assignedTo: string | null
 }
@@ -125,6 +127,7 @@ export interface OrderDetailsInput {
   deviceType: DeviceType
   deviceBrand: string
   deviceModel: string
+  deviceSerial: string | null
   fault: string
 }
 

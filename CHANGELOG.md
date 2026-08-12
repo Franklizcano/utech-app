@@ -1,5 +1,9 @@
 # CHANGELOG
 
+### [0.1.8] - 2026-08-12
+- Added client search functionality in order creation view.
+- Added serial field to order creation view.
+
 ### [0.1.7] - 2026-08-11
 - Improve user interface.
 - Added finished orders inbox.

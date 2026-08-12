@@ -94,6 +94,7 @@ CREATE TABLE IF NOT EXISTS orders (
   device_type VARCHAR(50) NOT NULL, -- PC, Notebook, PlayStation, Xbox, Nintendo, Otro
   device_brand VARCHAR(100) NOT NULL,
   device_model VARCHAR(100) NOT NULL,
+  device_serial VARCHAR(255), -- Serial del equipo; puede no estar disponible
   fault TEXT NOT NULL, -- Descripción del daño/problema
   -- Gestión de la orden
   status TEXT NOT NULL REFERENCES order_states(id),
@@ -107,6 +108,7 @@ CREATE INDEX IF NOT EXISTS idx_orders_client_id ON orders(client_id);
 CREATE INDEX IF NOT EXISTS idx_orders_status ON orders(status);
 CREATE INDEX IF NOT EXISTS idx_orders_assigned_to ON orders(assigned_to);
 CREATE INDEX IF NOT EXISTS idx_orders_created_at ON orders(created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_orders_device_serial ON orders(device_serial);
 CREATE INDEX IF NOT EXISTS idx_orders_unassigned ON orders(created_at DESC) WHERE assigned_to IS NULL;
 
 -- ============================================
@@ -178,7 +180,8 @@ SELECT
   o.assigned_to,
   COALESCE(SUM(bi.amount), 0)::DECIMAL as budget_total,
   o.created_at,
-  o.updated_at
+  o.updated_at,
+  o.device_serial
 FROM orders o
 LEFT JOIN users u ON o.client_id = u.id
 LEFT JOIN companies c ON u.company_id = c.id

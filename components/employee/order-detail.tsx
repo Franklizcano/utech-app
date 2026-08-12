@@ -40,6 +40,7 @@ export function OrderDetail({ order }: { order: Order }) {
   const [draftDeviceType, setDraftDeviceType] = useState<DeviceType>(order.deviceType)
   const [draftDeviceBrand, setDraftDeviceBrand] = useState(order.deviceBrand)
   const [draftDeviceModel, setDraftDeviceModel] = useState(order.deviceModel)
+  const [draftDeviceSerial, setDraftDeviceSerial] = useState(order.deviceSerial ?? "")
   const [draftFault, setDraftFault] = useState(order.fault)
 
   const total = budgetTotal(order)
@@ -49,6 +50,7 @@ export function OrderDetail({ order }: { order: Order }) {
     draftDeviceType !== order.deviceType ||
     draftDeviceBrand !== order.deviceBrand ||
     draftDeviceModel !== order.deviceModel ||
+    draftDeviceSerial !== (order.deviceSerial ?? "") ||
     draftFault !== order.fault
 
   function handleAddItem(e: React.FormEvent) {
@@ -70,6 +72,7 @@ export function OrderDetail({ order }: { order: Order }) {
     setDraftDeviceType(order.deviceType)
     setDraftDeviceBrand(order.deviceBrand)
     setDraftDeviceModel(order.deviceModel)
+    setDraftDeviceSerial(order.deviceSerial ?? "")
     setDraftFault(order.fault)
     setEditingDetails(true)
   }
@@ -78,6 +81,7 @@ export function OrderDetail({ order }: { order: Order }) {
     setDraftDeviceType(order.deviceType)
     setDraftDeviceBrand(order.deviceBrand)
     setDraftDeviceModel(order.deviceModel)
+    setDraftDeviceSerial(order.deviceSerial ?? "")
     setDraftFault(order.fault)
     setEditingDetails(false)
   }
@@ -90,6 +94,7 @@ export function OrderDetail({ order }: { order: Order }) {
       deviceType: draftDeviceType,
       deviceBrand: draftDeviceBrand.trim(),
       deviceModel: draftDeviceModel.trim(),
+      deviceSerial: draftDeviceSerial.trim() || null,
       fault,
     })
     setEditingDetails(false)
@@ -116,7 +121,7 @@ export function OrderDetail({ order }: { order: Order }) {
               )}
               {editingDetails ? (
                 <div className="mt-3 space-y-2">
-                  <div className="grid gap-2 sm:grid-cols-3">
+                  <div className="grid gap-2 sm:grid-cols-4">
                     <div className="space-y-1">
                       <Label htmlFor="order-device-type" className="text-xs">
                         Tipo
@@ -156,6 +161,18 @@ export function OrderDetail({ order }: { order: Order }) {
                         placeholder="Ej: PS5 Slim"
                       />
                     </div>
+                    <div className="space-y-1">
+                      <Label htmlFor="order-device-serial" className="text-xs">
+                        Serial
+                      </Label>
+                      <Input
+                        id="order-device-serial"
+                        value={draftDeviceSerial}
+                        onChange={(e) => setDraftDeviceSerial(e.target.value)}
+                        placeholder="Ej: SN123456789"
+                        autoComplete="off"
+                      />
+                    </div>
                   </div>
                   <div className="flex justify-end gap-1">
                     <Button
@@ -184,6 +201,7 @@ export function OrderDetail({ order }: { order: Order }) {
                 <div className="mt-1 flex items-center gap-2 text-sm text-muted-foreground">
                   <span>
                     {order.deviceType} · {order.deviceBrand} {order.deviceModel}
+                    {order.deviceSerial && ` · Serial: ${order.deviceSerial}`}
                   </span>
                   <Button
                     type="button"

@@ -1,7 +1,7 @@
 "use client"
 
 import { useState } from "react"
-import { UserPlus, Pencil, ShieldCheck, Trash2, AlertCircle, Loader2 } from "lucide-react"
+import { UserPlus, Pencil, ShieldCheck, Trash2, AlertCircle, Loader2, Search } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -41,6 +41,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table"
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { useStore } from "@/lib/store"
 import type { Role, User } from "@/lib/types"
 
@@ -56,6 +57,16 @@ const ROLE_BADGE: Record<Role, string> = {
   cliente: "bg-zinc-500/15 text-zinc-300 border-zinc-500/30",
 }
 
+type RoleFilter = "all" | Role
+
+function normalizeSearchText(value: string) {
+  return value
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .trim()
+}
+
 export function UserManagement() {
   const { users, addUser, updateUser, toggleUserActive, deleteUser, usersLoading } = useStore()
   const [open, setOpen] = useState(false)
@@ -68,6 +79,23 @@ export function UserManagement() {
   const [passwordConfirmation, setPasswordConfirmation] = useState("")
   const [formError, setFormError] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
+  const [roleFilter, setRoleFilter] = useState<RoleFilter>("all")
+  const [search, setSearch] = useState("")
+
+  const managedUsers = users.filter((user) => !user.companyId)
+  const normalizedSearch = normalizeSearchText(search)
+  const visibleUsers = managedUsers.filter((user) => {
+    const matchesRole = roleFilter === "all" || user.role === roleFilter
+    const matchesSearch = !normalizedSearch || [user.name, user.email, user.phone].some((value) =>
+      normalizeSearchText(value).includes(normalizedSearch),
+    )
+
+    return matchesRole && matchesSearch
+  })
+
+  function countForRole(filter: RoleFilter) {
+    return filter === "all" ? managedUsers.length : managedUsers.filter((user) => user.role === filter).length
+  }
 
   function openCreate() {
     setEditing(null)
@@ -157,80 +185,112 @@ export function UserManagement() {
             Cargando usuarios…
           </div>
         ) : (
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Nombre</TableHead>
-              <TableHead>Email</TableHead>
-              <TableHead>Rol</TableHead>
-              <TableHead>Estado</TableHead>
-              <TableHead className="text-right">Acciones</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {users.filter((user) => !user.companyId).map((user) => (
-              <TableRow key={user.id}>
-                <TableCell className="font-medium text-foreground">{user.name}</TableCell>
-                <TableCell className="text-muted-foreground">{user.email}</TableCell>
-                <TableCell>
-                  <Badge variant="outline" className={ROLE_BADGE[user.role]}>
-                    {ROLE_LABELS[user.role]}
-                  </Badge>
-                </TableCell>
-                <TableCell>
-                  <button
-                    type="button"
-                    onClick={() => toggleUserActive(user.id)}
-                    className="inline-flex items-center gap-1.5 rounded-md border border-transparent px-2 py-1 text-sm transition-all hover:-translate-y-0.5 hover:border-border hover:bg-secondary hover:shadow-sm active:translate-y-0 active:shadow-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                  >
-                    <span className={`size-2 rounded-full ${user.active ? "bg-emerald-400" : "bg-zinc-500"}`} />
-                    <span className={user.active ? "text-foreground" : "text-muted-foreground"}>
-                      {user.active ? "Activo" : "Inactivo"}
-                    </span>
-                  </button>
-                </TableCell>
-                <TableCell className="text-right space-x-1">
-                  <Button variant="ghost" size="sm" className="gap-1.5" onClick={() => openEdit(user)}>
-                    <Pencil className="size-3.5" />
-                    Editar
-                  </Button>
-                  <AlertDialog>
-                    <AlertDialogTrigger
-                      render={
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="gap-1.5 text-destructive hover:text-destructive"
-                        >
-                          <Trash2 className="size-3.5" />
-                          Eliminar
-                        </Button>
-                      }
-                    />
-                    <AlertDialogContent>
-                      <AlertDialogHeader>
-                        <AlertDialogTitle>¿Eliminar usuario?</AlertDialogTitle>
-                        <AlertDialogDescription>
-                          Esta acción no se puede deshacer. Se eliminará permanentemente a{" "}
-                          <strong>{user.name}</strong> ({user.email}).
-                        </AlertDialogDescription>
-                      </AlertDialogHeader>
-                      <AlertDialogFooter>
-                        <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                        <AlertDialogAction
-                          className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                          onClick={() => deleteUser(user.id)}
-                        >
-                          Eliminar
-                        </AlertDialogAction>
-                      </AlertDialogFooter>
-                    </AlertDialogContent>
-                  </AlertDialog>
-                </TableCell>
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>
+        <div className="space-y-4">
+          <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+            <Tabs value={roleFilter} onValueChange={(value) => setRoleFilter(value as RoleFilter)}>
+              <TabsList className="w-full overflow-x-auto lg:w-auto">
+                <TabsTrigger value="all">Todos ({countForRole("all")})</TabsTrigger>
+                <TabsTrigger value="admin">Administradores ({countForRole("admin")})</TabsTrigger>
+                <TabsTrigger value="colaborador">Colaboradores ({countForRole("colaborador")})</TabsTrigger>
+                <TabsTrigger value="cliente">Clientes ({countForRole("cliente")})</TabsTrigger>
+              </TabsList>
+            </Tabs>
+            <div className="relative w-full lg:max-w-xs">
+              <Search className="pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-muted-foreground" />
+              <Input
+                aria-label="Buscar usuarios"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder="Buscar por nombre, email o teléfono"
+                autoComplete="off"
+                className="pl-9"
+              />
+            </div>
+          </div>
+
+          {visibleUsers.length === 0 ? (
+            <div className="rounded-lg border border-dashed border-border bg-secondary/20 p-8 text-center text-sm text-muted-foreground">
+              {managedUsers.length === 0
+                ? "No hay usuarios para mostrar."
+                : "No se encontraron usuarios con los filtros seleccionados."}
+            </div>
+          ) : (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Nombre</TableHead>
+                  <TableHead>Email</TableHead>
+                  <TableHead>Rol</TableHead>
+                  <TableHead>Estado</TableHead>
+                  <TableHead className="text-right">Acciones</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {visibleUsers.map((user) => (
+                  <TableRow key={user.id}>
+                    <TableCell className="font-medium text-foreground">{user.name}</TableCell>
+                    <TableCell className="text-muted-foreground">{user.email}</TableCell>
+                    <TableCell>
+                      <Badge variant="outline" className={ROLE_BADGE[user.role]}>
+                        {ROLE_LABELS[user.role]}
+                      </Badge>
+                    </TableCell>
+                    <TableCell>
+                      <button
+                        type="button"
+                        onClick={() => toggleUserActive(user.id)}
+                        className="inline-flex items-center gap-1.5 rounded-md border border-transparent px-2 py-1 text-sm transition-all hover:-translate-y-0.5 hover:border-border hover:bg-secondary hover:shadow-sm active:translate-y-0 active:shadow-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                      >
+                        <span className={`size-2 rounded-full ${user.active ? "bg-emerald-400" : "bg-zinc-500"}`} />
+                        <span className={user.active ? "text-foreground" : "text-muted-foreground"}>
+                          {user.active ? "Activo" : "Inactivo"}
+                        </span>
+                      </button>
+                    </TableCell>
+                    <TableCell className="text-right space-x-1">
+                      <Button variant="ghost" size="sm" className="gap-1.5" onClick={() => openEdit(user)}>
+                        <Pencil className="size-3.5" />
+                        Editar
+                      </Button>
+                      <AlertDialog>
+                        <AlertDialogTrigger
+                          render={
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="gap-1.5 text-destructive hover:text-destructive"
+                            >
+                              <Trash2 className="size-3.5" />
+                              Eliminar
+                            </Button>
+                          }
+                        />
+                        <AlertDialogContent>
+                          <AlertDialogHeader>
+                            <AlertDialogTitle>¿Eliminar usuario?</AlertDialogTitle>
+                            <AlertDialogDescription>
+                              Esta acción no se puede deshacer. Se eliminará permanentemente a{" "}
+                              <strong>{user.name}</strong> ({user.email}).
+                            </AlertDialogDescription>
+                          </AlertDialogHeader>
+                          <AlertDialogFooter>
+                            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                            <AlertDialogAction
+                              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                              onClick={() => deleteUser(user.id)}
+                            >
+                              Eliminar
+                            </AlertDialogAction>
+                          </AlertDialogFooter>
+                        </AlertDialogContent>
+                      </AlertDialog>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          )}
+        </div>
         )}
       </CardContent>
 
