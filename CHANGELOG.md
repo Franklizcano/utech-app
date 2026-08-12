@@ -3,6 +3,8 @@
 ### [0.1.8] - 2026-08-12
 - Added client search functionality in order creation view.
 - Added serial field to order creation view.
+- Added role filter in user management view.
+- Added announcements management functionality.
 
 ### [0.1.7] - 2026-08-11
 - Improve user interface.

@@ -13,6 +13,18 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog"
 import type { Announcement } from "@/lib/types"
+import { cn } from "@/lib/utils"
+
+const ANNOUNCEMENT_STYLES = {
+  importante: {
+    card: "border-amber-500/40 bg-amber-500/10",
+    icon: "text-amber-500",
+  },
+  normal: {
+    card: "border-border bg-secondary/20",
+    icon: "text-primary",
+  },
+} as const
 
 export function AnnouncementInbox() {
   const [announcements, setAnnouncements] = useState<Announcement[]>([])
@@ -46,27 +58,27 @@ export function AnnouncementInbox() {
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
-      <DialogContent className="max-h-[min(680px,calc(100vh-2rem))] overflow-y-auto sm:max-w-lg">
+      <DialogContent className="max-h-[min(680px,calc(100vh-2rem))] overflow-y-auto p-4 sm:max-w-lg sm:p-5">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Bell className="size-5 text-primary" />
-            Avisos importantes
+            Comunicaciones
           </DialogTitle>
           <DialogDescription>
-            Revisá las comunicaciones del equipo antes de continuar.
+            Tenés {unreadAnnouncements.length === 1 ? "un aviso pendiente" : `${unreadAnnouncements.length} avisos pendientes`} para revisar.
           </DialogDescription>
         </DialogHeader>
         <div className="space-y-3">
           {unreadAnnouncements.map((announcement) => (
             <article
               key={announcement.id}
-              className={`rounded-xl border p-4 ${announcement.priority === "importante" ? "border-amber-500/40 bg-amber-500/10" : "border-border bg-secondary/20"}`}
+              className={cn("rounded-xl border p-4", ANNOUNCEMENT_STYLES[announcement.priority].card)}
             >
               <div className="flex items-start gap-3">
                 {announcement.priority === "importante" ? (
-                  <TriangleAlert className="mt-0.5 size-5 shrink-0 text-amber-500" />
+                  <TriangleAlert className={cn("mt-0.5 size-5 shrink-0", ANNOUNCEMENT_STYLES.importante.icon)} />
                 ) : (
-                  <Megaphone className="mt-0.5 size-5 shrink-0 text-primary" />
+                  <Megaphone className={cn("mt-0.5 size-5 shrink-0", ANNOUNCEMENT_STYLES.normal.icon)} />
                 )}
                 <div className="min-w-0 flex-1">
                   <h3 className="font-semibold text-foreground">{announcement.title}</h3>
@@ -85,7 +97,7 @@ export function AnnouncementInbox() {
             </article>
           ))}
         </div>
-        <DialogFooter>
+        <DialogFooter className="-mx-4 -mb-4 sm:-mx-5 sm:-mb-5">
           <Button type="button" variant="ghost" onClick={() => setOpen(false)}>
             Revisar más tarde
           </Button>
