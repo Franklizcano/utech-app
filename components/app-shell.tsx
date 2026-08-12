@@ -8,6 +8,7 @@ import { ClientPortal } from "@/components/client/client-portal"
 import { AdminView } from "@/components/admin/admin-view"
 import { LoginScreen } from "@/components/login-screen"
 import { ChangePasswordDialog } from "@/components/change-password-dialog"
+import { AnnouncementInbox } from "@/components/announcements/announcement-inbox"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -39,6 +40,7 @@ export function AppShell() {
 
   return (
     <div className="min-h-screen bg-background">
+      <AnnouncementInbox />
       <header className="sticky top-0 z-30 border-b border-border/70 bg-background/75 backdrop-blur-xl">
         <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-4 px-4 py-3 sm:px-6">
           <div className="flex items-center gap-3">

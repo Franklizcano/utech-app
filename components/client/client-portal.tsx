@@ -39,7 +39,7 @@ function ClientOrderDetail({ order }: { order: Order }) {
             {order.deviceType} · Creado el {formatDate(order.createdAt)}
             {order.deviceSerial && ` · Serial: ${order.deviceSerial}`}
           </p>
-          <p className="mt-1 text-sm text-muted-foreground">📞 {order.clientPhone}</p>
+          <p className="mt-1 text-sm text-muted-foreground"> {order.clientPhone}</p>
         </div>
         <StatusBadge status={order.status} className="self-start text-sm" />
       </div>

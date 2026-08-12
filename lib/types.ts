@@ -1,5 +1,8 @@
 export type Role = "admin" | "colaborador" | "cliente"
 
+export type AnnouncementAudience = "personal" | "admin" | "colaborador" | "cliente_particular" | "cliente_corporativo"
+export type AnnouncementPriority = "normal" | "importante"
+
 export type DeviceType = "PC" | "Notebook" | "PlayStation" | "Xbox" | "Nintendo" | "Otro"
 
 export type OrderStatus = string
@@ -79,6 +82,18 @@ export interface AppNotification {
   id: string
   message: string
   date: string
+  read: boolean
+}
+
+export interface Announcement {
+  id: string
+  title: string
+  message: string
+  audience: AnnouncementAudience
+  priority: AnnouncementPriority
+  active: boolean
+  expiresAt: string | null
+  createdAt: string
   read: boolean
 }
 
