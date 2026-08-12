@@ -1,5 +1,8 @@
 export type Role = "admin" | "colaborador" | "cliente"
 
+export type AnnouncementAudience = "personal" | "admin" | "colaborador" | "cliente_particular" | "cliente_corporativo"
+export type AnnouncementPriority = "normal" | "importante"
+
 export type DeviceType = "PC" | "Notebook" | "PlayStation" | "Xbox" | "Nintendo" | "Otro"
 
 export type OrderStatus = string
@@ -82,6 +85,18 @@ export interface AppNotification {
   read: boolean
 }
 
+export interface Announcement {
+  id: string
+  title: string
+  message: string
+  audience: AnnouncementAudience
+  priority: AnnouncementPriority
+  active: boolean
+  expiresAt: string | null
+  createdAt: string
+  read: boolean
+}
+
 export interface Order {
   id: string
   code: string
@@ -94,6 +109,7 @@ export interface Order {
   deviceType: DeviceType
   deviceBrand: string
   deviceModel: string
+  deviceSerial: string | null
   fault: string
   // Gestión
   status: OrderStatus
@@ -112,6 +128,7 @@ export interface OrderCreationInput {
   deviceType: DeviceType
   deviceBrand: string
   deviceModel: string
+  deviceSerial: string | null
   fault: string
   assignedTo: string | null
 }
@@ -125,6 +142,7 @@ export interface OrderDetailsInput {
   deviceType: DeviceType
   deviceBrand: string
   deviceModel: string
+  deviceSerial: string | null
   fault: string
 }
 

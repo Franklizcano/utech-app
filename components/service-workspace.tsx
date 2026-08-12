@@ -27,7 +27,7 @@ export function ServiceWorkspace() {
   const [dialogOpen, setDialogOpen] = useState(false)
   const [searchQuery, setSearchQuery] = useState("")
 
-  // Filtrar órdenes por código o nombre de cliente
+  // Filtrar órdenes por código, nombre de cliente o serial
   const filteredOrders = useMemo(() => {
     if (!searchQuery.trim()) return orders
 
@@ -37,7 +37,8 @@ export function ServiceWorkspace() {
     return orders.filter((order) => {
       const matchesCode = normalizeOrderCode(order.code).includes(normalizedQuery)
       const matchesClient = order.clientName.toLowerCase().includes(lowerQuery)
-      return matchesCode || matchesClient
+      const matchesSerial = order.deviceSerial?.toLowerCase().includes(lowerQuery) ?? false
+      return matchesCode || matchesClient || matchesSerial
     })
   }, [orders, searchQuery])
 
@@ -69,7 +70,7 @@ export function ServiceWorkspace() {
             <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
             <Input
               type="text"
-              placeholder="Buscar por código o cliente..."
+              placeholder="Buscar por código, cliente o serial..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               disabled={ordersLoading}
@@ -117,6 +118,7 @@ export function ServiceWorkspace() {
                       </div>
                       <p className="mt-0.5 truncate text-sm text-muted-foreground">
                         {order.deviceType} · {order.deviceBrand} {order.deviceModel}
+                        {order.deviceSerial && ` · Serial: ${order.deviceSerial}`}
                       </p>
                       <div className="mt-3 flex items-center justify-between gap-2">
                         <StatusBadge status={order.status} />

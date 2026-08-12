@@ -146,6 +146,7 @@ export async function updateOrderDetailsRemote(orderId: string, input: OrderDeta
         device_type: input.deviceType,
         device_brand: input.deviceBrand,
         device_model: input.deviceModel,
+        device_serial: input.deviceSerial,
         fault: input.fault,
         updated_at: new Date().toISOString(),
       })

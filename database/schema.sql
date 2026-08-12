@@ -94,6 +94,7 @@ CREATE TABLE IF NOT EXISTS orders (
   device_type VARCHAR(50) NOT NULL, -- PC, Notebook, PlayStation, Xbox, Nintendo, Otro
   device_brand VARCHAR(100) NOT NULL,
   device_model VARCHAR(100) NOT NULL,
+  device_serial VARCHAR(255), -- Serial del equipo; puede no estar disponible
   fault TEXT NOT NULL, -- Descripción del daño/problema
   -- Gestión de la orden
   status TEXT NOT NULL REFERENCES order_states(id),
@@ -107,6 +108,7 @@ CREATE INDEX IF NOT EXISTS idx_orders_client_id ON orders(client_id);
 CREATE INDEX IF NOT EXISTS idx_orders_status ON orders(status);
 CREATE INDEX IF NOT EXISTS idx_orders_assigned_to ON orders(assigned_to);
 CREATE INDEX IF NOT EXISTS idx_orders_created_at ON orders(created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_orders_device_serial ON orders(device_serial);
 CREATE INDEX IF NOT EXISTS idx_orders_unassigned ON orders(created_at DESC) WHERE assigned_to IS NULL;
 
 -- ============================================
@@ -156,6 +158,33 @@ CREATE INDEX IF NOT EXISTS idx_notifications_order_id ON notifications(order_id)
 CREATE INDEX IF NOT EXISTS idx_notifications_read ON notifications(read);
 
 -- ============================================
+-- Tabla: general_announcements (Avisos generales)
+-- ============================================
+CREATE TABLE IF NOT EXISTS general_announcements (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  title VARCHAR(255) NOT NULL,
+  message TEXT NOT NULL,
+  audience VARCHAR(40) NOT NULL CHECK (audience IN ('personal', 'admin', 'colaborador', 'cliente_particular', 'cliente_corporativo')),
+  priority VARCHAR(20) NOT NULL DEFAULT 'normal' CHECK (priority IN ('normal', 'importante')),
+  active BOOLEAN NOT NULL DEFAULT true,
+  expires_at TIMESTAMP WITH TIME ZONE,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_general_announcements_active ON general_announcements(active, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_general_announcements_audience ON general_announcements(audience);
+
+CREATE TABLE IF NOT EXISTS general_announcement_reads (
+  announcement_id UUID NOT NULL REFERENCES general_announcements(id) ON DELETE CASCADE,
+  user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  read_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (announcement_id, user_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_general_announcement_reads_user ON general_announcement_reads(user_id);
+
+-- ============================================
 -- Vistas útiles
 -- ============================================
 
@@ -178,7 +207,8 @@ SELECT
   o.assigned_to,
   COALESCE(SUM(bi.amount), 0)::DECIMAL as budget_total,
   o.created_at,
-  o.updated_at
+  o.updated_at,
+  o.device_serial
 FROM orders o
 LEFT JOIN users u ON o.client_id = u.id
 LEFT JOIN companies c ON u.company_id = c.id
@@ -234,6 +264,8 @@ ALTER TABLE orders ENABLE ROW LEVEL SECURITY;
 ALTER TABLE budget_items ENABLE ROW LEVEL SECURITY;
 ALTER TABLE timeline_events ENABLE ROW LEVEL SECURITY;
 ALTER TABLE notifications ENABLE ROW LEVEL SECURITY;
+ALTER TABLE general_announcements ENABLE ROW LEVEL SECURITY;
+ALTER TABLE general_announcement_reads ENABLE ROW LEVEL SECURITY;
 
 -- Políticas de acceso básicas (modificar según tus necesidades de autenticación)
 -- Nota: Estas son ejemplos. Ajusta según tu sistema de autenticación real.
