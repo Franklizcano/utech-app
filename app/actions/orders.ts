@@ -5,16 +5,18 @@ import { getSupabaseServerClient } from "@/lib/supabase"
 import {
   claimOrderServer,
   fetchAvailableOrdersForCollaborator,
+  fetchAvailableOrdersCount,
   fetchCompletedOrdersForUser,
   fetchOccasionalTicketStatus,
   fetchOrdersForUser,
+  fetchOrderDetailForUser,
   insertOrderServer,
 } from "@/lib/queries/orders-server"
 import type { OccasionalTicketStatus, Order, OrderCreationInput } from "@/lib/types"
 
 export interface OccasionalTicketLookupResult {
   success: boolean
-  ticket?: OccasionalTicketStatus
+  tickets?: OccasionalTicketStatus[]
   error?: string
 }
 
@@ -103,6 +105,12 @@ export async function fetchAvailableOrdersAction(): Promise<Order[]> {
   return fetchAvailableOrdersForCollaborator()
 }
 
+export async function fetchAvailableOrdersCountAction(): Promise<number> {
+  const session = await getSessionAction()
+  if (!session || !session.active || !["admin", "colaborador"].includes(session.role)) return 0
+  return fetchAvailableOrdersCount()
+}
+
 export async function claimOrderAction(orderId: string): Promise<boolean> {
   const session = await getSessionAction()
   if (!session || !session.active || !["admin", "colaborador"].includes(session.role)) return false
@@ -130,13 +138,19 @@ export async function assignOrderAction(orderId: string, collaboratorId: string)
   return claimOrderServer(orderId, collaborator.name as string)
 }
 
-export async function fetchOrdersAction() {
+export async function fetchOrdersAction(offset = 0, limit = 50, search = "") {
   const session = await getSessionAction()
   if (!session || !session.active) {
     return []
   }
 
-  return fetchOrdersForUser(session.id, session.role, session.name)
+  return fetchOrdersForUser(session.id, session.role, session.name, offset, limit, search)
+}
+
+export async function fetchOrderDetailAction(orderId: string): Promise<Order | null> {
+  const session = await getSessionAction()
+  if (!session || !session.active) return null
+  return fetchOrderDetailForUser(orderId, session.id, session.role, session.name)
 }
 
 export async function fetchCompletedOrdersAction(): Promise<Order[]> {
@@ -153,11 +167,11 @@ export async function lookupOccasionalTicketAction(code: string): Promise<Occasi
 
   try {
     const ticket = await fetchOccasionalTicketStatus(code)
-    if (!ticket) {
+    if (ticket.length === 0) {
       return { success: false, error: "No encontramos un ticket ocasional con ese código." }
     }
 
-    return { success: true, ticket }
+    return { success: true, tickets: ticket }
   } catch {
     return { success: false, error: "No se pudo consultar el ticket. Intentá nuevamente." }
   }

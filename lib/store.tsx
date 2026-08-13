@@ -1,7 +1,7 @@
 "use client"
 
-import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from "react"
-import { createOrderAction, fetchOrdersAction, markNotificationsReadAction } from "@/app/actions/orders"
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react"
+import { createOrderAction, fetchOrderDetailAction, fetchOrdersAction, markNotificationsReadAction } from "@/app/actions/orders"
 import { fetchUsersAction } from "@/app/actions/users"
 import {
   type AppNotification,
@@ -73,7 +73,8 @@ const initialUsers: User[] = [
 ]
 
 const initialOrders: Order[] = []
-const DEFAULT_ORDERS_CACHE_TTL_SECONDS = 60
+const ORDERS_PAGE_SIZE = 50
+const DEFAULT_ORDERS_CACHE_TTL_SECONDS = 120
 const configuredOrdersCacheTtlSeconds = Number(process.env.NEXT_PUBLIC_ORDERS_CACHE_TTL_SECONDS)
 const ORDERS_CACHE_TTL_MS =
   Number.isFinite(configuredOrdersCacheTtlSeconds) && configuredOrdersCacheTtlSeconds > 0
@@ -96,7 +97,12 @@ interface StoreValue {
   statesLoading: boolean
   usersLoading: boolean
   ordersLoading: boolean
+  ordersLoadingMore: boolean
+  ordersHasMore: boolean
   refreshOrders: () => Promise<void>
+  loadMoreOrders: (query?: string) => Promise<void>
+  searchOrders: (query: string) => Promise<void>
+  loadOrderDetail: (orderId: string) => Promise<Order | null>
   // acciones
   addOrder: (input: NewOrderInput) => Order
   advanceStatus: (orderId: string, status: OrderStatus, note?: string) => void
@@ -135,7 +141,35 @@ export function StoreProvider({
   const [statesLoading, setStatesLoading] = useState(true)
   const [usersLoading, setUsersLoading] = useState(true)
   const [ordersLoading, setOrdersLoading] = useState(true)
+  const [ordersLoadingMore, setOrdersLoadingMore] = useState(false)
+  const [ordersHasMore, setOrdersHasMore] = useState(true)
+  const ordersRef = useRef(orders)
+  useEffect(() => {
+    ordersRef.current = orders
+  }, [orders])
   const ordersCacheKey = currentUser && isLoggedIn ? getOrdersCacheKey(currentUser.id, currentUser.role) : null
+  const loadOrderDetail = useCallback(async (orderId: string): Promise<Order | null> => {
+    const cachedDetail = ordersRef.current.find((order) => order.id === orderId)
+    if (cachedDetail?.fault) return cachedDetail
+
+    const detail = await fetchOrderDetailAction(orderId)
+    if (detail) {
+      setOrdersState((previous) => previous.map((order) => (order.id === detail.id ? detail : order)))
+    }
+    return detail
+  }, [])
+  const searchOrders = useCallback(async (query: string): Promise<void> => {
+    setOrdersLoading(true)
+    try {
+      const results = await fetchOrdersAction(0, ORDERS_PAGE_SIZE, query)
+      setOrdersState(results)
+      setOrdersHasMore(results.length === ORDERS_PAGE_SIZE)
+    } catch (error: unknown) {
+      console.error("No se pudieron buscar las órdenes:", error)
+    } finally {
+      setOrdersLoading(false)
+    }
+  }, [])
 
   // Carga los estados de orden reales desde Supabase al montar el provider.
   useEffect(() => {
@@ -191,6 +225,7 @@ export function StoreProvider({
         if (cancelled) return
         setOrdersState([])
         setOrdersLoading(false)
+        setOrdersHasMore(false)
       })
       return () => {
         cancelled = true
@@ -203,6 +238,7 @@ export function StoreProvider({
       if (cachedOrders) {
         setOrdersState(cachedOrders)
         setOrdersLoading(false)
+        setOrdersHasMore(cachedOrders.length >= ORDERS_PAGE_SIZE)
       } else {
         setOrdersLoading(true)
       }
@@ -213,6 +249,7 @@ export function StoreProvider({
         if (cancelled) return
         setOrdersState(remoteOrders)
         setOrdersLoading(false)
+        setOrdersHasMore(remoteOrders.length === ORDERS_PAGE_SIZE)
       }).catch((error: unknown) => {
         if (cancelled) return
         console.error("No se pudieron cargar las órdenes:", error)
@@ -266,7 +303,7 @@ export function StoreProvider({
 
     function addOrder(input: NewOrderInput): Order {
       const tempId = uid("o")
-      const tempCode = `TF-TEMP-${tempId}`
+      const tempCode = `TEMP-${tempId}`
       const tempOrder: Order = {
         id: tempId,
         code: tempCode,
@@ -615,7 +652,25 @@ export function StoreProvider({
       statesLoading,
       usersLoading,
       ordersLoading,
+      ordersLoadingMore,
+      ordersHasMore,
       refreshOrders,
+      loadMoreOrders: async (query = "") => {
+        if (!ordersCacheKey || ordersLoadingMore || !ordersHasMore) return
+        setOrdersLoadingMore(true)
+        try {
+          const nextOrders = await fetchOrdersAction(orders.length, ORDERS_PAGE_SIZE, query)
+          setOrdersState((previous) => [...previous, ...nextOrders])
+          setOrdersCache(ordersCacheKey, [...orders, ...nextOrders])
+          setOrdersHasMore(nextOrders.length === ORDERS_PAGE_SIZE)
+        } catch (error: unknown) {
+          console.error("No se pudieron cargar más órdenes:", error)
+        } finally {
+          setOrdersLoadingMore(false)
+        }
+      },
+      searchOrders,
+      loadOrderDetail,
       addOrder,
       advanceStatus,
       reassignOrder,
@@ -633,7 +688,7 @@ export function StoreProvider({
       deleteState,
       reorderStates,
     }
-  }, [role, currentUser, isLoggedIn, users, orders, states, statesLoading, usersLoading, ordersLoading, ordersCacheKey])
+  }, [role, currentUser, isLoggedIn, users, orders, states, statesLoading, usersLoading, ordersLoading, ordersLoadingMore, ordersHasMore, ordersCacheKey, searchOrders, loadOrderDetail])
 
   return <StoreContext.Provider value={value}>{children}</StoreContext.Provider>
 }

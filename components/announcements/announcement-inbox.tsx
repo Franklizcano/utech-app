@@ -17,11 +17,11 @@ import { cn } from "@/lib/utils"
 
 const ANNOUNCEMENT_STYLES = {
   importante: {
-    card: "border-amber-500/40 bg-amber-500/10",
+    card: "border-amber-500/50 bg-amber-500/10 hover:border-amber-400/80 hover:bg-amber-500/15 hover:shadow-md hover:shadow-amber-950/10",
     icon: "text-amber-500",
   },
   normal: {
-    card: "border-border bg-secondary/20",
+    card: "border-border bg-secondary/30 hover:border-primary/35 hover:bg-secondary/50 hover:shadow-md hover:shadow-black/10",
     icon: "text-primary",
   },
 } as const
@@ -72,7 +72,7 @@ export function AnnouncementInbox() {
           {unreadAnnouncements.map((announcement) => (
             <article
               key={announcement.id}
-              className={cn("rounded-xl border p-4", ANNOUNCEMENT_STYLES[announcement.priority].card)}
+              className={cn("rounded-xl border p-4 transition-[background-color,border-color,box-shadow] duration-200", ANNOUNCEMENT_STYLES[announcement.priority].card)}
             >
               <div className="flex items-start gap-3">
                 {announcement.priority === "importante" ? (
@@ -89,7 +89,7 @@ export function AnnouncementInbox() {
                 </div>
               </div>
               <div className="mt-3 flex justify-end">
-                <Button type="button" size="sm" variant="outline" className="gap-1.5" onClick={() => markAsRead(announcement.id)}>
+                <Button type="button" size="sm" variant="outline" className="gap-1.5 border-primary/35 bg-background/80 text-foreground shadow-sm hover:border-primary hover:bg-primary/10 hover:text-primary" onClick={() => markAsRead(announcement.id)}>
                   <Check className="size-3.5" />
                   Marcar como leído
                 </Button>
@@ -98,7 +98,7 @@ export function AnnouncementInbox() {
           ))}
         </div>
         <DialogFooter className="-mx-4 -mb-4 sm:-mx-5 sm:-mb-5">
-          <Button type="button" variant="ghost" onClick={() => setOpen(false)}>
+          <Button type="button" variant="ghost" className="text-foreground hover:bg-primary/10 hover:text-primary" onClick={() => setOpen(false)}>
             Revisar más tarde
           </Button>
         </DialogFooter>

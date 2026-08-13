@@ -160,10 +160,10 @@ export function AnnouncementManagement() {
         </Button>
       </CardHeader>
       <CardContent className="space-y-6">
-        {loading ? <div className="rounded-lg border border-dashed border-border bg-secondary/20 p-8 text-center text-sm text-muted-foreground">Cargando avisos…</div> : announcements.length === 0 ? <div className="rounded-lg border border-dashed border-border bg-secondary/20 p-8 text-center text-sm text-muted-foreground">Todavía no hay avisos publicados.</div> : (
+        {loading ? <div className="rounded-lg border border-dashed border-border bg-secondary/30 p-8 text-center text-sm text-foreground/75">Cargando avisos…</div> : announcements.length === 0 ? <div className="rounded-lg border border-dashed border-border bg-secondary/30 p-8 text-center text-sm text-foreground/75">Todavía no hay avisos publicados.</div> : (
           <div className="space-y-4">
             {announcements.map((item) => (
-              <article key={item.id} className="rounded-xl border border-border p-4 transition-colors hover:border-primary/30 hover:bg-muted/20 sm:p-5">
+              <article key={item.id} className="rounded-xl border border-border bg-card p-4 transition-[background-color,border-color,box-shadow] duration-200 hover:border-primary/40 hover:bg-secondary/35 hover:shadow-md hover:shadow-black/10 sm:p-5">
                 <div className="flex flex-wrap items-start justify-between gap-3">
                   <div className="min-w-0 flex-1">
                     <div className="flex flex-wrap items-center gap-2"><h3 className="mr-1 w-full font-semibold sm:w-auto">{item.title}</h3><Badge variant="outline">{AUDIENCE_LABELS[item.audience]}</Badge><Badge variant="outline" className={item.priority === "importante" ? "border-amber-500/40 text-amber-500" : ""}>{item.priority === "importante" ? "Importante" : "Normal"}</Badge><Badge variant="outline" className={item.active ? "border-emerald-500/40 text-emerald-500" : ""}>{item.active ? "Activo" : "Inactivo"}</Badge></div>
@@ -175,7 +175,7 @@ export function AnnouncementManagement() {
                       type="button"
                       variant="ghost"
                       size="icon"
-                      className="size-8 rounded-md text-muted-foreground hover:bg-background hover:text-foreground hover:shadow-sm"
+                      className="size-8 rounded-md border border-transparent text-foreground hover:border-primary/30 hover:bg-primary/10 hover:text-primary hover:shadow-sm"
                       onClick={() => startEditing(item)}
                       aria-label="Editar aviso"
                       title="Editar aviso"
@@ -186,7 +186,7 @@ export function AnnouncementManagement() {
                       type="button"
                       variant="ghost"
                       size="icon"
-                      className={`size-8 rounded-md hover:bg-background hover:shadow-sm ${item.active ? "text-emerald-500 hover:text-emerald-600" : "text-muted-foreground hover:text-foreground"}`}
+                      className={`size-8 rounded-md border border-transparent hover:shadow-sm ${item.active ? "text-emerald-600 hover:border-emerald-500/30 hover:bg-emerald-500/10 hover:text-emerald-500" : "text-foreground hover:border-primary/30 hover:bg-primary/10 hover:text-primary"}`}
                       onClick={() => toggleActive(item)}
                       aria-label={item.active ? "Desactivar aviso" : "Activar aviso"}
                       title={item.active ? "Desactivar aviso" : "Activar aviso"}
@@ -197,7 +197,7 @@ export function AnnouncementManagement() {
                       type="button"
                       variant="ghost"
                       size="icon"
-                      className="size-8 rounded-md text-muted-foreground hover:bg-destructive/10 hover:text-destructive hover:shadow-sm"
+                      className="size-8 rounded-md border border-transparent text-destructive/80 hover:border-destructive/30 hover:bg-destructive/10 hover:text-destructive hover:shadow-sm"
                       onClick={() => setDeleteTarget(item)}
                       aria-label="Eliminar aviso"
                       title="Eliminar aviso"

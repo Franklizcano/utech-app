@@ -59,7 +59,7 @@ INSERT INTO orders (
   device_type, device_brand, device_model, fault,
   status, assigned_to
 ) VALUES (
-  'TF-1030',
+  'CO-2407070004',
   NULL,  -- o UUID si es cliente registrado
   'Cliente Nuevo',
   '+54 11 1111-2222',
@@ -75,7 +75,7 @@ INSERT INTO orders (
 
 #### Buscar orden por código
 ```sql
-SELECT * FROM orders WHERE code = 'TF-1024';
+SELECT * FROM orders WHERE code = 'CP-2407010001';
 ```
 
 #### Ver órdenes de un cliente
@@ -89,28 +89,28 @@ ORDER BY created_at DESC;
 ```sql
 UPDATE orders
 SET status = 'en_reparacion'
-WHERE code = 'TF-1024';
+WHERE code = 'CP-2407010001';
 ```
 
 #### Ver presupuesto de orden
 ```sql
 SELECT description, amount
 FROM budget_items
-WHERE order_id = (SELECT id FROM orders WHERE code = 'TF-1024');
+WHERE order_id = (SELECT id FROM orders WHERE code = 'CP-2407010001');
 ```
 
 #### Total presupuesto de orden
 ```sql
 SELECT get_order_budget_total(id) 
 FROM orders 
-WHERE code = 'TF-1024';
+WHERE code = 'CP-2407010001';
 ```
 
 #### Agregar item de presupuesto
 ```sql
 INSERT INTO budget_items (order_id, description, amount)
 VALUES (
-  (SELECT id FROM orders WHERE code = 'TF-1024'),
+  (SELECT id FROM orders WHERE code = 'CP-2407010001'),
   'Cambio de batería',
   15000
 );
@@ -124,7 +124,7 @@ SELECT
   te.event_date
 FROM timeline_events te
 LEFT JOIN order_states os ON te.status = os.id
-WHERE te.order_id = (SELECT id FROM orders WHERE code = 'TF-1024')
+WHERE te.order_id = (SELECT id FROM orders WHERE code = 'CP-2407010001')
 ORDER BY event_date ASC;
 ```
 
@@ -132,7 +132,7 @@ ORDER BY event_date ASC;
 ```sql
 INSERT INTO timeline_events (order_id, status, note, event_date)
 VALUES (
-  (SELECT id FROM orders WHERE code = 'TF-1024'),
+  (SELECT id FROM orders WHERE code = 'CP-2407010001'),
   'en_reparacion',
   'Se inicia reparación',
   CURRENT_TIMESTAMP
@@ -143,7 +143,7 @@ VALUES (
 ```sql
 SELECT message, read, notification_date
 FROM notifications
-WHERE order_id = (SELECT id FROM orders WHERE code = 'TF-1024')
+WHERE order_id = (SELECT id FROM orders WHERE code = 'CP-2407010001')
 ORDER BY notification_date DESC;
 ```
 
@@ -151,7 +151,7 @@ ORDER BY notification_date DESC;
 ```sql
 INSERT INTO notifications (order_id, message, read, notification_date)
 VALUES (
-  (SELECT id FROM orders WHERE code = 'TF-1024'),
+  (SELECT id FROM orders WHERE code = 'CP-2407010001'),
   'Tu orden está lista',
   false,
   CURRENT_TIMESTAMP
@@ -217,7 +217,7 @@ WHERE status = 'entregado';
 
 ```
 📦 ORDEN
-  ├─ code: TF-1024
+  ├─ code: CO-2407070004
   ├─ client: Juan Pérez (juan.perez@mail.com)
   ├─ device: Sony PS5 Slim
   ├─ fault: No da imagen por HDMI

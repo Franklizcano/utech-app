@@ -106,7 +106,7 @@ La tabla central del sistema que almacena todas las órdenes de reparación.
 ```sql
 -- Identificación
 id (UUID, PK)              -- Identificador único
-code (VARCHAR, UNIQUE)     -- Código de orden (ej: TF-1024)
+code (VARCHAR(32), UNIQUE)  -- Código de orden (formato: PREFIJO-YYMMDDCONTADOR, ej: CP-2407010001)
 
 -- Información del cliente
 client_id (FK → users.id)  -- Referencia a usuario cliente (NULL para ocasionales)
@@ -137,7 +137,7 @@ updated_at (TIMESTAMP)     -- Fecha de actualización
 
 **Ejemplo:**
 ```
-Código: TF-1024
+Código: CP-2407010001
 Cliente: Juan Pérez (juan.perez@mail.com)
 Equipo: Sony PS5 Slim
 Problema: No da imagen por HDMI
@@ -164,7 +164,7 @@ created_at (TIMESTAMP)     -- Fecha de creación
 **Índice:**
 - `order_id` - Items de una orden específica
 
-**Ejemplo para orden TF-1024:**
+**Ejemplo para orden CP-240701-0001:**
 | Descripción | Monto |
 |---|---|
 | Cambio de módulo HDMI PS5 | $28.000 |
@@ -195,7 +195,7 @@ created_at (TIMESTAMP)     -- Fecha de registro
 
 **Ejemplo:**
 ```
-Orden TF-1024:
+Orden CP-240701-0001:
   2024-07-01 10:30 → Recibido: "Equipo ingresado en mostrador"
   2024-07-02 14:15 → En diagnóstico: "Se confirma puerto HDMI dañado"
   2024-07-04 09:00 → Esperando repuestos: "Se encarga módulo HDMI original"
@@ -224,7 +224,7 @@ created_at (TIMESTAMP)         -- Fecha de creación en BD
 
 **Ejemplo:**
 ```
-Orden TF-1024:
+Orden CP-240701-0001:
   [LEÍDA] "Tu PS5 fue recibida. Te avisaremos con el diagnóstico."
   [LEÍDA] "Presupuesto cargado. Total: $56.000"
   [NO LEÍDA] "Estamos esperando el repuesto (módulo HDMI)"
@@ -335,9 +335,9 @@ El schema incluye datos iniciales:
 
 ### Órdenes (3 total)
 ```
-1. TF-1024 (Juan Pérez) - PlayStation PS5 Slim - Estado: Esperando repuestos
-2. TF-1025 (María López) - Notebook Lenovo - Estado: Listo
-3. TF-1026 (Carlos Díaz) - PC Armada - Estado: En diagnóstico
+1. CP-240701-0001 (Juan Pérez) - PlayStation PS5 Slim - Estado: Esperando repuestos
+2. CP-240703-0002 (María López) - Notebook Lenovo - Estado: Listo
+3. CP-240706-0003 (Carlos Díaz) - PC Armada - Estado: En diagnóstico
 ```
 
 ---
@@ -368,7 +368,7 @@ ORDER BY created_at DESC;
 ```sql
 SELECT status, note, event_date
 FROM timeline_events
-WHERE order_id = (SELECT id FROM orders WHERE code = 'TF-1024')
+WHERE order_id = (SELECT id FROM orders WHERE code = 'CP-240701-0001')
 ORDER BY event_date ASC;
 ```
 
@@ -402,7 +402,7 @@ Cliente (usuario)
 
 3. **Zona horaria:** Todas las timestamps usan `TIMESTAMP WITH TIME ZONE`.
 
-4. **Códigos únicos:** Los códigos de orden son únicos y se generan automáticamente (TF-XXXX).
+4. **Códigos únicos:** Los códigos de orden son únicos y se generan automáticamente (PREFIJO-YYMMDD-CONTADOR global).
 
 5. **Eliminación en cascada:** Si se elimina una orden, se eliminan automáticamente sus items de presupuesto, eventos y notificaciones.
 

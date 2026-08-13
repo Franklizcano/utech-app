@@ -33,7 +33,7 @@ Reemplazar `WHERE NOT EXISTS (...)` por `ON CONFLICT DO NOTHING`
 ```sql
 INSERT INTO budget_items (order_id, description, amount)
 SELECT id, 'Cambio de módulo HDMI PS5', 28000
-FROM orders WHERE code = 'TF-1024'
+FROM orders WHERE code = 'CP-2407010001'
 WHERE NOT EXISTS (...);  -- ❌ Segundo WHERE - ERROR
 ```
 
@@ -41,7 +41,7 @@ WHERE NOT EXISTS (...);  -- ❌ Segundo WHERE - ERROR
 ```sql
 INSERT INTO budget_items (order_id, description, amount)
 SELECT id, 'Cambio de módulo HDMI PS5', 28000
-FROM orders WHERE code = 'TF-1024'
+FROM orders WHERE code = 'CP-2407010001'
 ON CONFLICT DO NOTHING;  -- ✅ Válido
 ```
 

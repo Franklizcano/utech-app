@@ -84,7 +84,7 @@ ON CONFLICT (id) DO NOTHING;
 -- ============================================
 CREATE TABLE IF NOT EXISTS orders (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-  code VARCHAR(20) NOT NULL UNIQUE,
+  code VARCHAR(32) NOT NULL UNIQUE,
   -- Información del cliente
   client_id UUID REFERENCES users(id) ON DELETE SET NULL, -- NULL para clientes ocasionales
   client_name VARCHAR(255) NOT NULL,
@@ -110,6 +110,15 @@ CREATE INDEX IF NOT EXISTS idx_orders_assigned_to ON orders(assigned_to);
 CREATE INDEX IF NOT EXISTS idx_orders_created_at ON orders(created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_orders_device_serial ON orders(device_serial);
 CREATE INDEX IF NOT EXISTS idx_orders_unassigned ON orders(created_at DESC) WHERE assigned_to IS NULL;
+
+CREATE TABLE IF NOT EXISTS order_code_counter (
+  id BOOLEAN PRIMARY KEY DEFAULT true CHECK (id),
+  current_value BIGINT NOT NULL DEFAULT 0 CHECK (current_value >= 0)
+);
+
+INSERT INTO order_code_counter (id, current_value)
+VALUES (true, 0)
+ON CONFLICT (id) DO NOTHING;
 
 -- ============================================
 -- Tabla: budget_items (Presupuesto)
@@ -306,7 +315,7 @@ ON CONFLICT (email) DO NOTHING;
 -- Insertar órdenes de ejemplo
 INSERT INTO orders (code, client_id, client_name, client_phone, client_email, device_type, device_brand, device_model, fault, status, assigned_to) 
 SELECT 
-  'TF-1024',
+  'CP-240701-0001',
   (SELECT id FROM users WHERE email = 'juan.perez@mail.com'),
   'Juan Pérez',
   '+54 11 5555-1234',
@@ -317,11 +326,11 @@ SELECT
   'No da imagen por HDMI, se escucha el ventilador pero la TV no detecta señal.',
   'esperando_repuestos',
   'Martín Gómez'
-WHERE NOT EXISTS (SELECT 1 FROM orders WHERE code = 'TF-1024');
+WHERE NOT EXISTS (SELECT 1 FROM orders WHERE code = 'CP-240701-0001');
 
 INSERT INTO orders (code, client_id, client_name, client_phone, client_email, device_type, device_brand, device_model, fault, status, assigned_to)
 SELECT
-  'TF-1025',
+  'CP-240703-0002',
   (SELECT id FROM users WHERE email = 'maria.lopez@mail.com'),
   'María López',
   '+54 11 4444-9876',
@@ -332,11 +341,11 @@ SELECT
   'Se apaga sola al rato de encender. Posible sobrecalentamiento.',
   'listo',
   'Sofía Ruiz'
-WHERE NOT EXISTS (SELECT 1 FROM orders WHERE code = 'TF-1025');
+WHERE NOT EXISTS (SELECT 1 FROM orders WHERE code = 'CP-240703-0002');
 
 INSERT INTO orders (code, client_id, client_name, client_phone, client_email, device_type, device_brand, device_model, fault, status, assigned_to)
 SELECT
-  'TF-1026',
+  'CP-240706-0003',
   (SELECT id FROM users WHERE email = 'carlos.diaz@mail.com'),
   'Carlos Díaz',
   '+54 11 3333-2211',
@@ -347,77 +356,135 @@ SELECT
   'No enciende. No hay luces ni ventiladores al apretar el botón.',
   'en_diagnostico',
   'Martín Gómez'
-WHERE NOT EXISTS (SELECT 1 FROM orders WHERE code = 'TF-1026');
+WHERE NOT EXISTS (SELECT 1 FROM orders WHERE code = 'CP-240706-0003');
 
 -- Insertar items de presupuesto
 INSERT INTO budget_items (order_id, description, amount)
 SELECT id, 'Cambio de módulo HDMI PS5', 28000
-FROM orders WHERE code = 'TF-1024'
+FROM orders WHERE code = 'CP-240701-0001'
 ON CONFLICT DO NOTHING;
 
 INSERT INTO budget_items (order_id, description, amount)
 SELECT id, 'Mano de obra (microsoldadura)', 22000
-FROM orders WHERE code = 'TF-1024'
+FROM orders WHERE code = 'CP-240701-0001'
 ON CONFLICT DO NOTHING;
 
 INSERT INTO budget_items (order_id, description, amount)
 SELECT id, 'Limpieza y pasta térmica', 6000
-FROM orders WHERE code = 'TF-1024'
+FROM orders WHERE code = 'CP-240701-0001'
 ON CONFLICT DO NOTHING;
 
 INSERT INTO budget_items (order_id, description, amount)
 SELECT id, 'Cambio de pasta térmica', 9000
-FROM orders WHERE code = 'TF-1025'
+FROM orders WHERE code = 'CP-240703-0002'
 ON CONFLICT DO NOTHING;
 
 INSERT INTO budget_items (order_id, description, amount)
 SELECT id, 'Limpieza interna de disipador', 7000
-FROM orders WHERE code = 'TF-1025'
+FROM orders WHERE code = 'CP-240703-0002'
 ON CONFLICT DO NOTHING;
 
 INSERT INTO budget_items (order_id, description, amount)
 SELECT id, 'Mano de obra', 12000
-FROM orders WHERE code = 'TF-1025'
+FROM orders WHERE code = 'CP-240703-0002'
 ON CONFLICT DO NOTHING;
 
 -- Insertar eventos de línea de tiempo
 INSERT INTO timeline_events (order_id, status, note, event_date)
 SELECT id, 'recibido', 'Equipo ingresado en mostrador.', NOW() - INTERVAL '6 days'
-FROM orders WHERE code = 'TF-1024'
+FROM orders WHERE code = 'CP-240701-0001'
 ON CONFLICT DO NOTHING;
 
 INSERT INTO timeline_events (order_id, status, note, event_date)
 SELECT id, 'en_diagnostico', 'Se confirma puerto HDMI dañado.', NOW() - INTERVAL '5 days'
-FROM orders WHERE code = 'TF-1024'
+FROM orders WHERE code = 'CP-240701-0001'
 ON CONFLICT DO NOTHING;
 
 INSERT INTO timeline_events (order_id, status, note, event_date)
 SELECT id, 'esperando_repuestos', 'Se encarga módulo HDMI original.', NOW() - INTERVAL '3 days'
-FROM orders WHERE code = 'TF-1024'
+FROM orders WHERE code = 'CP-240701-0001'
 ON CONFLICT DO NOTHING;
 
 -- Insertar notificaciones
 INSERT INTO notifications (order_id, message, read, notification_date)
 SELECT id, 'Tu PS5 fue recibida. Te avisaremos con el diagnóstico.', true, NOW() - INTERVAL '6 days'
-FROM orders WHERE code = 'TF-1024'
+FROM orders WHERE code = 'CP-240701-0001'
 ON CONFLICT DO NOTHING;
 
 INSERT INTO notifications (order_id, message, read, notification_date)
 SELECT id, 'Presupuesto cargado. Total estimado disponible en tu portal.', true, NOW() - INTERVAL '5 days'
-FROM orders WHERE code = 'TF-1024'
+FROM orders WHERE code = 'CP-240701-0001'
 ON CONFLICT DO NOTHING;
 
 INSERT INTO notifications (order_id, message, read, notification_date)
 SELECT id, 'Estamos esperando el repuesto (módulo HDMI).', false, NOW() - INTERVAL '3 days'
-FROM orders WHERE code = 'TF-1024'
+FROM orders WHERE code = 'CP-240701-0001'
 ON CONFLICT DO NOTHING;
 
 INSERT INTO notifications (order_id, message, read, notification_date)
 SELECT id, 'Tu notebook está lista para retirar.', false, NOW() - INTERVAL '1 day'
-FROM orders WHERE code = 'TF-1025'
+FROM orders WHERE code = 'CP-240703-0002'
 ON CONFLICT DO NOTHING;
 
 INSERT INTO notifications (order_id, message, read, notification_date)
 SELECT id, 'Recibimos tu PC, estamos haciendo el diagnóstico.', false, NOW() - INTERVAL '1 day'
-FROM orders WHERE code = 'TF-1026'
+FROM orders WHERE code = 'CP-240706-0003'
 ON CONFLICT DO NOTHING;
+
+UPDATE order_code_counter SET current_value = (SELECT COUNT(*) FROM orders) WHERE id = true;
+
+CREATE OR REPLACE FUNCTION create_order_with_code(
+  p_client_id UUID,
+  p_client_name VARCHAR,
+  p_client_phone VARCHAR,
+  p_client_email VARCHAR,
+  p_device_type VARCHAR,
+  p_device_brand VARCHAR,
+  p_device_model VARCHAR,
+  p_device_serial VARCHAR,
+  p_fault TEXT,
+  p_status TEXT,
+  p_assigned_to VARCHAR
+)
+RETURNS SETOF orders
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  v_counter BIGINT;
+  v_prefix TEXT;
+  v_created_at TIMESTAMPTZ := CURRENT_TIMESTAMP;
+  v_code TEXT;
+BEGIN
+  INSERT INTO order_code_counter (id, current_value) VALUES (true, 0) ON CONFLICT (id) DO NOTHING;
+  SELECT current_value INTO v_counter FROM order_code_counter WHERE id = true FOR UPDATE;
+  v_counter := v_counter + 1;
+  IF p_client_id IS NULL THEN
+    v_prefix := 'CO';
+  ELSIF EXISTS (SELECT 1 FROM users WHERE id = p_client_id AND company_id IS NOT NULL) THEN
+    v_prefix := 'CC';
+  ELSE
+    v_prefix := 'CP';
+  END IF;
+  v_code := v_prefix || '-' || to_char(v_created_at AT TIME ZONE 'America/Argentina/Buenos_Aires', 'YYMMDD') || lpad(v_counter::text, 4, '0');
+  UPDATE order_code_counter SET current_value = v_counter WHERE id = true;
+  RETURN QUERY
+  INSERT INTO orders (code, client_id, client_name, client_phone, client_email, device_type, device_brand, device_model, device_serial, fault, status, assigned_to, created_at, updated_at)
+  VALUES (v_code, p_client_id, p_client_name, p_client_phone, p_client_email, p_device_type, p_device_brand, p_device_model, p_device_serial, p_fault, p_status, p_assigned_to, v_created_at, v_created_at)
+  RETURNING *;
+END;
+$$;
+
+CREATE OR REPLACE FUNCTION search_occasional_tickets(p_query TEXT)
+RETURNS TABLE(code VARCHAR, status TEXT)
+LANGUAGE sql
+STABLE
+SET search_path = public
+AS $$
+  SELECT o.code, o.status FROM orders o
+  WHERE o.client_id IS NULL
+    AND upper(regexp_replace(o.code, '[-[:space:]]', '', 'g')) LIKE '%' || upper(regexp_replace(trim(p_query), '[-[:space:]]', '', 'g')) || '%'
+  ORDER BY o.created_at DESC
+  LIMIT 50;
+$$;
