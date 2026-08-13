@@ -12,6 +12,7 @@ import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import Image from "next/image"
 import { useStore } from "@/lib/store"
+import { useDebouncedValue } from "@/lib/use-debounced-value"
 import type { Company, User } from "@/lib/types"
 
 export function CompanyManagement() {
@@ -33,6 +34,7 @@ export function CompanyManagement() {
   const [userConfirmation, setUserConfirmation] = useState("")
   const [userCompanyId, setUserCompanyId] = useState("")
   const [search, setSearch] = useState("")
+  const debouncedSearch = useDebouncedValue(search, 350)
   const [draggingLogo, setDraggingLogo] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
@@ -41,10 +43,10 @@ export function CompanyManagement() {
   useEffect(() => { load() }, [])
 
   const filteredCompanies = useMemo(() => {
-    const query = search.trim().toLocaleLowerCase()
+    const query = debouncedSearch.trim().toLocaleLowerCase()
     if (!query) return companies
     return companies.filter((company) => company.name.toLocaleLowerCase().includes(query))
-  }, [companies, search])
+  }, [companies, debouncedSearch])
 
   function startCreateCompany() { setEditingCompany(null); setName(""); setLimit("1"); setLogo(""); setError(null); setCompanyDialogOpen(true) }
   function startEditCompany(company: Company) { setEditingCompany(company); setName(company.name); setLimit(String(company.userLimit)); setLogo(company.logo ?? ""); setError(null); setCompanyDialogOpen(true) }

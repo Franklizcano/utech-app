@@ -87,7 +87,7 @@ INSERT INTO orders (
   status,
   assigned_to
 ) VALUES (
-  'TF-' || LPAD((SELECT COUNT(*) + 1027 FROM orders)::text, 4, '0'),
+  'CP-2407010001',
   (SELECT id FROM users WHERE email = 'cliente@mail.com'),
   'Cliente Nuevo',
   '+54 11 1111-2222',
@@ -117,7 +117,7 @@ INSERT INTO orders (
   status,
   assigned_to
 ) VALUES (
-  'TF-1030',
+  'CO-240707-0004',
   NULL,  -- Sin cliente registrado
   'Roberto García',
   '+54 9 11 3333-4444',
@@ -137,7 +137,7 @@ RETURNING code, client_name;
 SELECT id, code, client_name, client_email, device_brand, device_model, 
        fault, status, assigned_to, created_at
 FROM orders
-WHERE code = 'TF-1024';
+WHERE code = 'CP-2407010001';
 ```
 
 ### Listar todas las órdenes activas
@@ -168,7 +168,7 @@ ORDER BY created_at DESC;
 ```sql
 UPDATE orders
 SET status = 'en_reparacion', updated_at = CURRENT_TIMESTAMP
-WHERE code = 'TF-1024'
+WHERE code = 'CP-2407010001'
 RETURNING code, status;
 ```
 
@@ -176,7 +176,7 @@ RETURNING code, status;
 ```sql
 UPDATE orders
 SET assigned_to = 'Sofía Ruiz', updated_at = CURRENT_TIMESTAMP
-WHERE code = 'TF-1024'
+WHERE code = 'CP-2407010001'
 RETURNING code, assigned_to;
 ```
 
@@ -212,7 +212,7 @@ ORDER BY os.position ASC;
 ```sql
 INSERT INTO budget_items (order_id, description, amount)
 VALUES (
-  (SELECT id FROM orders WHERE code = 'TF-1024'),
+  (SELECT id FROM orders WHERE code = 'CP-2407010001'),
   'Reemplazo de batería',
   15000
 )
@@ -227,7 +227,7 @@ SELECT
   ROUND(amount::numeric / (SELECT SUM(amount) FROM budget_items WHERE order_id = o.id) * 100, 1) as porcentaje
 FROM budget_items bi
 JOIN orders o ON bi.order_id = o.id
-WHERE o.code = 'TF-1024'
+WHERE o.code = 'CP-2407010001'
 ORDER BY bi.created_at ASC;
 ```
 
@@ -278,7 +278,7 @@ WHERE status != 'entregado';
 ```sql
 INSERT INTO timeline_events (order_id, status, note, event_date)
 VALUES (
-  (SELECT id FROM orders WHERE code = 'TF-1024'),
+  (SELECT id FROM orders WHERE code = 'CP-2407010001'),
   'en_reparacion',
   'Se inicia reparación del módulo HDMI',
   CURRENT_TIMESTAMP
@@ -295,7 +295,7 @@ SELECT
   EXTRACT(DAY FROM CURRENT_TIMESTAMP - te.event_date) as hace_dias
 FROM timeline_events te
 LEFT JOIN order_states os ON te.status = os.id
-WHERE te.order_id = (SELECT id FROM orders WHERE code = 'TF-1024')
+WHERE te.order_id = (SELECT id FROM orders WHERE code = 'CP-2407010001')
 ORDER BY te.event_date ASC;
 ```
 
@@ -304,7 +304,7 @@ ORDER BY te.event_date ASC;
 SELECT 
   EXTRACT(DAY FROM AVG(LEAD(event_date) OVER (ORDER BY event_date) - event_date)) as dias_promedio
 FROM timeline_events
-WHERE order_id = (SELECT id FROM orders WHERE code = 'TF-1024');
+WHERE order_id = (SELECT id FROM orders WHERE code = 'CP-2407010001');
 ```
 
 ---
@@ -315,7 +315,7 @@ WHERE order_id = (SELECT id FROM orders WHERE code = 'TF-1024');
 ```sql
 INSERT INTO notifications (order_id, message, read, notification_date)
 VALUES (
-  (SELECT id FROM orders WHERE code = 'TF-1024'),
+  (SELECT id FROM orders WHERE code = 'CP-2407010001'),
   'Tu orden está lista para retirar',
   false,
   CURRENT_TIMESTAMP
@@ -331,7 +331,7 @@ SELECT
   notification_date,
   CASE WHEN read THEN 'Leída' ELSE 'No leída' END as estado
 FROM notifications
-WHERE order_id = (SELECT id FROM orders WHERE code = 'TF-1024')
+WHERE order_id = (SELECT id FROM orders WHERE code = 'CP-2407010001')
 ORDER BY notification_date DESC;
 ```
 
@@ -353,7 +353,7 @@ ORDER BY COUNT(n.id) DESC;
 ```sql
 UPDATE notifications
 SET read = true
-WHERE order_id = (SELECT id FROM orders WHERE code = 'TF-1024')
+WHERE order_id = (SELECT id FROM orders WHERE code = 'CP-2407010001')
 AND read = false
 RETURNING COUNT(*) as notificaciones_marcadas;
 ```
@@ -517,7 +517,7 @@ ORDER BY created_at ASC;
 
 ### 1. Obtener ID de orden rápidamente por código:
 ```sql
-SELECT id FROM orders WHERE code = 'TF-1024';
+SELECT id FROM orders WHERE code = 'CP-2407010001';
 ```
 
 ### 2. Verificar integridad referencial:
@@ -554,7 +554,7 @@ COPY (
 ### Eliminar orden completa (y todos sus datos asociados)
 ```sql
 DELETE FROM orders
-WHERE code = 'TF-1024'
+WHERE code = 'CP-240701-0001'
 RETURNING code, client_name;
 -- Automáticamente elimina: budget_items, timeline_events, notifications
 ```

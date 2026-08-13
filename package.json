@@ -1,6 +1,6 @@
 {
   "name": "utech-app",
-  "version": "0.1.8",
+  "version": "0.1.9",
   "private": true,
   "packageManager": "pnpm@10.34.5",
   "scripts": {

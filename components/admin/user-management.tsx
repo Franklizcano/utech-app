@@ -43,6 +43,7 @@ import {
 } from "@/components/ui/table"
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { useStore } from "@/lib/store"
+import { useDebouncedValue } from "@/lib/use-debounced-value"
 import type { Role, User } from "@/lib/types"
 
 const ROLE_LABELS: Record<Role, string> = {
@@ -81,9 +82,10 @@ export function UserManagement() {
   const [saving, setSaving] = useState(false)
   const [roleFilter, setRoleFilter] = useState<RoleFilter>("all")
   const [search, setSearch] = useState("")
+  const debouncedSearch = useDebouncedValue(search, 350)
 
   const managedUsers = users.filter((user) => !user.companyId)
-  const normalizedSearch = normalizeSearchText(search)
+  const normalizedSearch = normalizeSearchText(debouncedSearch)
   const visibleUsers = managedUsers.filter((user) => {
     const matchesRole = roleFilter === "all" || user.role === roleFilter
     const matchesSearch = !normalizedSearch || [user.name, user.email, user.phone].some((value) =>

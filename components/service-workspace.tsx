@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useMemo } from "react"
+import { useState, useEffect, useRef } from "react"
 import { Plus, Inbox, Loader2, Search } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
@@ -18,38 +18,64 @@ import { CompletedOrdersInbox } from "@/components/completed-orders-inbox"
 import { OrderForm } from "@/components/employee/order-form"
 import { OrderDetail } from "@/components/employee/order-detail"
 import { useStore, formatCurrency } from "@/lib/store"
-import { budgetTotal } from "@/lib/types"
-import { cn, normalizeOrderCode } from "@/lib/utils"
+import { budgetTotal, type Order } from "@/lib/types"
+import { cn } from "@/lib/utils"
 
 export function ServiceWorkspace() {
-  const { role, orders, ordersLoading } = useStore()
-  const [selectedId, setSelectedId] = useState<string | null>(orders[0]?.id ?? null)
+  const { role, orders, ordersLoading, ordersLoadingMore, ordersHasMore, loadMoreOrders, searchOrders, loadOrderDetail } = useStore()
+  const [selectedId, setSelectedId] = useState<string | null>(null)
+  const [selectedDetail, setSelectedDetail] = useState<Order | null>(null)
   const [dialogOpen, setDialogOpen] = useState(false)
   const [searchQuery, setSearchQuery] = useState("")
+  const initialSearchEffect = useRef(true)
 
-  // Filtrar órdenes por código, nombre de cliente o serial
-  const filteredOrders = useMemo(() => {
-    if (!searchQuery.trim()) return orders
+  useEffect(() => {
+    if (initialSearchEffect.current) {
+      initialSearchEffect.current = false
+      return
+    }
 
-    const normalizedQuery = normalizeOrderCode(searchQuery.trim())
-    const lowerQuery = searchQuery.trim().toLowerCase()
+    const timeoutId = window.setTimeout(() => {
+      void searchOrders(searchQuery.trim())
+    }, 350)
+    return () => window.clearTimeout(timeoutId)
+  }, [searchQuery, searchOrders])
 
-    return orders.filter((order) => {
-      const matchesCode = normalizeOrderCode(order.code).includes(normalizedQuery)
-      const matchesClient = order.clientName.toLowerCase().includes(lowerQuery)
-      const matchesSerial = order.deviceSerial?.toLowerCase().includes(lowerQuery) ?? false
-      return matchesCode || matchesClient || matchesSerial
+  const selected = orders.find((o) => o.id === selectedId) ?? null
+
+  useEffect(() => {
+    if (!selected?.id) {
+      return
+    }
+
+    let cancelled = false
+    loadOrderDetail(selected.id).then((detail) => {
+      if (cancelled) return
+      setSelectedDetail(detail)
+    }).catch((error: unknown) => {
+      if (cancelled) return
+      console.error("No se pudo cargar el detalle de la orden:", error)
+      setSelectedDetail(null)
     })
-  }, [orders, searchQuery])
 
-  const selected = orders.find((o) => o.id === selectedId) ?? (!ordersLoading ? orders[0] ?? null : null)
+    return () => {
+      cancelled = true
+    }
+  }, [selected?.id, loadOrderDetail])
+
+  const displayedDetail = selected?.fault
+    ? selected
+    : selected?.id === selectedDetail?.id
+      ? selectedDetail
+      : null
+  const detailLoading = Boolean(selected?.id && !displayedDetail)
 
   return (
     <div className="animate-utech-enter space-y-5">
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-xl font-semibold tracking-tight text-foreground">Pedidos</h2>
-          <p className="text-sm text-muted-foreground">{orders.length} órdenes de reparación en el sistema</p>
+          <p className="text-sm text-muted-foreground">{orders.length} órdenes cargadas</p>
         </div>
         <Button className="gap-2" onClick={() => setDialogOpen(true)} disabled={ordersLoading}>
           <Plus className="size-4" />
@@ -62,9 +88,9 @@ export function ServiceWorkspace() {
         <CompletedOrdersInbox onSelectOrderAction={setSelectedId} />
       </div>
 
-      <div className="grid gap-5 lg:grid-cols-[340px_1fr]">
+      <div className={cn("grid gap-5", selected ? "lg:grid-cols-[340px_1fr]" : "grid-cols-1")}>
         {/* Lista de pedidos */}
-        <div className="space-y-3">
+        <div className="space-y-4">
           {/* Buscador */}
           <div className="relative">
             <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
@@ -79,18 +105,19 @@ export function ServiceWorkspace() {
           </div>
 
           {/* Lista filtrada */}
+          <div className={cn("space-y-4", !selected && "grid gap-4 space-y-0 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4")}>
           {ordersLoading ? (
             <div role="status" aria-live="polite" className="flex flex-col items-center justify-center gap-2 rounded-lg border border-dashed border-border py-8 text-center">
               <Loader2 className="size-8 animate-spin text-primary" />
               <p className="text-sm text-muted-foreground">Cargando órdenes…</p>
             </div>
-          ) : filteredOrders.length === 0 ? (
+          ) : orders.length === 0 ? (
             <div className="flex flex-col items-center justify-center gap-2 rounded-lg border border-dashed border-border py-8 text-center">
               <Search className="size-8 text-muted-foreground" />
               <p className="text-sm text-muted-foreground">No se encontraron órdenes</p>
             </div>
           ) : (
-            filteredOrders.map((order) => {
+            orders.map((order) => {
               const total = budgetTotal(order)
               const isActive = order.id === selected?.id
               return (
@@ -132,13 +159,24 @@ export function ServiceWorkspace() {
               )
             })
           )}
+          </div>
+          {ordersHasMore && !ordersLoading && (
+            <Button type="button" variant="outline" className="w-full" disabled={ordersLoadingMore} onClick={() => void loadMoreOrders(searchQuery.trim())}>
+              {ordersLoadingMore ? "Cargando más…" : "Cargar más órdenes"}
+            </Button>
+          )}
         </div>
 
         {/* Detalle */}
-        <Card>
+        {selected && <Card>
           <CardContent className="pt-6">
-            {selected ? (
-              <OrderDetail key={selected.id} order={selected} />
+            {detailLoading ? (
+              <div role="status" aria-live="polite" className="flex items-center justify-center gap-2 py-16 text-sm text-muted-foreground">
+                <Loader2 className="size-5 animate-spin text-primary" />
+                Cargando detalle…
+              </div>
+            ) : displayedDetail ? (
+              <OrderDetail key={displayedDetail.id} order={displayedDetail} />
             ) : (
               <div className="flex flex-col items-center justify-center gap-3 py-16 text-center">
                 <Inbox className="size-10 text-muted-foreground" />
@@ -146,7 +184,7 @@ export function ServiceWorkspace() {
               </div>
             )}
           </CardContent>
-        </Card>
+        </Card>}
       </div>
 
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>

@@ -1,5 +1,11 @@
 # CHANGELOG
 
+### [0.1.9] - 2026-08-12
+- Adjusted code generation in order creation to include a prefix based on the client type.
+- Optimized order queries to include pagination and caching.
+- Fixed announcement UI.
+- Adjusted orders visualization when the user login.
+
 ### [0.1.8] - 2026-08-12
 - Added client search functionality in order creation view.
 - Added serial field to order creation view.
@@ -7,7 +13,7 @@
 - Added announcements management functionality.
 
 ### [0.1.7] - 2026-08-11
-- Improve user interface.
+- Improved user interface.
 - Added finished orders inbox.
 
 ### [0.1.6] - 2026-08-11

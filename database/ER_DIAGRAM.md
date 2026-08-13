@@ -220,7 +220,7 @@ Tabla principal: order_states
 Tabla principal: orders (Entidad Central)
 ├─ Identificación
 │  ├─ id (UUID) - Primary Key
-│  └─ code (VARCHAR UNIQUE) - Código orden (TF-1024)
+│  └─ code (VARCHAR UNIQUE) - Código orden (CP-2407010001)
 ├─ Cliente
 │  ├─ client_id (FK, nullable) - Referencia usuario
 │  ├─ client_name (VARCHAR) - Nombre del cliente

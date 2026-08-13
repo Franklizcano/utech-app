@@ -1,8 +1,8 @@
 "use client"
 
-import { useCallback, useState } from "react"
+import { useCallback, useEffect, useRef, useState } from "react"
 import { Inbox, Loader2, Plus } from "lucide-react"
-import { assignOrderAction, claimOrderAction, fetchAvailableOrdersAction } from "@/app/actions/orders"
+import { assignOrderAction, claimOrderAction, fetchAvailableOrdersAction, fetchAvailableOrdersCountAction } from "@/app/actions/orders"
 import { StatusBadge } from "@/components/status-badge"
 import { Button } from "@/components/ui/button"
 import {
@@ -35,16 +35,38 @@ export function UnassignedOrdersInbox() {
   const { currentUser, employees, ordersLoading, refreshOrders } = useStore()
   const [open, setOpen] = useState(false)
   const [availableOrders, setAvailableOrders] = useState<Order[]>([])
+  const [availableOrdersCount, setAvailableOrdersCount] = useState(0)
   const [loading, setLoading] = useState(false)
   const [claimingOrderId, setClaimingOrderId] = useState<string | null>(null)
   const [assigningOrderId, setAssigningOrderId] = useState<string | null>(null)
   const [selectedAssignees, setSelectedAssignees] = useState<Record<string, string>>({})
   const [error, setError] = useState("")
+  const countCheckKey = useRef<string | null>(null)
+
+  useEffect(() => {
+    const role = currentUser?.role
+    if (!currentUser || !currentUser.active || (role !== "admin" && role !== "colaborador")) {
+      countCheckKey.current = null
+      return
+    }
+
+    const key = `${currentUser.id}:${role}`
+    if (countCheckKey.current === key) return
+    countCheckKey.current = key
+
+    void fetchAvailableOrdersCountAction()
+      .then((count: number) => setAvailableOrdersCount(count))
+      .catch((countError: unknown) => {
+        console.error("No se pudo contar el buzón de órdenes:", countError)
+      })
+  }, [currentUser])
 
   const refreshInbox = useCallback(async () => {
     setLoading(true)
     try {
-      setAvailableOrders(await fetchAvailableOrdersAction())
+      const nextOrders = await fetchAvailableOrdersAction()
+      setAvailableOrders(nextOrders)
+      setAvailableOrdersCount(nextOrders.length)
     } catch (refreshError) {
       console.error("No se pudieron cargar las órdenes disponibles:", refreshError)
       setError("No se pudo actualizar el buzón.")
@@ -115,9 +137,9 @@ export function UnassignedOrdersInbox() {
       <Button type="button" variant="outline" className="gap-2" onClick={() => handleOpenChange(true)}>
         <Inbox className="size-4" />
         Buzón de órdenes
-        {availableOrders.length > 0 && (
+        {availableOrdersCount > 0 && (
           <span className="rounded-full bg-primary/10 px-1.5 py-0.5 text-[10px] font-semibold text-primary">
-            {availableOrders.length}
+            {availableOrdersCount}
           </span>
         )}
       </Button>

@@ -12,20 +12,20 @@ import type { OccasionalTicketStatus } from "@/lib/types"
 
 export function OccasionalTicketLookup() {
   const [code, setCode] = useState("")
-  const [ticket, setTicket] = useState<OccasionalTicketStatus | null>(null)
+  const [tickets, setTickets] = useState<OccasionalTicketStatus[]>([])
   const [error, setError] = useState("")
   const [loading, setLoading] = useState(false)
 
   async function handleSubmit(event: React.FormEvent) {
     event.preventDefault()
     setError("")
-    setTicket(null)
+    setTickets([])
     setLoading(true)
 
     try {
       const result = await lookupOccasionalTicketAction(code)
-      if (result.success && result.ticket) {
-        setTicket(result.ticket)
+      if (result.success && result.tickets) {
+        setTickets(result.tickets)
       } else {
         setError(result.error ?? "No se pudo consultar el ticket.")
       }
@@ -55,7 +55,7 @@ export function OccasionalTicketLookup() {
               id="occasional-ticket-code"
               value={code}
               onChange={(event) => setCode(event.target.value)}
-              placeholder="Ej: TF-1024"
+              placeholder="Ej: CO-2608120001 o 2608120001"
               autoComplete="off"
               aria-invalid={!!error}
               disabled={loading}
@@ -74,13 +74,17 @@ export function OccasionalTicketLookup() {
           </div>
         )}
 
-        {ticket && (
-          <div role="status" aria-live="polite" className="flex items-center justify-between gap-3 rounded-lg border border-primary/30 bg-primary/5 p-4">
-            <div>
-              <p className="text-xs text-muted-foreground">Ticket consultado</p>
-              <p className="font-mono text-sm font-medium text-foreground">{ticket.code}</p>
-            </div>
-            <StatusBadge status={ticket.status} className="text-sm" />
+        {tickets.length > 0 && (
+          <div role="status" aria-live="polite" className="space-y-2">
+            <p className="text-xs text-muted-foreground">
+              {tickets.length === 1 ? "Ticket consultado" : `${tickets.length} tickets encontrados`}
+            </p>
+            {tickets.map((ticket) => (
+              <div key={ticket.code} className="flex items-center justify-between gap-3 rounded-lg border border-primary/30 bg-primary/5 p-4">
+                <p className="font-mono text-sm font-medium text-foreground">{ticket.code}</p>
+                <StatusBadge status={ticket.status} className="text-sm" />
+              </div>
+            ))}
           </div>
         )}
       </CardContent>

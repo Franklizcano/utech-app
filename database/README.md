@@ -122,7 +122,7 @@ Crea ORDEN
 ### Tabla Principal: ORDERS
 
 Una orden tiene:
-- Identificación (`code`: TF-1024)
+- Identificación (`code`: CP-240701-0001)
 - Información del cliente (nombre, email, teléfono)
 - Datos del equipo (marca, modelo, tipo)
 - Descripción del problema (`fault`)
@@ -143,7 +143,7 @@ INSERT INTO orders (
   device_type, device_brand, device_model, fault,
   status, assigned_to
 ) VALUES (
-  'TF-1030',
+  'CP-240701-0001',
   'Cliente Nuevo',
   '+54 11 1111-2222',
   'cliente@mail.com',
@@ -160,14 +160,14 @@ INSERT INTO orders (
 ```sql
 UPDATE orders
 SET status = 'en_reparacion'
-WHERE code = 'TF-1030';
+WHERE code = 'CP-240701-0001';
 ```
 
 ### Ver presupuesto
 ```sql
 SELECT description, amount
 FROM budget_items
-WHERE order_id = (SELECT id FROM orders WHERE code = 'TF-1030');
+WHERE order_id = (SELECT id FROM orders WHERE code = 'CP-240701-0001');
 ```
 
 → Más ejemplos en: **[QUERIES_GUIDE.md](./QUERIES_GUIDE.md)**
@@ -234,9 +234,9 @@ Se incluyen datos iniciales:
 
 ### 3 Órdenes
 ```
-- TF-1024: PS5 - Esperando repuestos
-- TF-1025: Notebook - Lista para retirar
-- TF-1026: PC - En diagnóstico
+- CP-240701-0001: PS5 - Esperando repuestos
+- CP-240703-0002: Notebook - Lista para retirar
+- CP-240706-0003: PC - En diagnóstico
 ```
 
 Con eventos, presupuestos y notificaciones completas.
@@ -291,13 +291,13 @@ SELECT * FROM orders WHERE status != 'entregado';
 SELECT * FROM orders WHERE client_email = 'ejemplo@mail.com';
 
 -- Ver presupuesto de orden
-SELECT get_order_budget_total(id) FROM orders WHERE code = 'TF-1024';
+SELECT get_order_budget_total(id) FROM orders WHERE code = 'CP-2407010001';
 
 -- Ver estadísticas
 SELECT * FROM get_order_statistics();
 
 -- Cambiar estado
-UPDATE orders SET status = 'en_reparacion' WHERE code = 'TF-1024';
+UPDATE orders SET status = 'en_reparacion' WHERE code = 'CP-2407010001';
 ```
 
 → Más queries: **[QUERIES_GUIDE.md](./QUERIES_GUIDE.md)**
@@ -324,7 +324,7 @@ UPDATE orders SET status = 'en_reparacion' WHERE code = 'TF-1024';
 
 1. **Buscar orden rápido:**
    ```sql
-   SELECT * FROM orders WHERE code = 'TF-1024';
+   SELECT * FROM orders WHERE code = 'CP-2407010001';
    ```
 
 2. **Total de ingresos:**
@@ -412,7 +412,7 @@ database/
 
 1. **Moneda**: Todos los montos en ARS (pesos argentinos)
 2. **Zona horaria**: TIMESTAMP WITH TIME ZONE
-3. **Códigos únicos**: Generados automáticamente (TF-XXXX)
+3. **Códigos únicos**: Generados automáticamente (CP-YYYYMMDDCONTADOR; el contador es global y transaccional)
 4. **Eliminación**: En cascada para órdenes
 5. **Clientes ocasionales**: `client_id` puede ser NULL
 

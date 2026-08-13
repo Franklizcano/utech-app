@@ -8,8 +8,8 @@ interface OrdersCacheEntry {
 
 const ordersCache = new Map<string, OrdersCacheEntry>()
 
-export function getOrdersCacheKey(userId: string, role: string): string {
-  return `${role === "cliente" ? "client" : "staff"}:${userId}`
+export function getOrdersCacheKey(userId: string, role: string, search = ""): string {
+  return `${role === "cliente" ? "client" : "staff"}:${userId}:${search.trim().toLowerCase()}`
 }
 
 export function getOrdersCache(key: string): Order[] | undefined {

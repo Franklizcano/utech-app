@@ -1,6 +1,6 @@
 "use client"
 
-import { useMemo, useState } from "react"
+import { useEffect, useRef, useState } from "react"
 import { Bell, Inbox, Loader2, Plus, Receipt, Search, Wrench } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -18,7 +18,7 @@ import { RepairTimeline } from "@/components/repair-timeline"
 import { ClientOrderForm } from "@/components/client/client-order-form"
 import { useStore, formatCurrency } from "@/lib/store"
 import { budgetTotal, type Order } from "@/lib/types"
-import { cn, normalizeOrderCode } from "@/lib/utils"
+import { cn } from "@/lib/utils"
 
 function formatDate(iso: string) {
   return new Date(iso).toLocaleDateString("es-AR", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })
@@ -135,27 +135,48 @@ function ClientOrderDetail({ order }: { order: Order }) {
 }
 
 export function ClientPortal() {
-  const { orders, ordersLoading, markNotificationsRead } = useStore()
+  const { orders, ordersLoading, ordersLoadingMore, ordersHasMore, loadMoreOrders, searchOrders, markNotificationsRead, loadOrderDetail } = useStore()
   const [selectedOrderId, setSelectedOrderId] = useState<string | null>(null)
+  const [selectedOrderDetail, setSelectedOrderDetail] = useState<Order | null>(null)
   const [searchQuery, setSearchQuery] = useState("")
   const [dialogOpen, setDialogOpen] = useState(false)
+  const initialSearchEffect = useRef(true)
 
-  const filteredOrders = useMemo(() => {
-    const query = searchQuery.trim()
-    if (!query) return orders
+  useEffect(() => {
+    if (initialSearchEffect.current) {
+      initialSearchEffect.current = false
+      return
+    }
 
-    const normalizedCode = normalizeOrderCode(query)
-    const lowerQuery = query.toLowerCase()
-    return orders.filter((order) => {
-      const matchesCode = normalizeOrderCode(order.code).includes(normalizedCode)
-      const matchesDevice = `${order.deviceBrand} ${order.deviceModel}`.toLowerCase().includes(lowerQuery)
-      const matchesSerial = order.deviceSerial?.toLowerCase().includes(lowerQuery) ?? false
-      const matchesStatus = order.status.toLowerCase().includes(lowerQuery)
-      return matchesCode || matchesDevice || matchesSerial || matchesStatus
-    })
-  }, [orders, searchQuery])
+    const timeoutId = window.setTimeout(() => {
+      void searchOrders(searchQuery.trim())
+    }, 350)
+    return () => window.clearTimeout(timeoutId)
+  }, [searchQuery, searchOrders])
 
   const selectedOrder = orders.find((order) => order.id === selectedOrderId) ?? orders[0] ?? null
+
+  useEffect(() => {
+    if (!selectedOrder?.id) {
+      return
+    }
+
+    let cancelled = false
+    loadOrderDetail(selectedOrder.id).then((detail) => {
+      if (cancelled) return
+      setSelectedOrderDetail(detail)
+    }).catch((error: unknown) => {
+      if (cancelled) return
+      console.error("No se pudo cargar el detalle de la orden:", error)
+      setSelectedOrderDetail(null)
+    })
+
+    return () => {
+      cancelled = true
+    }
+  }, [selectedOrder?.id, loadOrderDetail])
+
+  const detailLoading = Boolean(selectedOrder?.id && selectedOrderDetail?.id !== selectedOrder.id)
 
   function handleSelectOrder(orderId: string) {
     setSelectedOrderId(orderId)
@@ -168,7 +189,7 @@ export function ClientPortal() {
         <div>
           <h2 className="text-xl font-semibold tracking-tight text-foreground">Mis órdenes</h2>
           <p className="text-sm text-muted-foreground">
-            {orders.length} {orders.length === 1 ? "orden asociada" : "órdenes asociadas"} a tu cuenta
+            {orders.length} {orders.length === 1 ? "orden cargada" : "órdenes cargadas"}
           </p>
         </div>
         <Button className="gap-2" onClick={() => setDialogOpen(true)} disabled={ordersLoading}>
@@ -196,7 +217,7 @@ export function ClientPortal() {
               <Loader2 className="size-8 animate-spin text-primary" />
               <p className="text-sm text-muted-foreground">Cargando tus órdenes…</p>
             </div>
-          ) : filteredOrders.length === 0 ? (
+          ) : orders.length === 0 ? (
             <div className="flex flex-col items-center justify-center gap-2 rounded-lg border border-dashed border-border py-8 text-center">
               <Inbox className="size-8 text-muted-foreground" />
               <p className="text-sm text-muted-foreground">
@@ -204,7 +225,7 @@ export function ClientPortal() {
               </p>
             </div>
           ) : (
-            filteredOrders.map((order) => (
+            orders.map((order) => (
               <Button
                 key={order.id}
                 type="button"
@@ -229,12 +250,22 @@ export function ClientPortal() {
               </Button>
             ))
           )}
+          {ordersHasMore && !ordersLoading && (
+            <Button type="button" variant="outline" className="w-full" disabled={ordersLoadingMore} onClick={() => void loadMoreOrders(searchQuery.trim())}>
+              {ordersLoadingMore ? "Cargando más…" : "Cargar más órdenes"}
+            </Button>
+          )}
         </div>
 
         <Card>
           <CardContent className="pt-6">
-            {selectedOrder ? (
-              <ClientOrderDetail key={selectedOrder.id} order={selectedOrder} />
+            {detailLoading ? (
+              <div role="status" aria-live="polite" className="flex items-center justify-center gap-2 py-16 text-sm text-muted-foreground">
+                <Loader2 className="size-5 animate-spin text-primary" />
+                Cargando detalle…
+              </div>
+            ) : selectedOrderDetail ? (
+              <ClientOrderDetail key={selectedOrderDetail.id} order={selectedOrderDetail} />
             ) : (
               <div className="flex flex-col items-center justify-center gap-3 py-16 text-center">
                 <Inbox className="size-10 text-muted-foreground" />

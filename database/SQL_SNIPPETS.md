@@ -17,7 +17,7 @@ ORDER BY created_at DESC;
 
 ### 2. Buscar orden por código
 ```sql
-SELECT * FROM orders WHERE code = 'TF-1024';
+SELECT * FROM orders WHERE code = 'CP-240701-0001';
 ```
 
 ### 3. Ver órdenes de un cliente
@@ -45,7 +45,7 @@ SELECT
   client_name,
   get_order_budget_total(id) as presupuesto_total
 FROM orders 
-WHERE code = 'TF-1024';
+WHERE code = 'CP-240701-0001';
 ```
 
 ### 6. Ver items de presupuesto
@@ -54,7 +54,7 @@ SELECT
   description,
   amount
 FROM budget_items
-WHERE order_id = (SELECT id FROM orders WHERE code = 'TF-1024')
+WHERE order_id = (SELECT id FROM orders WHERE code = 'CP-240701-0001')
 ORDER BY created_at;
 ```
 
@@ -66,7 +66,7 @@ SELECT
   te.event_date
 FROM timeline_events te
 LEFT JOIN order_states os ON te.status = os.id
-WHERE te.order_id = (SELECT id FROM orders WHERE code = 'TF-1024')
+WHERE te.order_id = (SELECT id FROM orders WHERE code = 'CP-240701-0001')
 ORDER BY te.event_date ASC;
 ```
 
@@ -77,7 +77,7 @@ SELECT
   read,
   notification_date
 FROM notifications
-WHERE order_id = (SELECT id FROM orders WHERE code = 'TF-1024')
+WHERE order_id = (SELECT id FROM orders WHERE code = 'CP-240701-0001')
 ORDER BY notification_date DESC;
 ```
 
@@ -92,7 +92,7 @@ INSERT INTO orders (
   device_type, device_brand, device_model, fault,
   status, assigned_to
 ) VALUES (
-  'TF-1030',
+  'CP-240701-0001',
   (SELECT id FROM users WHERE email = 'cliente@mail.com'),
   'Nombre Cliente',
   '+54 11 1111-2222',
@@ -114,7 +114,7 @@ INSERT INTO orders (
   device_type, device_brand, device_model, fault,
   status, assigned_to
 ) VALUES (
-  'TF-1031',
+  'CO-240703-0002',
   NULL,
   'Cliente Ocasional',
   '+54 9 11 3333-4444',
@@ -133,7 +133,7 @@ RETURNING code;
 ```sql
 UPDATE orders
 SET status = 'en_reparacion'
-WHERE code = 'TF-1024'
+WHERE code = 'CP-240701-0001'
 RETURNING code, status;
 ```
 
@@ -141,7 +141,7 @@ RETURNING code, status;
 ```sql
 UPDATE orders
 SET assigned_to = 'Sofía Ruiz'
-WHERE code = 'TF-1024'
+WHERE code = 'CP-240701-0001'
 RETURNING code, assigned_to;
 ```
 
@@ -152,7 +152,7 @@ INSERT INTO budget_items (
   description,
   amount
 ) VALUES (
-  (SELECT id FROM orders WHERE code = 'TF-1024'),
+  (SELECT id FROM orders WHERE code = 'CP-240701-0001'),
   'Cambio de batería',
   15000
 )
@@ -167,7 +167,7 @@ INSERT INTO timeline_events (
   note,
   event_date
 ) VALUES (
-  (SELECT id FROM orders WHERE code = 'TF-1024'),
+  (SELECT id FROM orders WHERE code = 'CP-240701-0001'),
   'en_reparacion',
   'Se inicia reparación del puerto HDMI',
   CURRENT_TIMESTAMP
@@ -183,7 +183,7 @@ INSERT INTO notifications (
   read,
   notification_date
 ) VALUES (
-  (SELECT id FROM orders WHERE code = 'TF-1024'),
+  (SELECT id FROM orders WHERE code = 'CP-240701-0001'),
   'Tu orden está lista para retirar',
   false,
   CURRENT_TIMESTAMP
@@ -233,7 +233,7 @@ RETURNING id, company_id;
 ```sql
 UPDATE notifications
 SET read = true
-WHERE order_id = (SELECT id FROM orders WHERE code = 'TF-1024')
+WHERE order_id = (SELECT id FROM orders WHERE code = 'CP-240701-0001')
 AND read = false;
 ```
 
@@ -447,7 +447,7 @@ ORDER BY days_sin_respuesta DESC;
 ### Eliminar orden completa (y todos sus datos)
 ```sql
 DELETE FROM orders
-WHERE code = 'TF-1024'
+WHERE code = 'CP-240701-0001'
 RETURNING code, client_name;
 ```
 
@@ -471,7 +471,7 @@ RETURNING name, email;
 ```sql
 UPDATE orders
 SET status = 'recibido'
-WHERE code = 'TF-1024'
+WHERE code = 'CP-240701-0001'
 RETURNING code, status;
 ```
 
@@ -571,7 +571,7 @@ ORDER BY ordenes_activas DESC;
 
 ### Obtener ID de orden por código
 ```sql
-SELECT id FROM orders WHERE code = 'TF-1024';
+SELECT id FROM orders WHERE code = 'CP-240701-0001';
 ```
 
 ### Total rápido de ingresos

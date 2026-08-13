@@ -69,7 +69,7 @@ Implementar el schema SQL en tu base de datos Supabase integrada para que el sis
 
 ### 7️⃣ Verifica los Datos de Ejemplo
 - [ ] Haz clic en la tabla **"orders"**
-- [ ] Deberías ver 3 órdenes (TF-1024, TF-1025, TF-1026)
+- [ ] Deberías ver 3 órdenes (CP-2407010001, CP-2407030002, CP-2407060003)
 - [ ] Haz clic en **"users"**
 - [ ] Deberías ver 7 usuarios (1 admin, 3 empleados, 3 clientes)
 
