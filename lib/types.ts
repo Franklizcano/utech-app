@@ -133,6 +133,18 @@ export interface OrderCreationInput {
   assignedTo: string | null
 }
 
+export interface AdminStatsFilters {
+  assignedTo?: string
+  from?: string
+  to?: string
+}
+
+export interface AdminStatsResult {
+  total: number
+  revenue: number
+  countsByStatus: Record<OrderStatus, number>
+}
+
 export interface OccasionalTicketStatus {
   code: string
   status: OrderStatus

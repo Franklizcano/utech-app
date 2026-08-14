@@ -14,7 +14,7 @@ Los INSERT statements con SELECT tenían dos claúsulas WHERE, lo cual es invál
 ```sql
 INSERT INTO budget_items (order_id, description, amount)
 SELECT id, 'Cambio de módulo HDMI PS5', 28000
-FROM orders WHERE code = 'TF-1024'
+FROM orders WHERE code = 'CP-240701-0001'
 WHERE NOT EXISTS (SELECT 1 FROM budget_items WHERE order_id = ... ); -- ❌ SEGUNDO WHERE - ERROR!
 ```
 
@@ -25,31 +25,31 @@ Se reemplazó la claúsula `WHERE NOT EXISTS` por `ON CONFLICT DO NOTHING`, que 
 ```sql
 INSERT INTO budget_items (order_id, description, amount)
 SELECT id, 'Cambio de módulo HDMI PS5', 28000
-FROM orders WHERE code = 'TF-1024'
+FROM orders WHERE code = 'CP-240701-0001'
 ON CONFLICT DO NOTHING; -- ✅ Sintaxis correcta
 ```
 
 ## Cambios Realizados
 
 ### 1. Budget Items (6 statements corregidos)
-- `INSERT INTO budget_items` para TF-1024 (módulo HDMI)
-- `INSERT INTO budget_items` para TF-1024 (mano de obra)
-- `INSERT INTO budget_items` para TF-1024 (limpieza)
-- `INSERT INTO budget_items` para TF-1025 (pasta térmica)
-- `INSERT INTO budget_items` para TF-1025 (disipador)
-- `INSERT INTO budget_items` para TF-1025 (mano de obra)
+- `INSERT INTO budget_items` para CP-240701-0001 (módulo HDMI)
+- `INSERT INTO budget_items` para CP-240701-0001 (mano de obra)
+- `INSERT INTO budget_items` para CP-240701-0001 (limpieza)
+- `INSERT INTO budget_items` para CP-240703-0002 (pasta térmica)
+- `INSERT INTO budget_items` para CP-240703-0002 (disipador)
+- `INSERT INTO budget_items` para CP-240703-0002 (mano de obra)
 
 ### 2. Timeline Events (3 statements corregidos)
-- `INSERT INTO timeline_events` para TF-1024 (recibido)
-- `INSERT INTO timeline_events` para TF-1024 (diagnóstico)
-- `INSERT INTO timeline_events` para TF-1024 (esperando repuestos)
+- `INSERT INTO timeline_events` para CP-240701-0001 (recibido)
+- `INSERT INTO timeline_events` para CP-240701-0001 (diagnóstico)
+- `INSERT INTO timeline_events` para CP-240701-0001 (esperando repuestos)
 
 ### 3. Notifications (5 statements corregidos)
-- `INSERT INTO notifications` para TF-1024 (recibida)
-- `INSERT INTO notifications` para TF-1024 (presupuesto)
-- `INSERT INTO notifications` para TF-1024 (repuesto)
-- `INSERT INTO notifications` para TF-1025 (lista)
-- `INSERT INTO notifications` para TF-1026 (diagnóstico)
+- `INSERT INTO notifications` para CP-240701-0001 (recibida)
+- `INSERT INTO notifications` para CP-240701-0001 (presupuesto)
+- `INSERT INTO notifications` para CP-240701-0001 (repuesto)
+- `INSERT INTO notifications` para CP-240703-0002 (lista)
+- `INSERT INTO notifications` para CP-240706-0003 (diagnóstico)
 
 **Total de statements corregidos: 14**
 

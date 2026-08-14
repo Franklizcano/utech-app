@@ -1,5 +1,9 @@
 # CHANGELOG
 
+### [0.1.10] - 2026-08-14
+- Add filters to statistics view.
+- 
+
 ### [0.1.9] - 2026-08-12
 - Adjusted code generation in order creation to include a prefix based on the client type.
 - Optimized order queries to include pagination and caching.
