@@ -5,6 +5,7 @@
 
 -- Crear extensiones necesarias
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
+CREATE EXTENSION IF NOT EXISTS "pgcrypto";
 
 -- ============================================
 -- Tabla: roles
@@ -35,13 +36,18 @@ CREATE TABLE IF NOT EXISTS users (
   role TEXT NOT NULL REFERENCES roles(id),
   password_hash TEXT NOT NULL DEFAULT '',
   active BOOLEAN DEFAULT true,
+  referral_code VARCHAR(12) NOT NULL UNIQUE DEFAULT upper(encode(gen_random_bytes(6), 'hex')),
+  referred_by UUID REFERENCES users(id) ON DELETE SET NULL,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-  updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+  CONSTRAINT users_not_self_referred CHECK (referred_by IS NULL OR referred_by <> id)
 );
 
 CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);
 CREATE INDEX IF NOT EXISTS idx_users_role ON users(role);
 CREATE INDEX IF NOT EXISTS idx_users_active ON users(active);
+CREATE INDEX IF NOT EXISTS idx_users_referral_code ON users(referral_code);
+CREATE INDEX IF NOT EXISTS idx_users_referred_by ON users(referred_by);
 
 -- Empresas: administración independiente de clientes corporativos.
 CREATE TABLE IF NOT EXISTS companies (

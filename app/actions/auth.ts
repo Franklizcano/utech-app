@@ -2,6 +2,7 @@
 
 import { cookies } from "next/headers"
 import bcrypt from "bcryptjs"
+import { randomBytes } from "node:crypto"
 import { getSupabaseServerClient } from "@/lib/supabase"
 import type { CompanySummary, Role, User } from "@/lib/types"
 
@@ -13,6 +14,7 @@ type UserInput = {
   phone: string
   role: Role
   companyId?: string
+  referralCode?: string
 }
 
 export interface CreateUserResult {
@@ -33,6 +35,12 @@ function validatePassword(password: string): string | null {
   return null
 }
 
+const REFERRAL_CODE_LENGTH = 12
+
+function generateReferralCode(): string {
+  return randomBytes(REFERRAL_CODE_LENGTH).toString("hex").slice(0, REFERRAL_CODE_LENGTH).toUpperCase()
+}
+
 function rowToUser(row: Record<string, unknown>): User {
   const company = Array.isArray(row.company) ? row.company[0] : row.company as { name?: string; logo?: string | null } | undefined
   return {
@@ -44,11 +52,13 @@ function rowToUser(row: Record<string, unknown>): User {
     active: row.active as boolean,
     companyId: (row.company_id as string) ?? undefined,
     company: company?.name ? { name: company.name, logo: company.logo ?? undefined } : undefined,
+    referralCode: row.referral_code as string,
+    referredBy: (row.referred_by as string | null) ?? undefined,
     createdAt: row.created_at as string,
   }
 }
 
-const safeUserSelect = "id, name, email, phone, role, active, company_id, created_at, company:companies(name, logo)"
+const safeUserSelect = "id, name, email, phone, role, active, company_id, referral_code, referred_by, created_at, company:companies(name, logo)"
 
 export interface AuthUser {
   id: string
@@ -59,6 +69,8 @@ export interface AuthUser {
   active: boolean
   companyId?: string
   company?: CompanySummary
+  referralCode: string
+  referredBy?: string
   createdAt: string
 }
 
@@ -79,7 +91,7 @@ export async function loginAction(email: string, password: string): Promise<Logi
 
     const { data, error } = await supabase
       .from("users")
-      .select("id, name, email, phone, role, active, password_hash, company_id, created_at, company:companies(name, logo)")
+      .select("id, name, email, phone, role, active, password_hash, company_id, referral_code, referred_by, created_at, company:companies(name, logo)")
       .eq("email", email.toLowerCase().trim())
       .single()
 
@@ -117,6 +129,8 @@ export async function loginAction(email: string, password: string): Promise<Logi
       company: data.company?.[0]
         ? { name: data.company[0].name, logo: data.company[0].logo ?? undefined }
         : undefined,
+      referralCode: data.referral_code,
+      referredBy: data.referred_by ?? undefined,
       createdAt: data.created_at,
     }
 
@@ -159,6 +173,19 @@ export async function createUserWithPasswordAction(
     if (input.companyId && input.role !== "cliente") return { success: false, error: "Solo los clientes pueden pertenecer a una empresa." }
 
     const supabase = getSupabaseServerClient()
+    let referredBy: string | null = null
+    if (input.referralCode?.trim()) {
+      if (input.role !== "cliente") return { success: false, error: "El código de referido solo aplica a clientes." }
+      const { data: referrer, error: referrerError } = await supabase
+        .from("users")
+        .select("id")
+        .eq("referral_code", input.referralCode.trim().toUpperCase())
+        .eq("role", "cliente")
+        .eq("active", true)
+        .maybeSingle()
+      if (referrerError || !referrer) return { success: false, error: "El código de referido no es válido." }
+      referredBy = referrer.id
+    }
     if (input.companyId) {
       const { data: company, error: companyError } = await supabase
         .from("companies")
@@ -179,19 +206,28 @@ export async function createUserWithPasswordAction(
       }
     }
     const passwordHash = await bcrypt.hash(input.password, 10)
-    const { data, error } = await supabase
-      .from("users")
-      .insert({
-        name,
-        email,
-        phone,
-        role: input.role,
-        active: true,
-        password_hash: passwordHash,
-        company_id: input.companyId || null,
-      })
-      .select(safeUserSelect)
-      .single()
+    let data: Record<string, unknown> | null = null
+    let error: { code?: string; message?: string } | null = null
+    for (let attempt = 0; attempt < 3 && !data; attempt += 1) {
+      const result = await supabase
+        .from("users")
+        .insert({
+          name,
+          email,
+          phone,
+          role: input.role,
+          active: true,
+          password_hash: passwordHash,
+          company_id: input.companyId || null,
+          referral_code: generateReferralCode(),
+          referred_by: referredBy,
+        })
+        .select(safeUserSelect)
+        .single()
+      data = result.data as Record<string, unknown> | null
+      error = result.error
+      if (error?.code !== "23505") break
+    }
 
     if (error || !data) {
       console.error("Error al crear usuario con contraseña:", error?.message)

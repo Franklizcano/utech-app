@@ -65,13 +65,6 @@ export function formatCurrency(value: number) {
   }).format(value)
 }
 
-const initialUsers: User[] = [
-  { id: "u_admin", name: "Lucía Fernández", email: "lucia@tecnofix.com", phone: "+54 11 2222-8888", role: "admin", active: true, createdAt: "2026-03-08T12:00:00.000Z" },
-  { id: "u_emp1", name: "Martín Gómez", email: "martin@tecnofix.com", phone: "+54 11 3333-4444", role: "colaborador", active: true, createdAt: "2026-04-07T12:00:00.000Z" },
-  { id: "u_emp2", name: "Sofía Ruiz", email: "sofia@tecnofix.com", phone: "+54 11 4444-5555", role: "colaborador", active: true, createdAt: "2026-05-22T12:00:00.000Z" },
-  { id: "u_emp3", name: "Diego Páez", email: "diego@tecnofix.com", phone: "+54 11 5555-6666", role: "colaborador", active: false, createdAt: "2026-06-16T12:00:00.000Z" },
-]
-
 const initialOrders: Order[] = []
 const ORDERS_PAGE_SIZE = 50
 const DEFAULT_ORDERS_CACHE_TTL_SECONDS = 120
@@ -96,6 +89,9 @@ interface StoreValue {
   states: OrderState[]
   statesLoading: boolean
   usersLoading: boolean
+  usersPage: number
+  usersHasMore: boolean
+  loadUsersPage: (page: number, search?: string) => Promise<void>
   ordersLoading: boolean
   ordersLoadingMore: boolean
   ordersHasMore: boolean
@@ -111,7 +107,7 @@ interface StoreValue {
   addBudgetItem: (orderId: string, description: string, amount: number) => void
   removeBudgetItem: (orderId: string, itemId: string) => void
   sendBudgetNotification: (orderId: string) => void
-  addUser: (input: { name: string; email: string; phone: string; role: Role; password: string; companyId?: string }) => Promise<CreateUserResult>
+  addUser: (input: { name: string; email: string; phone: string; role: Role; password: string; companyId?: string; referralCode?: string }) => Promise<CreateUserResult>
   updateUser: (id: string, input: { name: string; email: string; phone: string; role: Role; active: boolean; companyId?: string }) => void
   toggleUserActive: (id: string) => void
   deleteUser: (id: string) => void
@@ -135,11 +131,13 @@ export function StoreProvider({
   const [role, setRole] = useState<Role>(initialSession?.role ?? "colaborador")
   const [currentUser, setCurrentUser] = useState<AuthUser | null>(initialSession)
   const [isLoggedIn, setIsLoggedIn] = useState(initialSession !== null)
-  const [users, setUsers] = useState<User[]>(initialSession?.role === "cliente" ? [] : initialUsers)
+  const [users, setUsers] = useState<User[]>([])
   const [orders, setOrdersState] = useState<Order[]>(initialOrders)
   const [states, setStates] = useState<OrderState[]>(DEFAULT_STATES)
   const [statesLoading, setStatesLoading] = useState(true)
   const [usersLoading, setUsersLoading] = useState(true)
+  const [usersPage, setUsersPage] = useState(0)
+  const [usersHasMore, setUsersHasMore] = useState(false)
   const [ordersLoading, setOrdersLoading] = useState(true)
   const [ordersLoadingMore, setOrdersLoadingMore] = useState(false)
   const [ordersHasMore, setOrdersHasMore] = useState(true)
@@ -186,13 +184,28 @@ export function StoreProvider({
     }
   }, [])
 
+  const loadUsersPage = useCallback(async (page: number, search = "") => {
+    if (!currentUser || !isLoggedIn || currentUser.role === "cliente" || page < 0) return
+    setUsersLoading(true)
+    try {
+      const result = await fetchUsersAction(page, undefined, search)
+      setUsers(result.users)
+      setUsersPage(page)
+      setUsersHasMore(result.hasMore)
+    } catch (error: unknown) {
+      console.error("No se pudieron cargar los usuarios:", error)
+    } finally {
+      setUsersLoading(false)
+    }
+  }, [currentUser, isLoggedIn])
+
   // Carga los usuarios reales solo para personal autorizado.
   useEffect(() => {
     let cancelled = false
     if (!currentUser || !isLoggedIn || currentUser.role === "cliente") {
       Promise.resolve().then(() => {
         if (cancelled) return
-        setUsers(currentUser?.role === "cliente" ? [] : initialUsers)
+        setUsers([])
         setUsersLoading(false)
       })
       return () => {
@@ -201,21 +214,12 @@ export function StoreProvider({
     }
 
     Promise.resolve().then(() => {
-      if (!cancelled) setUsersLoading(true)
-    })
-    fetchUsersAction().then((remoteUsers) => {
-      if (cancelled) return
-      setUsers(remoteUsers)
-      setUsersLoading(false)
-    }).catch((error: unknown) => {
-      if (cancelled) return
-      console.error("No se pudieron cargar los usuarios:", error)
-      setUsersLoading(false)
+      if (!cancelled) void loadUsersPage(0)
     })
     return () => {
       cancelled = true
     }
-  }, [currentUser, isLoggedIn])
+  }, [currentUser, isLoggedIn, loadUsersPage])
 
   // Carga solo las órdenes autorizadas para la sesión actual y reutiliza la caché fresca.
   useEffect(() => {
@@ -492,7 +496,7 @@ export function StoreProvider({
       })
     }
 
-    async function addUser(input: { name: string; email: string; phone: string; role: Role; password: string; companyId?: string }): Promise<CreateUserResult> {
+    async function addUser(input: { name: string; email: string; phone: string; role: Role; password: string; companyId?: string; referralCode?: string }): Promise<CreateUserResult> {
       const tempId = uid("u")
       const tempUser: User = {
         id: tempId,
@@ -502,6 +506,7 @@ export function StoreProvider({
         role: input.role,
         active: true,
         companyId: input.companyId,
+        referralCode: "",
         createdAt: now(),
       }
       // Actualización optimista
@@ -651,6 +656,9 @@ export function StoreProvider({
       states,
       statesLoading,
       usersLoading,
+      usersPage,
+      usersHasMore,
+      loadUsersPage,
       ordersLoading,
       ordersLoadingMore,
       ordersHasMore,
@@ -688,7 +696,7 @@ export function StoreProvider({
       deleteState,
       reorderStates,
     }
-  }, [role, currentUser, isLoggedIn, users, orders, states, statesLoading, usersLoading, ordersLoading, ordersLoadingMore, ordersHasMore, ordersCacheKey, searchOrders, loadOrderDetail])
+  }, [role, currentUser, isLoggedIn, users, orders, states, statesLoading, usersLoading, usersPage, usersHasMore, ordersLoading, ordersLoadingMore, ordersHasMore, ordersCacheKey, searchOrders, loadOrderDetail, loadUsersPage])
 
   return <StoreContext.Provider value={value}>{children}</StoreContext.Provider>
 }

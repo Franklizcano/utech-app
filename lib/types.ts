@@ -53,7 +53,33 @@ export interface User {
   active: boolean
   companyId?: string
   company?: CompanySummary
+  referralCode: string
+  referredBy?: string
   createdAt: string
+}
+
+export interface ReferralStats {
+  referralCode: string
+  referredUsers: Array<{
+    id: string
+    name: string
+    email: string
+    orderCount: number
+  }>
+  totalReferredUsers: number
+  totalOrders: number
+}
+
+export interface AdminReferralSummary {
+  referrerId: string
+  referredUsers: Array<{
+    id: string
+    name: string
+    email: string
+    orderCount: number
+  }>
+  totalReferredUsers: number
+  totalOrders: number
 }
 
 export interface Company {
