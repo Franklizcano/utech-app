@@ -1,6 +1,6 @@
 # CHANGELOG
 
-### [0.1.10] - 2026-08-14
+### [0.1.10] - 2026-08-17
 - Add filters to statistics view.
 - Added referral codes to users and added visualization to admin view.
 - Add protection to structural states.
