@@ -23,6 +23,7 @@ import {
 import { StatusBadge } from "@/components/status-badge"
 import { RepairTimeline } from "@/components/repair-timeline"
 import { ReassignDialog } from "@/components/employee/reassign-dialog"
+import { sendBudgetToClientAction, submitOrderForBudgetAction } from "@/app/actions/budget"
 import { useStore, formatCurrency } from "@/lib/store"
 import { budgetTotal, getStatusFlow, getStatusLabel, type DeviceType, type Order, type OrderStatus } from "@/lib/types"
 import Image from "next/image"
@@ -30,7 +31,7 @@ import Image from "next/image"
 const DEVICE_TYPES: DeviceType[] = ["PC", "Notebook", "PlayStation", "Xbox", "Nintendo", "Otro"]
 
 export function OrderDetail({ order }: { order: Order }) {
-  const { addBudgetItem, removeBudgetItem, advanceStatus, sendBudgetNotification, updateOrderDetails, states, users } = useStore()
+  const { role, addBudgetItem, removeBudgetItem, advanceStatus, updateOrderDetails, states, users, refreshOrders } = useStore()
   const [desc, setDesc] = useState("")
   const [amount, setAmount] = useState("")
   const [nextStatus, setNextStatus] = useState<OrderStatus>(order.status)
@@ -42,9 +43,11 @@ export function OrderDetail({ order }: { order: Order }) {
   const [draftDeviceModel, setDraftDeviceModel] = useState(order.deviceModel)
   const [draftDeviceSerial, setDraftDeviceSerial] = useState(order.deviceSerial ?? "")
   const [draftFault, setDraftFault] = useState(order.fault)
+  const [submittingBudget, setSubmittingBudget] = useState(false)
 
   const total = budgetTotal(order)
-  const statusFlow = getStatusFlow(states)
+  const canManageBudget = role === "admin" || role === "presupuestador"
+  const statusFlow = getStatusFlow(states).filter((status) => canManageBudget || !status.startsWith("presupuesto") && status !== "pendiente_presupuesto")
   const client = users.find((u) => u.id === order.clientId)
   const detailsChanged =
     draftDeviceType !== order.deviceType ||
@@ -272,7 +275,7 @@ export function OrderDetail({ order }: { order: Order }) {
 
       <div className="grid gap-6 lg:grid-cols-2">
         {/* Presupuesto */}
-        <div className="space-y-4">
+        {canManageBudget ? <div className="space-y-4">
           <h4 className="text-sm font-semibold text-foreground">Presupuesto</h4>
 
           <div className="space-y-2">
@@ -346,12 +349,18 @@ export function OrderDetail({ order }: { order: Order }) {
             variant="outline"
             className="w-full gap-2"
             disabled={order.budget.length === 0}
-            onClick={() => sendBudgetNotification(order.id)}
+            onClick={async () => { if (await sendBudgetToClientAction(order.id)) await refreshOrders() }}
           >
             <Send className="size-4" />
             Notificar presupuesto al cliente
           </Button>
-        </div>
+        </div> : <div className="space-y-4 rounded-lg border border-dashed border-border p-4">
+          <h4 className="text-sm font-semibold text-foreground">Análisis técnico</h4>
+          <p className="text-sm text-muted-foreground">El presupuesto es gestionado por el responsable de presupuestos y no está visible para colaboradores.</p>
+          <Button type="button" className="w-full" disabled={submittingBudget || order.status !== "recibido"} onClick={async () => { setSubmittingBudget(true); try { if (await submitOrderForBudgetAction(order.id)) await refreshOrders() } finally { setSubmittingBudget(false) } }}>
+            {submittingBudget ? "Enviando…" : "Finalizar análisis y enviar a presupuesto"}
+          </Button>
+        </div>}
 
         {/* Estado + timeline */}
         <div className="space-y-4">

@@ -20,13 +20,16 @@ import { ClientOrderForm } from "@/components/client/client-order-form"
 import { useStore, formatCurrency } from "@/lib/store"
 import { budgetTotal, type Order } from "@/lib/types"
 import { cn } from "@/lib/utils"
+import { decideBudgetAction } from "@/app/actions/budget"
 
 function formatDate(iso: string) {
   return new Date(iso).toLocaleDateString("es-AR", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })
 }
-function ClientOrderDetail({ order }: { order: Order }) {
+function ClientOrderDetail({ order, showBudget, onDecisionAction }: { order: Order; showBudget: boolean; onDecisionAction: () => Promise<void> }) {
   const total = budgetTotal(order)
   const notifications = [...order.notifications].reverse()
+  const [decisionNote, setDecisionNote] = useState("")
+  const [deciding, setDeciding] = useState(false)
 
   return (
     <div className="animate-utech-enter space-y-6">
@@ -73,7 +76,7 @@ function ClientOrderDetail({ order }: { order: Order }) {
         </Card>
 
         <div className="space-y-6">
-          <Card>
+          {showBudget && <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2 text-base">
                 <Receipt className="size-4 text-primary" />
@@ -101,7 +104,17 @@ function ClientOrderDetail({ order }: { order: Order }) {
                 </div>
               )}
             </CardContent>
-          </Card>
+            {showBudget && order.status === "presupuesto_enviado" && (
+              <div className="mt-4 space-y-3 rounded-lg border border-primary/25 bg-primary/5 p-3">
+                <p className="text-sm font-medium text-foreground">¿Querés aprobar este presupuesto?</p>
+                <Input value={decisionNote} onChange={(event) => setDecisionNote(event.target.value)} placeholder="Comentario opcional" />
+                <div className="flex gap-2">
+                  <Button type="button" className="flex-1" disabled={deciding} onClick={async () => { setDeciding(true); try { if (await decideBudgetAction(order.id, "aprobado", decisionNote)) await onDecisionAction() } finally { setDeciding(false) } }}>Aprobar</Button>
+                  <Button type="button" variant="outline" className="flex-1" disabled={deciding} onClick={async () => { setDeciding(true); try { if (await decideBudgetAction(order.id, "rechazado", decisionNote)) await onDecisionAction() } finally { setDeciding(false) } }}>Rechazar</Button>
+                </div>
+              </div>
+            )}
+          </Card>}
 
           <Card>
             <CardHeader>
@@ -136,7 +149,7 @@ function ClientOrderDetail({ order }: { order: Order }) {
 }
 
 export function ClientPortal() {
-  const { currentUser, orders, ordersLoading, ordersLoadingMore, ordersHasMore, loadMoreOrders, searchOrders, markNotificationsRead, loadOrderDetail } = useStore()
+  const { currentUser, orders, ordersLoading, ordersLoadingMore, ordersHasMore, loadMoreOrders, searchOrders, markNotificationsRead, loadOrderDetail, refreshOrders } = useStore()
   const [selectedOrderId, setSelectedOrderId] = useState<string | null>(null)
   const [selectedOrderDetail, setSelectedOrderDetail] = useState<Order | null>(null)
   const [searchQuery, setSearchQuery] = useState("")
@@ -316,7 +329,7 @@ export function ClientPortal() {
                 Cargando detalle…
               </div>
             ) : selectedOrderDetail ? (
-              <ClientOrderDetail key={selectedOrderDetail.id} order={selectedOrderDetail} />
+              <ClientOrderDetail key={selectedOrderDetail.id} order={selectedOrderDetail} showBudget={!currentUser?.companyId} onDecisionAction={refreshOrders} />
             ) : (
               <div className="flex flex-col items-center justify-center gap-3 py-16 text-center">
                 <Inbox className="size-10 text-muted-foreground" />

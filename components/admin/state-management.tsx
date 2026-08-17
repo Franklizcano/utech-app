@@ -1,7 +1,7 @@
 "use client"
 
 import { useState } from "react"
-import { Plus, Trash2, Edit2, GripVertical } from "lucide-react"
+import { Plus, Trash2, Edit2, GripVertical, Archive, RotateCcw } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -25,10 +25,10 @@ import {
 } from "@/components/ui/alert-dialog"
 import { useStore } from "@/lib/store"
 import { cn } from "@/lib/utils"
-import type { OrderState } from "@/lib/types"
+import { isProtectedOrderState, type OrderState } from "@/lib/types"
 
 export function StateManagement() {
-  const { states, addState, updateState, deleteState, reorderStates } = useStore()
+  const { states, archivedStates, addState, updateState, deleteState, restoreState, reorderStates } = useStore()
   const [dialogOpen, setDialogOpen] = useState(false)
   const [editingState, setEditingState] = useState<OrderState | null>(null)
   const [label, setLabel] = useState("")
@@ -36,6 +36,7 @@ export function StateManagement() {
   const [deleteTarget, setDeleteTarget] = useState<OrderState | null>(null)
   const [draggedId, setDraggedId] = useState<string | null>(null)
   const [dragOverId, setDragOverId] = useState<string | null>(null)
+  const [deleteError, setDeleteError] = useState<string | null>(null)
 
   function handleOpenDialog(state?: OrderState) {
     if (state) {
@@ -66,16 +67,24 @@ export function StateManagement() {
 
   function handleDelete(state: OrderState) {
     if (states.length === 1) return
-    deleteState(state.id)
-    setDeleteTarget(null)
+    setDeleteError(null)
+    deleteState(state.id).then((result) => {
+      if (result.success) setDeleteTarget(null)
+      else setDeleteError(result.error ?? "No se pudo archivar el estado.")
+    })
   }
 
   function handleDragStart(e: React.DragEvent<HTMLDivElement>, stateId: string) {
+    if (isProtectedOrderState(stateId)) {
+      e.preventDefault()
+      return
+    }
     setDraggedId(stateId)
     e.dataTransfer.effectAllowed = "move"
   }
 
   function handleDragOver(e: React.DragEvent<HTMLDivElement>, stateId: string) {
+    if (isProtectedOrderState(stateId)) return
     e.preventDefault()
     e.dataTransfer.dropEffect = "move"
     setDragOverId(stateId)
@@ -87,6 +96,11 @@ export function StateManagement() {
 
   function handleDrop(e: React.DragEvent<HTMLDivElement>, targetId: string) {
     e.preventDefault()
+    if (isProtectedOrderState(targetId) || (draggedId && isProtectedOrderState(draggedId))) {
+      setDraggedId(null)
+      setDragOverId(null)
+      return
+    }
     if (!draggedId || draggedId === targetId) {
       setDraggedId(null)
       setDragOverId(null)
@@ -121,8 +135,8 @@ export function StateManagement() {
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-lg font-semibold text-foreground">Gestión de Estados</h2>
-          <p className="mt-1 text-sm text-muted-foreground">
-            Crea y personaliza los estados disponibles para las órdenes de reparación.
+            <p className="mt-1 text-sm text-muted-foreground">
+            Crea y personaliza los estados disponibles para las órdenes de reparación. Los estados usados se archivan para conservar el historial.
           </p>
         </div>
         <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
@@ -175,6 +189,12 @@ export function StateManagement() {
 
       <Separator />
 
+      {deleteError && (
+        <div className="rounded-lg border border-destructive/30 bg-destructive/5 px-4 py-3 text-sm text-destructive">
+          {deleteError}
+        </div>
+      )}
+
       <div className="space-y-2">
         {sortedStates.length === 0 ? (
           <div className="rounded-lg border border-border bg-card p-6 text-center">
@@ -185,13 +205,14 @@ export function StateManagement() {
             {sortedStates.map((state) => (
               <div
                 key={state.id}
-                draggable
+                draggable={!isProtectedOrderState(state.id)}
                 onDragStart={(e) => handleDragStart(e, state.id)}
                 onDragOver={(e) => handleDragOver(e, state.id)}
                 onDragLeave={handleDragLeave}
                 onDrop={(e) => handleDrop(e, state.id)}
                 className={cn(
-                  "flex items-center justify-between gap-3 rounded-lg border transition-all cursor-move",
+                  "flex items-center justify-between gap-3 rounded-lg border transition-all",
+                  isProtectedOrderState(state.id) ? "cursor-not-allowed" : "cursor-move",
                   draggedId === state.id ? "opacity-50 border-primary/50 bg-primary/5" : "border-border bg-card",
                   dragOverId === state.id && draggedId !== state.id
                     ? "border-primary/70 bg-primary/10 ring-2 ring-primary/20"
@@ -211,7 +232,9 @@ export function StateManagement() {
                     <p className="text-sm font-medium text-foreground">{state.label}</p>
                     <p className="text-xs text-muted-foreground font-mono">{state.color}</p>
                   </div>
-                  <div className="text-xs text-muted-foreground">Posición: {state.position + 1}</div>
+                  <div className="text-xs text-muted-foreground">
+                    Posición: {state.position + 1}{isProtectedOrderState(state.id) && " · Protegido"}
+                  </div>
                 </div>
                 <div className="flex gap-1 flex-shrink-0">
                   <Button
@@ -227,11 +250,11 @@ export function StateManagement() {
                     variant="ghost"
                     size="icon"
                     className="h-8 w-8 text-destructive hover:bg-destructive/10"
-                    disabled={states.length === 1}
+                    disabled={states.length === 1 || isProtectedOrderState(state.id)}
                     onClick={() => setDeleteTarget(state)}
                   >
                     <Trash2 className="h-4 w-4" />
-                    <span className="sr-only">Eliminar</span>
+                    <span className="sr-only">Archivar</span>
                   </Button>
                 </div>
               </div>
@@ -243,10 +266,10 @@ export function StateManagement() {
       <AlertDialog open={!!deleteTarget} onOpenChange={(open) => !open && setDeleteTarget(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Eliminar estado</AlertDialogTitle>
+              <AlertDialogTitle>Archivar estado</AlertDialogTitle>
             <AlertDialogDescription>
-              ¿Estás seguro que deseas eliminar &quot;{deleteTarget?.label}&quot;? Esta acción no se puede deshacer.
-              {states.length === 1 && " No puedes eliminar el único estado disponible."}
+              ¿Estás seguro que deseas archivar &quot;{deleteTarget?.label}&quot;? El estado dejará de estar disponible para nuevas órdenes, pero seguirá visible en las órdenes e historiales existentes.
+              {states.length === 1 && " No puedes archivar el único estado disponible."}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <div className="flex justify-end gap-2">
@@ -255,11 +278,53 @@ export function StateManagement() {
               onClick={() => deleteTarget && handleDelete(deleteTarget)}
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
             >
-              Eliminar
+              Archivar
             </AlertDialogAction>
           </div>
         </AlertDialogContent>
       </AlertDialog>
+
+      <section className="space-y-3 rounded-lg border border-border bg-card p-4">
+        <div className="flex items-center gap-2">
+          <Archive className="h-4 w-4 text-muted-foreground" />
+          <div>
+            <h3 className="text-sm font-semibold text-foreground">Estados archivados</h3>
+            <p className="text-xs text-muted-foreground">
+              No aparecen en nuevas órdenes, pero se conservan para proteger el historial.
+            </p>
+          </div>
+        </div>
+        {archivedStates.length === 0 ? (
+          <p className="rounded-md border border-dashed border-border p-4 text-center text-sm text-muted-foreground">
+            No hay estados archivados.
+          </p>
+        ) : (
+          <div className="space-y-2">
+            {[...archivedStates].sort((a, b) => a.label.localeCompare(b.label)).map((state) => (
+              <div key={state.id} className="flex items-center justify-between gap-3 rounded-md border border-border p-3">
+                <div className="flex min-w-0 items-center gap-3">
+                  <div className="h-7 w-7 flex-shrink-0 rounded-md border border-border opacity-60" style={{ backgroundColor: state.color }} />
+                  <div className="min-w-0">
+                    <p className="truncate text-sm font-medium text-foreground">{state.label}</p>
+                    <p className="text-xs text-muted-foreground">Archivado · {state.color}</p>
+                  </div>
+                </div>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="flex-shrink-0 gap-2"
+                  onClick={() => restoreState(state.id).then((result) => {
+                    if (!result.success) setDeleteError(result.error ?? "No se pudo restaurar el estado.")
+                  })}
+                >
+                  <RotateCcw className="h-3.5 w-3.5" />
+                  Restaurar
+                </Button>
+              </div>
+            ))}
+          </div>
+        )}
+      </section>
     </div>
   )
 }

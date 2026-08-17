@@ -50,12 +50,14 @@ import type { Role, User } from "@/lib/types"
 const ROLE_LABELS: Record<Role, string> = {
   admin: "Administrador",
   colaborador: "Colaborador",
+  presupuestador: "Responsable de presupuesto",
   cliente: "Cliente",
 }
 
 const ROLE_BADGE: Record<Role, string> = {
   admin: "bg-primary/15 text-primary border-primary/30",
   colaborador: "bg-sky-500/15 text-sky-300 border-sky-500/30",
+  presupuestador: "bg-amber-500/15 text-amber-300 border-amber-500/30",
   cliente: "bg-zinc-500/15 text-zinc-300 border-zinc-500/30",
 }
 
@@ -216,6 +218,7 @@ export function UserManagement() {
                 <TabsTrigger value="all">Todos ({countForRole("all")})</TabsTrigger>
                 <TabsTrigger value="admin">Administradores ({countForRole("admin")})</TabsTrigger>
                 <TabsTrigger value="colaborador">Colaboradores ({countForRole("colaborador")})</TabsTrigger>
+                <TabsTrigger value="presupuestador">Presupuestos ({countForRole("presupuestador")})</TabsTrigger>
                 <TabsTrigger value="cliente">Clientes ({countForRole("cliente")})</TabsTrigger>
               </TabsList>
             </Tabs>
@@ -411,6 +414,7 @@ export function UserManagement() {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="colaborador">Colaborador</SelectItem>
+                  <SelectItem value="presupuestador">Responsable de presupuesto</SelectItem>
                   <SelectItem value="admin">Administrador</SelectItem>
                   <SelectItem value="cliente">Cliente</SelectItem>
                 </SelectContent>

@@ -16,13 +16,17 @@ import {
   DEFAULT_STATES,
   FINAL_ORDER_STATUS,
   getStatusLabel,
+  isProtectedOrderState,
+  PROTECTED_ORDER_STATE_POSITIONS,
 } from "@/lib/types"
 import { createUserWithPasswordAction, type AuthUser, type CreateUserResult, logoutAction } from "@/app/actions/auth"
 import {
   fetchOrderStates,
+  fetchArchivedOrderStates,
   insertOrderState,
   updateOrderStateRemote,
   deleteOrderStateRemote,
+  restoreOrderStateRemote,
   reorderOrderStatesRemote,
 } from "@/lib/queries/order-states"
 import {
@@ -87,6 +91,7 @@ interface StoreValue {
   orders: Order[]
   employees: User[]
   states: OrderState[]
+  archivedStates: OrderState[]
   statesLoading: boolean
   usersLoading: boolean
   usersPage: number
@@ -115,7 +120,8 @@ interface StoreValue {
   // estado management
   addState: (label: string, color: string) => void
   updateState: (id: string, label: string, color: string) => void
-  deleteState: (id: string) => void
+  deleteState: (id: string) => Promise<{ success: boolean; error?: string }>
+  restoreState: (id: string) => Promise<{ success: boolean; error?: string }>
   reorderStates: (ids: string[]) => void
 }
 
@@ -134,6 +140,7 @@ export function StoreProvider({
   const [users, setUsers] = useState<User[]>([])
   const [orders, setOrdersState] = useState<Order[]>(initialOrders)
   const [states, setStates] = useState<OrderState[]>(DEFAULT_STATES)
+  const [archivedStates, setArchivedStates] = useState<OrderState[]>([])
   const [statesLoading, setStatesLoading] = useState(true)
   const [usersLoading, setUsersLoading] = useState(true)
   const [usersPage, setUsersPage] = useState(0)
@@ -172,11 +179,10 @@ export function StoreProvider({
   // Carga los estados de orden reales desde Supabase al montar el provider.
   useEffect(() => {
     let cancelled = false
-    fetchOrderStates().then((remoteStates) => {
+    Promise.all([fetchOrderStates(), fetchArchivedOrderStates()]).then(([remoteStates, remoteArchivedStates]) => {
       if (cancelled) return
-      if (remoteStates.length > 0) {
-        setStates(remoteStates)
-      }
+      setStates(remoteStates)
+      setArchivedStates(remoteArchivedStates)
       setStatesLoading(false)
     })
     return () => {
@@ -281,7 +287,7 @@ export function StoreProvider({
   }, [currentUser, isLoggedIn, ordersCacheKey])
 
   const value = useMemo<StoreValue>(() => {
-    const employees = users.filter((u) => u.role === "colaborador" || u.role === "admin")
+    const employees = users.filter((u) => u.role === "colaborador" || u.role === "presupuestador" || u.role === "admin")
 
     function setOrders(updater: Order[] | ((previous: Order[]) => Order[])) {
       setOrdersState((previous) => {
@@ -322,6 +328,11 @@ export function StoreProvider({
         fault: input.fault,
         status: "recibido",
         assignedTo: input.assignedTo?.trim() || null,
+        budgetAssignedTo: null,
+        budgetDecision: null,
+        budgetDecisionNote: null,
+        budgetSubmittedAt: null,
+        budgetDecidedAt: null,
         budget: [],
         timeline: [{ id: uid("ev"), status: "recibido", note: "Equipo ingresado en el sistema.", date: now() }],
         notifications: [
@@ -599,7 +610,7 @@ export function StoreProvider({
 
     function addState(label: string, color: string) {
       const maxPosition = Math.max(0, ...states.map((s) => s.position))
-      const newState: OrderState = { id: uid("st"), label, color, position: maxPosition + 1 }
+      const newState: OrderState = { id: uid("st"), label, color, position: maxPosition + 1, isActive: true }
       // Actualización optimista para UI instantánea
       setStates((prev) => [...prev, newState])
       insertOrderState(newState).then((saved) => {
@@ -617,20 +628,46 @@ export function StoreProvider({
       })
     }
 
-    function deleteState(id: string) {
+    async function deleteState(id: string): Promise<{ success: boolean; error?: string }> {
+      if (isProtectedOrderState(id)) {
+        return { success: false, error: "Este estado es estructural y no puede archivarse." }
+      }
       // No permitir eliminar si es el único estado
-      if (states.length <= 1) return
+      if (states.length <= 1) return { success: false, error: "Debe existir al menos un estado." }
       const previousStates = states
       setStates((prev) => prev.filter((s) => s.id !== id))
-      deleteOrderStateRemote(id).then((ok) => {
-        if (!ok) {
-          // Revertir si falló (ej: hay órdenes que referencian este estado)
-          setStates(previousStates)
-        }
-      })
+      const result = await deleteOrderStateRemote(id)
+      if (!result.success) {
+        setStates(previousStates)
+      } else {
+        const archivedState = previousStates.find((state) => state.id === id)
+        if (archivedState) setArchivedStates((prev) => [...prev, { ...archivedState, isActive: false }])
+      }
+      return result
+    }
+
+    async function restoreState(id: string): Promise<{ success: boolean; error?: string }> {
+      const archivedState = archivedStates.find((state) => state.id === id)
+      if (!archivedState) return { success: false, error: "No se encontró el estado archivado." }
+      const result = await restoreOrderStateRemote(id)
+      if (!result.success) return result
+
+      const maxPosition = Math.max(-1, ...states.map((state) => state.position))
+      setArchivedStates((prev) => prev.filter((state) => state.id !== id))
+      setStates((prev) => [...prev, { ...archivedState, isActive: true, position: maxPosition + 1 }])
+      return result
     }
 
     function reorderStates(ids: string[]) {
+      const protectedStatePositionsAreValid = Object.entries(PROTECTED_ORDER_STATE_POSITIONS).every(([id, position]) =>
+        ids[position] === id,
+      )
+      if (!protectedStatePositionsAreValid) {
+        console.error("No se pueden cambiar las posiciones de los estados estructurales.")
+        return
+      }
+
+      const previousStates = states
       const newStates = ids
         .map((id, idx) => {
           const state = states.find((s) => s.id === id)
@@ -639,7 +676,10 @@ export function StoreProvider({
         .filter(Boolean) as OrderState[]
       setStates(newStates)
       reorderOrderStatesRemote(newStates.map((s) => ({ id: s.id, position: s.position }))).then((ok) => {
-        if (!ok) console.error("No se pudo persistir el reordenamiento de estados en la base de datos.")
+        if (!ok) {
+          setStates(previousStates)
+          console.error("No se pudo persistir el reordenamiento de estados en la base de datos.")
+        }
       })
     }
 
@@ -654,6 +694,7 @@ export function StoreProvider({
       orders,
       employees,
       states,
+      archivedStates,
       statesLoading,
       usersLoading,
       usersPage,
@@ -694,9 +735,10 @@ export function StoreProvider({
       addState,
       updateState,
       deleteState,
+      restoreState,
       reorderStates,
     }
-  }, [role, currentUser, isLoggedIn, users, orders, states, statesLoading, usersLoading, usersPage, usersHasMore, ordersLoading, ordersLoadingMore, ordersHasMore, ordersCacheKey, searchOrders, loadOrderDetail, loadUsersPage])
+  }, [role, currentUser, isLoggedIn, users, orders, states, archivedStates, statesLoading, usersLoading, usersPage, usersHasMore, ordersLoading, ordersLoadingMore, ordersHasMore, ordersCacheKey, searchOrders, loadOrderDetail, loadUsersPage])
 
   return <StoreContext.Provider value={value}>{children}</StoreContext.Provider>
 }

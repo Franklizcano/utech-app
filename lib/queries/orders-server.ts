@@ -42,6 +42,11 @@ function rowToOrder(row: Record<string, unknown>): Order {
     fault: (row.fault as string | null) ?? "",
     status: row.status as OrderStatus,
     assignedTo: (row.assigned_to as string | null) ?? null,
+    budgetAssignedTo: (row.budget_assigned_to as string | null) ?? null,
+    budgetDecision: (row.budget_decision as Order["budgetDecision"]) ?? null,
+    budgetDecisionNote: (row.budget_decision_note as string | null) ?? null,
+    budgetSubmittedAt: (row.budget_submitted_at as string | null) ?? null,
+    budgetDecidedAt: (row.budget_decided_at as string | null) ?? null,
     budget: [],
     timeline: [],
     notifications: [],
@@ -52,12 +57,13 @@ function rowToOrder(row: Record<string, unknown>): Order {
 async function hydrateOrders(
   ordersData: Array<Record<string, unknown>>,
   supabase: ReturnType<typeof getSupabaseServerClient>,
+  includeBudget = true,
 ): Promise<Order[]> {
   if (!ordersData.length) return []
 
   const orderIds = ordersData.map((row) => row.id as string)
   const [budgetResult, timelineResult, notificationsResult] = await Promise.all([
-    supabase.from("budget_items").select("*").in("order_id", orderIds),
+    includeBudget ? supabase.from("budget_items").select("*").in("order_id", orderIds) : Promise.resolve({ data: [], error: null }),
     supabase.from("timeline_events").select("*").in("order_id", orderIds).order("event_date", { ascending: true }),
     supabase
       .from("notifications")
@@ -102,7 +108,7 @@ async function hydrateOrders(
 
   return ordersData.map((row) => {
     const order = rowToOrder(row)
-    order.budget = budgets.get(order.id) ?? []
+        order.budget = includeBudget ? budgets.get(order.id) ?? [] : []
     order.timeline = timelines.get(order.id) ?? []
     order.notifications = notifications.get(order.id) ?? []
     return order
@@ -184,6 +190,7 @@ export async function claimOrderServer(orderId: string, assignee: string): Promi
     .from("orders")
     .update({ assigned_to: assignee.trim(), updated_at: now })
     .eq("id", orderId)
+    .in("status", ["recibido", "presupuesto_aprobado"])
     .is("assigned_to", null)
     .not("client_id", "is", null)
     .select("id")
@@ -213,6 +220,7 @@ export async function fetchAvailableOrdersForCollaborator(): Promise<Order[]> {
   const { data, error } = await supabase
     .from("orders")
     .select("*")
+    .in("status", ["recibido", "presupuesto_aprobado"])
     .is("assigned_to", null)
     .not("client_id", "is", null)
     .order("created_at", { ascending: false })
@@ -222,7 +230,7 @@ export async function fetchAvailableOrdersForCollaborator(): Promise<Order[]> {
     throw new Error("No se pudieron cargar las órdenes disponibles.")
   }
 
-  return hydrateOrders((data ?? []) as Array<Record<string, unknown>>, supabase)
+  return hydrateOrders((data ?? []) as Array<Record<string, unknown>>, supabase, false)
 }
 
 export async function fetchAvailableOrdersCount(): Promise<number> {
@@ -230,6 +238,7 @@ export async function fetchAvailableOrdersCount(): Promise<number> {
   const { count, error } = await supabase
     .from("orders")
     .select("id", { count: "exact", head: true })
+    .in("status", ["recibido", "presupuesto_aprobado"])
     .is("assigned_to", null)
     .not("client_id", "is", null)
 
@@ -265,14 +274,14 @@ export async function fetchOccasionalTicketStatus(code: string): Promise<Occasio
  * Esta función solo debe importarse desde Server Actions o código server-side.
  */
 export async function fetchOrdersForUser(userId: string, role: Role, assignedTo?: string, offset = 0, limit = 50, search = ""): Promise<Order[]> {
-  if (!userId || !["admin", "colaborador", "cliente"].includes(role)) {
+  if (!userId || !["admin", "colaborador", "presupuestador", "cliente"].includes(role)) {
     return []
   }
 
   const supabase = getSupabaseServerClient()
   let ordersQuery = supabase
     .from("orders")
-    .select("id, code, client_id, client_name, client_phone, client_email, device_type, device_brand, device_model, device_serial, status, assigned_to, created_at")
+    .select("id, code, client_id, client_name, client_phone, client_email, device_type, device_brand, device_model, device_serial, status, assigned_to, budget_assigned_to, budget_decision, budget_decision_note, budget_submitted_at, budget_decided_at, created_at")
     .order("created_at", { ascending: false })
 
   if (role === "cliente") {
@@ -284,6 +293,8 @@ export async function fetchOrdersForUser(userId: string, role: Role, assignedTo?
 
     const lastMonth = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString()
     ordersQuery = ordersQuery.eq("assigned_to", assignedTo).neq("status", FINAL_ORDER_STATUS).gte("updated_at", lastMonth)
+  } else if (role === "presupuestador") {
+    ordersQuery = ordersQuery.eq("budget_assigned_to", userId).in("status", ["pendiente_presupuesto", "presupuesto_rechazado"])
   }
 
   const normalizedSearch = search.trim()
@@ -321,8 +332,9 @@ export async function fetchOrderDetailForUser(
   userId: string,
   role: Role,
   assignedTo?: string,
+  companyId?: string,
 ): Promise<Order | null> {
-  if (!orderId || !userId || !["admin", "colaborador", "cliente"].includes(role)) return null
+  if (!orderId || !userId || !["admin", "colaborador", "presupuestador", "cliente"].includes(role)) return null
 
   const supabase = getSupabaseServerClient()
   let orderQuery = supabase.from("orders").select("*").eq("id", orderId)
@@ -331,10 +343,12 @@ export async function fetchOrderDetailForUser(
     orderQuery = orderQuery.eq("client_id", userId)
   } else if (role === "admin") {
     orderQuery = orderQuery.not("assigned_to", "is", null).neq("status", FINAL_ORDER_STATUS)
-  } else {
+  } else if (role === "colaborador") {
     if (!assignedTo) return null
     const lastMonth = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString()
     orderQuery = orderQuery.eq("assigned_to", assignedTo).neq("status", FINAL_ORDER_STATUS).gte("updated_at", lastMonth)
+  } else if (role === "presupuestador") {
+    orderQuery = orderQuery.eq("budget_assigned_to", userId)
   }
 
   const { data, error } = await orderQuery.maybeSingle()
@@ -344,7 +358,8 @@ export async function fetchOrderDetailForUser(
   }
   if (!data) return null
 
-  const [order] = await hydrateOrders([data as Record<string, unknown>], supabase)
+  const canSeeBudget = role === "admin" || role === "presupuestador" || (role === "cliente" && !companyId && ["presupuesto_enviado", "presupuesto_aprobado", "presupuesto_rechazado"].includes(data.status))
+  const [order] = await hydrateOrders([data as Record<string, unknown>], supabase, canSeeBudget)
   return order ?? null
 }
 
@@ -373,6 +388,29 @@ export async function fetchCompletedOrdersForUser(userId: string, role: Role, as
     throw new Error("No se pudieron cargar las órdenes finalizadas.")
   }
 
-  return hydrateOrders((ordersData ?? []) as Array<Record<string, unknown>>, supabase)
+  return hydrateOrders((ordersData ?? []) as Array<Record<string, unknown>>, supabase, role === "admin")
+}
+
+export async function fetchBudgetOrdersForUser(userId: string, role: Role): Promise<Order[]> {
+  if (!userId || !["admin", "presupuestador"].includes(role)) return []
+  const supabase = getSupabaseServerClient()
+  let query = supabase.from("orders").select("*").in("status", ["pendiente_presupuesto", "presupuesto_rechazado"]).order("updated_at", { ascending: true })
+  if (role === "presupuestador") query = query.or(`budget_assigned_to.is.null,budget_assigned_to.eq.${userId}`)
+  const { data, error } = await query
+  if (error) throw new Error("No se pudieron cargar las órdenes pendientes de presupuesto.")
+  return hydrateOrders((data ?? []) as Array<Record<string, unknown>>, supabase)
+}
+
+export async function claimBudgetOrderServer(orderId: string, userId: string): Promise<boolean> {
+  const supabase = getSupabaseServerClient()
+  const { data, error } = await supabase
+    .from("orders")
+    .update({ budget_assigned_to: userId, updated_at: new Date().toISOString() })
+    .eq("id", orderId)
+    .eq("status", "pendiente_presupuesto")
+    .is("budget_assigned_to", null)
+    .select("id")
+    .maybeSingle()
+  return !error && Boolean(data)
 }
 

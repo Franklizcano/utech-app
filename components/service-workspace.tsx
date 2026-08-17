@@ -14,6 +14,7 @@ import {
 } from "@/components/ui/dialog"
 import { StatusBadge } from "@/components/status-badge"
 import { UnassignedOrdersInbox } from "@/components/unassigned-orders-inbox"
+import { BudgetOrdersInbox } from "@/components/budget-orders-inbox"
 import { CompletedOrdersInbox } from "@/components/completed-orders-inbox"
 import { OrderForm } from "@/components/employee/order-form"
 import { OrderDetail } from "@/components/employee/order-detail"
@@ -85,6 +86,7 @@ export function ServiceWorkspace() {
 
       <div className="flex flex-wrap items-center gap-2">
         <UnassignedOrdersInbox />
+        <BudgetOrdersInbox />
         <CompletedOrdersInbox onSelectOrderAction={setSelectedId} />
       </div>
 

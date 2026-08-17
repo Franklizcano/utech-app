@@ -1,4 +1,4 @@
-export type Role = "admin" | "colaborador" | "cliente"
+export type Role = "admin" | "colaborador" | "presupuestador" | "cliente"
 
 export type AnnouncementAudience = "personal" | "admin" | "colaborador" | "cliente_particular" | "cliente_corporativo"
 export type AnnouncementPriority = "normal" | "importante"
@@ -9,21 +9,43 @@ export type OrderStatus = string
 
 export const FINAL_ORDER_STATUS: OrderStatus = "entregado"
 
+/**
+ * Estados cuyo ID y posición forman parte del contrato del sistema.
+ * Los estados operativos del taller pueden reordenarse o archivarse.
+ */
+export const PROTECTED_ORDER_STATE_POSITIONS: Readonly<Record<string, number>> = {
+  recibido: 0,
+  pendiente_presupuesto: 5,
+  presupuesto_enviado: 6,
+  presupuesto_aprobado: 7,
+  presupuesto_rechazado: 8,
+  entregado: 9,
+}
+
+export function isProtectedOrderState(id: string): boolean {
+  return Object.prototype.hasOwnProperty.call(PROTECTED_ORDER_STATE_POSITIONS, id)
+}
+
 export interface OrderState {
   id: string
   label: string
   color: string // hex color
   position: number // orden en el flujo
+  isActive: boolean
 }
 
 // Estados por defecto iniciales
 export const DEFAULT_STATES: OrderState[] = [
-  { id: "recibido", label: "Recibido", color: "#8b5cf6", position: 0 },
-  { id: "en_diagnostico", label: "En diagnóstico", color: "#06b6d4", position: 1 },
-  { id: "esperando_repuestos", label: "Esperando repuestos", color: "#f59e0b", position: 2 },
-  { id: "en_reparacion", label: "En reparación", color: "#3b82f6", position: 3 },
-  { id: "listo", label: "Listo para retirar", color: "#10b981", position: 4 },
-  { id: "entregado", label: "Entregado", color: "#6366f1", position: 5 },
+  { id: "recibido", label: "Recibido", color: "#8b5cf6", position: 0, isActive: true },
+  { id: "en_diagnostico", label: "En diagnóstico", color: "#06b6d4", position: 1, isActive: true },
+  { id: "esperando_repuestos", label: "Esperando repuestos", color: "#f59e0b", position: 2, isActive: true },
+  { id: "en_reparacion", label: "En reparación", color: "#3b82f6", position: 3, isActive: true },
+  { id: "listo", label: "Listo para retirar", color: "#10b981", position: 4, isActive: true },
+  { id: "pendiente_presupuesto", label: "Pendiente de presupuesto", color: "#f97316", position: 5, isActive: true },
+  { id: "presupuesto_enviado", label: "Presupuesto enviado", color: "#eab308", position: 6, isActive: true },
+  { id: "presupuesto_aprobado", label: "Presupuesto aprobado", color: "#22c55e", position: 7, isActive: true },
+  { id: "presupuesto_rechazado", label: "Presupuesto rechazado", color: "#ef4444", position: 8, isActive: true },
+  { id: "entregado", label: "Entregado", color: "#6366f1", position: 9, isActive: true },
 ]
 
 // Helpers para compatibilidad con código existente
@@ -140,6 +162,11 @@ export interface Order {
   // Gestión
   status: OrderStatus
   assignedTo: string | null
+  budgetAssignedTo: string | null
+  budgetDecision: "aprobado" | "rechazado" | null
+  budgetDecisionNote: string | null
+  budgetSubmittedAt: string | null
+  budgetDecidedAt: string | null
   budget: BudgetItem[]
   timeline: TimelineEvent[]
   notifications: AppNotification[]

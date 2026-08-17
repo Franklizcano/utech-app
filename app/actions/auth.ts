@@ -117,7 +117,9 @@ export async function loginAction(email: string, password: string): Promise<Logi
       return { success: false, error: "Email o contraseña incorrectos." }
     }
 
-    // Map snake_case DB fields to camelCase
+    // Map snake_case DB fields to camelCase. Supabase puede devolver la relación
+    // como objeto o como arreglo según la cardinalidad inferida.
+    const company = Array.isArray(data.company) ? data.company[0] : data.company
     const user: AuthUser = {
       id: data.id,
       name: data.name,
@@ -126,8 +128,8 @@ export async function loginAction(email: string, password: string): Promise<Logi
       role: data.role as Role,
       active: data.active,
       companyId: data.company_id ?? undefined,
-      company: data.company?.[0]
-        ? { name: data.company[0].name, logo: data.company[0].logo ?? undefined }
+      company: company?.name
+        ? { name: company.name, logo: company.logo ?? undefined }
         : undefined,
       referralCode: data.referral_code,
       referredBy: data.referred_by ?? undefined,

@@ -150,7 +150,7 @@ export async function fetchOrdersAction(offset = 0, limit = 50, search = "") {
 export async function fetchOrderDetailAction(orderId: string): Promise<Order | null> {
   const session = await getSessionAction()
   if (!session || !session.active) return null
-  return fetchOrderDetailForUser(orderId, session.id, session.role, session.name)
+  return fetchOrderDetailForUser(orderId, session.id, session.role, session.name, session.companyId)
 }
 
 export async function fetchCompletedOrdersAction(): Promise<Order[]> {
