@@ -1,7 +1,8 @@
 "use client"
 
 import { useEffect, useRef, useState } from "react"
-import { Bell, Inbox, Loader2, Plus, Receipt, Search, Wrench } from "lucide-react"
+import { Bell, Check, Clipboard, Gift, Inbox, Loader2, Plus, Receipt, Search, Users, Wrench } from "lucide-react"
+import { fetchReferralStatsAction } from "@/app/actions/referrals"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -19,13 +20,16 @@ import { ClientOrderForm } from "@/components/client/client-order-form"
 import { useStore, formatCurrency } from "@/lib/store"
 import { budgetTotal, type Order } from "@/lib/types"
 import { cn } from "@/lib/utils"
+import { decideBudgetAction } from "@/app/actions/budget"
 
 function formatDate(iso: string) {
   return new Date(iso).toLocaleDateString("es-AR", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })
 }
-function ClientOrderDetail({ order }: { order: Order }) {
+function ClientOrderDetail({ order, showBudget, onDecisionAction }: { order: Order; showBudget: boolean; onDecisionAction: () => Promise<void> }) {
   const total = budgetTotal(order)
   const notifications = [...order.notifications].reverse()
+  const [decisionNote, setDecisionNote] = useState("")
+  const [deciding, setDeciding] = useState(false)
 
   return (
     <div className="animate-utech-enter space-y-6">
@@ -72,7 +76,7 @@ function ClientOrderDetail({ order }: { order: Order }) {
         </Card>
 
         <div className="space-y-6">
-          <Card>
+          {showBudget && <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2 text-base">
                 <Receipt className="size-4 text-primary" />
@@ -100,7 +104,17 @@ function ClientOrderDetail({ order }: { order: Order }) {
                 </div>
               )}
             </CardContent>
-          </Card>
+            {showBudget && order.status === "presupuesto_enviado" && (
+              <div className="mt-4 space-y-3 rounded-lg border border-primary/25 bg-primary/5 p-3">
+                <p className="text-sm font-medium text-foreground">¿Querés aprobar este presupuesto?</p>
+                <Input value={decisionNote} onChange={(event) => setDecisionNote(event.target.value)} placeholder="Comentario opcional" />
+                <div className="flex gap-2">
+                  <Button type="button" className="flex-1" disabled={deciding} onClick={async () => { setDeciding(true); try { if (await decideBudgetAction(order.id, "aprobado", decisionNote)) await onDecisionAction() } finally { setDeciding(false) } }}>Aprobar</Button>
+                  <Button type="button" variant="outline" className="flex-1" disabled={deciding} onClick={async () => { setDeciding(true); try { if (await decideBudgetAction(order.id, "rechazado", decisionNote)) await onDecisionAction() } finally { setDeciding(false) } }}>Rechazar</Button>
+                </div>
+              </div>
+            )}
+          </Card>}
 
           <Card>
             <CardHeader>
@@ -135,12 +149,27 @@ function ClientOrderDetail({ order }: { order: Order }) {
 }
 
 export function ClientPortal() {
-  const { orders, ordersLoading, ordersLoadingMore, ordersHasMore, loadMoreOrders, searchOrders, markNotificationsRead, loadOrderDetail } = useStore()
+  const { currentUser, orders, ordersLoading, ordersLoadingMore, ordersHasMore, loadMoreOrders, searchOrders, markNotificationsRead, loadOrderDetail, refreshOrders } = useStore()
   const [selectedOrderId, setSelectedOrderId] = useState<string | null>(null)
   const [selectedOrderDetail, setSelectedOrderDetail] = useState<Order | null>(null)
   const [searchQuery, setSearchQuery] = useState("")
   const [dialogOpen, setDialogOpen] = useState(false)
+  const [referralStats, setReferralStats] = useState<Awaited<ReturnType<typeof fetchReferralStatsAction>>>(null)
+  const [copied, setCopied] = useState(false)
   const initialSearchEffect = useRef(true)
+
+  useEffect(() => {
+    fetchReferralStatsAction().then(setReferralStats).catch((error: unknown) => {
+      console.error("No se pudieron cargar las métricas de referidos:", error)
+    })
+  }, [])
+
+  async function copyReferralCode() {
+    if (!currentUser?.referralCode) return
+    await navigator.clipboard.writeText(currentUser.referralCode)
+    setCopied(true)
+    window.setTimeout(() => setCopied(false), 1800)
+  }
 
   useEffect(() => {
     if (initialSearchEffect.current) {
@@ -185,6 +214,41 @@ export function ClientPortal() {
 
   return (
     <div className="animate-utech-enter space-y-5">
+      <Card className="border-primary/25 bg-primary/5">
+        <CardContent className="flex flex-col gap-4 pt-6 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex items-start gap-3">
+            <div className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-primary/15 text-primary">
+              <Gift className="size-5" />
+            </div>
+            <div>
+              <p className="font-semibold text-foreground">Invitá a tus conocidos</p>
+              <p className="text-sm text-muted-foreground">Compartí tu código para que podamos reconocer tus referidos.</p>
+              <div className="mt-2 flex items-center gap-2">
+                <span className="rounded-md border border-primary/30 bg-background px-3 py-1 font-mono text-sm font-semibold tracking-widest text-foreground">
+                  {currentUser?.referralCode ?? "—"}
+                </span>
+                <Button type="button" size="sm" variant="outline" className="gap-1.5" onClick={copyReferralCode} disabled={!currentUser?.referralCode}>
+                  {copied ? <Check className="size-3.5" /> : <Clipboard className="size-3.5" />}
+                  {copied ? "Copiado" : "Copiar"}
+                </Button>
+              </div>
+            </div>
+          </div>
+          <div className="grid grid-cols-2 gap-3 sm:min-w-56">
+            <div className="rounded-lg border border-border bg-card p-3 text-center">
+              <Users className="mx-auto size-4 text-primary" />
+              <p className="mt-1 text-xl font-semibold text-foreground">{referralStats?.totalReferredUsers ?? 0}</p>
+              <p className="text-xs text-muted-foreground">Referidos</p>
+            </div>
+            <div className="rounded-lg border border-border bg-card p-3 text-center">
+              <Receipt className="mx-auto size-4 text-primary" />
+              <p className="mt-1 text-xl font-semibold text-foreground">{referralStats?.totalOrders ?? 0}</p>
+              <p className="text-xs text-muted-foreground">Órdenes de referidos</p>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h2 className="text-xl font-semibold tracking-tight text-foreground">Mis órdenes</h2>
@@ -265,7 +329,7 @@ export function ClientPortal() {
                 Cargando detalle…
               </div>
             ) : selectedOrderDetail ? (
-              <ClientOrderDetail key={selectedOrderDetail.id} order={selectedOrderDetail} />
+              <ClientOrderDetail key={selectedOrderDetail.id} order={selectedOrderDetail} showBudget={!currentUser?.companyId} onDecisionAction={refreshOrders} />
             ) : (
               <div className="flex flex-col items-center justify-center gap-3 py-16 text-center">
                 <Inbox className="size-10 text-muted-foreground" />

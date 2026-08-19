@@ -8,13 +8,15 @@ function isAdmin(session: Awaited<ReturnType<typeof getSessionAction>>) {
   return session?.active && session.role === "admin"
 }
 
-export async function fetchCompaniesAction(): Promise<Company[]> {
+const COMPANIES_PAGE_SIZE = 50
+
+export async function fetchCompaniesAction(page = 0, pageSize = COMPANIES_PAGE_SIZE): Promise<{ companies: Company[]; hasMore: boolean }> {
   const session = await getSessionAction()
-  if (!isAdmin(session)) return []
+  if (!isAdmin(session)) return { companies: [], hasMore: false }
 
   const supabase = getSupabaseServerClient()
   const [{ data: companies, error: companiesError }, { data: users, error: usersError }] = await Promise.all([
-    supabase.from("companies").select("id, name, logo, user_limit, created_at").order("name"),
+    supabase.from("companies").select("id, name, logo, user_limit, created_at").order("name").range(page * pageSize, page * pageSize + pageSize),
     supabase.from("users").select("company_id").not("company_id", "is", null),
   ])
   if (companiesError || usersError) throw new Error("No se pudieron cargar las empresas.")
@@ -23,14 +25,15 @@ export async function fetchCompaniesAction(): Promise<Company[]> {
   for (const user of users ?? []) {
     if (user.company_id) counts.set(user.company_id, (counts.get(user.company_id) ?? 0) + 1)
   }
-  return (companies ?? []).map((company) => ({
+  const pagedCompanies = (companies ?? []).slice(0, pageSize)
+  return { companies: pagedCompanies.map((company) => ({
     id: company.id,
     name: company.name,
     logo: company.logo ?? undefined,
     userLimit: company.user_limit,
     userCount: counts.get(company.id) ?? 0,
     createdAt: company.created_at,
-  }))
+  })), hasMore: (companies?.length ?? 0) > pageSize }
 }
 
 export async function createCompanyAction(input: { name: string; userLimit: number; logo?: string }): Promise<{ success: boolean; company?: Company; error?: string }> {

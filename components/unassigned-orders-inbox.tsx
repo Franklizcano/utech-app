@@ -75,6 +75,8 @@ export function UnassignedOrdersInbox() {
     }
   }, [])
 
+  if (!currentUser || !["admin", "colaborador"].includes(currentUser.role)) return null
+
   function handleOpenChange(nextOpen: boolean) {
     setOpen(nextOpen)
     if (nextOpen) {

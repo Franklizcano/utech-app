@@ -50,7 +50,7 @@ export function OrderForm({ onCreatedAction }: { onCreatedAction?: (orderId: str
   const filteredClients = clients.filter((client) => {
     if (!normalizedClientSearch) return true
 
-    return [client.name, client.email, client.phone].some((value) =>
+    return [client.name, client.email, client.phone, client.referralCode].some((value) =>
       normalizeSearchText(value).includes(normalizedClientSearch),
     )
   })
@@ -148,7 +148,7 @@ export function OrderForm({ onCreatedAction }: { onCreatedAction?: (orderId: str
                       id="client-search"
                       value={clientSearch}
                       onChange={(e) => setClientSearch(e.target.value)}
-                      placeholder="Buscar por nombre, email o teléfono"
+                      placeholder="Buscar por nombre, email, teléfono o código"
                       autoComplete="off"
                       className="pl-9"
                     />
@@ -170,7 +170,7 @@ export function OrderForm({ onCreatedAction }: { onCreatedAction?: (orderId: str
                           <span className="min-w-0 flex-1">
                             <span className="block truncate text-sm font-medium text-foreground">{client.name}</span>
                             <span className="block truncate text-xs text-muted-foreground">
-                              {client.email} · {client.phone}
+                              {client.email} · {client.phone} · Código: {client.referralCode || "—"}
                             </span>
                           </span>
                           {client.id === clientId && <Check className="mt-0.5 size-4 shrink-0 text-primary" />}

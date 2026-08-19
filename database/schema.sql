@@ -5,6 +5,7 @@
 
 -- Crear extensiones necesarias
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
+CREATE EXTENSION IF NOT EXISTS "pgcrypto";
 
 -- ============================================
 -- Tabla: roles
@@ -20,6 +21,7 @@ CREATE TABLE IF NOT EXISTS roles (
 INSERT INTO roles (id, name, description) VALUES
   ('admin', 'Administrador', 'Acceso completo al sistema'),
   ('colaborador', 'Colaborador', 'Gestión de órdenes y diagnóstico'),
+  ('presupuestador', 'Responsable de presupuestos', 'Gestiona presupuestos y sus aprobaciones'),
   ('cliente', 'Cliente', 'Acceso a órdenes personales y seguimiento')
 ON CONFLICT (id) DO NOTHING;
 
@@ -35,13 +37,18 @@ CREATE TABLE IF NOT EXISTS users (
   role TEXT NOT NULL REFERENCES roles(id),
   password_hash TEXT NOT NULL DEFAULT '',
   active BOOLEAN DEFAULT true,
+  referral_code VARCHAR(12) NOT NULL UNIQUE DEFAULT upper(encode(gen_random_bytes(6), 'hex')),
+  referred_by UUID REFERENCES users(id) ON DELETE SET NULL,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-  updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+  CONSTRAINT users_not_self_referred CHECK (referred_by IS NULL OR referred_by <> id)
 );
 
 CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);
 CREATE INDEX IF NOT EXISTS idx_users_role ON users(role);
 CREATE INDEX IF NOT EXISTS idx_users_active ON users(active);
+CREATE INDEX IF NOT EXISTS idx_users_referral_code ON users(referral_code);
+CREATE INDEX IF NOT EXISTS idx_users_referred_by ON users(referred_by);
 
 -- Empresas: administración independiente de clientes corporativos.
 CREATE TABLE IF NOT EXISTS companies (
@@ -64,10 +71,24 @@ CREATE TABLE IF NOT EXISTS order_states (
   id TEXT PRIMARY KEY,
   label VARCHAR(100) NOT NULL,
   color VARCHAR(7) NOT NULL, -- Código hex de color
-  position INTEGER NOT NULL UNIQUE,
+  position INTEGER NOT NULL,
+  is_active BOOLEAN NOT NULL DEFAULT TRUE,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
+
+ALTER TABLE order_states
+  ADD COLUMN IF NOT EXISTS is_active BOOLEAN NOT NULL DEFAULT TRUE;
+
+ALTER TABLE order_states
+  DROP CONSTRAINT IF EXISTS order_states_position_key;
+
+CREATE UNIQUE INDEX IF NOT EXISTS idx_order_states_active_position_unique
+  ON order_states (position)
+  WHERE is_active = TRUE;
+
+CREATE INDEX IF NOT EXISTS idx_order_states_active
+  ON order_states (is_active);
 
 INSERT INTO order_states (id, label, color, position) VALUES
   ('recibido', 'Recibido', '#8b5cf6', 0),
@@ -75,7 +96,11 @@ INSERT INTO order_states (id, label, color, position) VALUES
   ('esperando_repuestos', 'Esperando repuestos', '#f59e0b', 2),
   ('en_reparacion', 'En reparación', '#3b82f6', 3),
   ('listo', 'Listo para retirar', '#10b981', 4),
-  ('entregado', 'Entregado', '#6366f1', 5)
+  ('entregado', 'Entregado', '#6366f1', 9),
+  ('pendiente_presupuesto', 'Pendiente de presupuesto', '#f97316', 5),
+  ('presupuesto_enviado', 'Presupuesto enviado', '#eab308', 6),
+  ('presupuesto_aprobado', 'Presupuesto aprobado', '#22c55e', 7),
+  ('presupuesto_rechazado', 'Presupuesto rechazado', '#ef4444', 8)
 ON CONFLICT (id) DO NOTHING;
 
 -- ============================================
@@ -99,6 +124,11 @@ CREATE TABLE IF NOT EXISTS orders (
   -- Gestión de la orden
   status TEXT NOT NULL REFERENCES order_states(id),
   assigned_to VARCHAR(255), -- Nombre del empleado asignado; NULL hasta que un colaborador tome la orden
+  budget_assigned_to UUID REFERENCES users(id) ON DELETE SET NULL,
+  budget_decision TEXT CHECK (budget_decision IS NULL OR budget_decision IN ('aprobado', 'rechazado')),
+  budget_decision_note TEXT,
+  budget_submitted_at TIMESTAMP WITH TIME ZONE,
+  budget_decided_at TIMESTAMP WITH TIME ZONE,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );

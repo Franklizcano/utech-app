@@ -1,7 +1,7 @@
 "use client"
 
 import { useState } from "react"
-import { Cpu, ShieldCheck, Wrench, UserRound, LogOut, KeyRound, ChevronDown } from "lucide-react"
+import { Cpu, ShieldCheck, Wrench, UserRound, LogOut, KeyRound, ChevronDown, Calculator } from "lucide-react"
 import { useStore } from "@/lib/store"
 import { ServiceWorkspace } from "@/components/service-workspace"
 import { ClientPortal } from "@/components/client/client-portal"
@@ -19,10 +19,12 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import type { Role } from "@/lib/types"
+import Image from "next/image"
 
 const ROLE_ICON: Record<Role, typeof ShieldCheck> = {
   admin: ShieldCheck,
   colaborador: Wrench,
+  presupuestador: Calculator,
   cliente: UserRound,
 }
 
@@ -36,7 +38,7 @@ export function AppShell() {
 
   const RoleIcon = ROLE_ICON[role]
   const displayName = currentUser?.name ?? (role === "colaborador" ? "Colaborador" : role === "admin" ? "Admin" : "Cliente")
-  const roleLabel = role === "colaborador" ? "Colaborador" : role === "admin" ? "Admin" : "Cliente"
+  const roleLabel = role === "colaborador" ? "Colaborador" : role === "presupuestador" ? "Presupuestos" : role === "admin" ? "Admin" : "Cliente"
 
   return (
     <div className="min-h-screen bg-background">
@@ -65,7 +67,7 @@ export function AppShell() {
                   />
                 }
               >
-                <RoleIcon className="size-4 text-primary" />
+                {role === "cliente" && currentUser?.company?.logo ? <Image src={currentUser.company.logo} alt={currentUser.company.name} width={24} height={24} unoptimized className="size-6 rounded object-contain" /> : <RoleIcon className="size-4 text-primary" />}
                 <span className="flex flex-col">
                   <span className="text-sm font-medium leading-tight text-foreground">{displayName}</span>
                   <span className="text-[10px] leading-tight text-muted-foreground">{roleLabel}</span>
@@ -100,7 +102,7 @@ export function AppShell() {
       <main className="mx-auto max-w-6xl px-4 py-8 sm:px-6">
         <div className="animate-utech-enter">
           {role === "admin" && <AdminView />}
-          {role === "colaborador" && <ServiceWorkspace />}
+          {(role === "colaborador" || role === "presupuestador") && <ServiceWorkspace />}
           {role === "cliente" && <ClientPortal />}
         </div>
       </main>

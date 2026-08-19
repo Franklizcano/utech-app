@@ -1,7 +1,7 @@
 "use client"
 
-import { useState } from "react"
-import { UserPlus, Pencil, ShieldCheck, Trash2, AlertCircle, Loader2, Search } from "lucide-react"
+import { useEffect, useState } from "react"
+import { UserPlus, Pencil, ShieldCheck, Trash2, AlertCircle, ChevronLeft, ChevronRight, Loader2, Search } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -43,18 +43,21 @@ import {
 } from "@/components/ui/table"
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { useStore } from "@/lib/store"
+import { fetchAdminReferralSummariesAction } from "@/app/actions/referrals"
 import { useDebouncedValue } from "@/lib/use-debounced-value"
 import type { Role, User } from "@/lib/types"
 
 const ROLE_LABELS: Record<Role, string> = {
   admin: "Administrador",
   colaborador: "Colaborador",
+  presupuestador: "Responsable de presupuesto",
   cliente: "Cliente",
 }
 
 const ROLE_BADGE: Record<Role, string> = {
   admin: "bg-primary/15 text-primary border-primary/30",
   colaborador: "bg-sky-500/15 text-sky-300 border-sky-500/30",
+  presupuestador: "bg-amber-500/15 text-amber-300 border-amber-500/30",
   cliente: "bg-zinc-500/15 text-zinc-300 border-zinc-500/30",
 }
 
@@ -69,7 +72,7 @@ function normalizeSearchText(value: string) {
 }
 
 export function UserManagement() {
-  const { users, addUser, updateUser, toggleUserActive, deleteUser, usersLoading } = useStore()
+  const { users, addUser, updateUser, toggleUserActive, deleteUser, usersLoading, usersPage, usersHasMore, loadUsersPage } = useStore()
   const [open, setOpen] = useState(false)
   const [editing, setEditing] = useState<User | null>(null)
   const [name, setName] = useState("")
@@ -78,17 +81,32 @@ export function UserManagement() {
   const [role, setRole] = useState<Role>("colaborador")
   const [password, setPassword] = useState("")
   const [passwordConfirmation, setPasswordConfirmation] = useState("")
+  const [referralCode, setReferralCode] = useState("")
   const [formError, setFormError] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
   const [roleFilter, setRoleFilter] = useState<RoleFilter>("all")
   const [search, setSearch] = useState("")
   const debouncedSearch = useDebouncedValue(search, 350)
+  const [referralSummaries, setReferralSummaries] = useState<Awaited<ReturnType<typeof fetchAdminReferralSummariesAction>>>([])
 
-  const managedUsers = users.filter((user) => !user.companyId)
+  useEffect(() => {
+    fetchAdminReferralSummariesAction().then(setReferralSummaries).catch((error: unknown) => {
+      console.error("No se pudieron cargar los resúmenes de referidos:", error)
+    })
+  }, [])
+
+  useEffect(() => {
+    const timeoutId = window.setTimeout(() => {
+      void loadUsersPage(0, debouncedSearch)
+    }, 350)
+    return () => window.clearTimeout(timeoutId)
+  }, [debouncedSearch, loadUsersPage])
+
+  const managedUsers = users
   const normalizedSearch = normalizeSearchText(debouncedSearch)
   const visibleUsers = managedUsers.filter((user) => {
     const matchesRole = roleFilter === "all" || user.role === roleFilter
-    const matchesSearch = !normalizedSearch || [user.name, user.email, user.phone].some((value) =>
+    const matchesSearch = !normalizedSearch || [user.name, user.email, user.phone, user.referralCode].some((value) =>
       normalizeSearchText(value).includes(normalizedSearch),
     )
 
@@ -99,6 +117,10 @@ export function UserManagement() {
     return filter === "all" ? managedUsers.length : managedUsers.filter((user) => user.role === filter).length
   }
 
+  function referralSummaryFor(userId: string) {
+    return referralSummaries.find((summary) => summary.referrerId === userId)
+  }
+
   function openCreate() {
     setEditing(null)
     setName("")
@@ -107,6 +129,7 @@ export function UserManagement() {
     setRole("colaborador")
     setPassword("")
     setPasswordConfirmation("")
+    setReferralCode("")
     setFormError(null)
     setOpen(true)
   }
@@ -119,6 +142,7 @@ export function UserManagement() {
     setRole(user.role)
     setPassword("")
     setPasswordConfirmation("")
+    setReferralCode("")
     setFormError(null)
     setOpen(true)
   }
@@ -152,7 +176,7 @@ export function UserManagement() {
       if (editing) {
         updateUser(editing.id, { ...userData, active: editing.active })
       } else {
-        const result = await addUser({ ...userData, password })
+        const result = await addUser({ ...userData, password, referralCode: role === "cliente" ? referralCode : undefined })
         if (!result.success) {
           setFormError(result.error ?? "No se pudo crear el usuario.")
           return
@@ -194,6 +218,7 @@ export function UserManagement() {
                 <TabsTrigger value="all">Todos ({countForRole("all")})</TabsTrigger>
                 <TabsTrigger value="admin">Administradores ({countForRole("admin")})</TabsTrigger>
                 <TabsTrigger value="colaborador">Colaboradores ({countForRole("colaborador")})</TabsTrigger>
+                <TabsTrigger value="presupuestador">Presupuestos ({countForRole("presupuestador")})</TabsTrigger>
                 <TabsTrigger value="cliente">Clientes ({countForRole("cliente")})</TabsTrigger>
               </TabsList>
             </Tabs>
@@ -223,6 +248,7 @@ export function UserManagement() {
                   <TableHead>Nombre</TableHead>
                   <TableHead>Email</TableHead>
                   <TableHead>Rol</TableHead>
+                  <TableHead>Referidos</TableHead>
                   <TableHead>Estado</TableHead>
                   <TableHead className="text-right">Acciones</TableHead>
                 </TableRow>
@@ -236,6 +262,24 @@ export function UserManagement() {
                       <Badge variant="outline" className={ROLE_BADGE[user.role]}>
                         {ROLE_LABELS[user.role]}
                       </Badge>
+                    </TableCell>
+                    <TableCell>
+                      {user.role === "cliente" ? (() => {
+                        const summary = referralSummaryFor(user.id)
+                        return (
+                          <div className="min-w-44 space-y-1">
+                            <div className="font-mono text-xs tracking-widest text-foreground">{user.referralCode || "—"}</div>
+                            <div className="text-xs text-muted-foreground">
+                              {summary?.totalReferredUsers ?? 0} referidos · {summary?.totalOrders ?? 0} órdenes
+                            </div>
+                            {summary && summary.referredUsers.length > 0 && (
+                              <div className="max-w-56 truncate text-xs text-muted-foreground" title={summary.referredUsers.map((referred) => `${referred.name} (${referred.orderCount})`).join(", ")}>
+                                {summary.referredUsers.map((referred) => `${referred.name} (${referred.orderCount})`).join(", ")}
+                              </div>
+                            )}
+                          </div>
+                        )
+                      })() : <span className="text-muted-foreground">—</span>}
                     </TableCell>
                     <TableCell>
                       <button
@@ -291,6 +335,21 @@ export function UserManagement() {
                 ))}
               </TableBody>
             </Table>
+          )}
+          {!usersLoading && (
+            <div className="flex items-center justify-between border-t border-border pt-4">
+              <p className="text-sm text-muted-foreground">Página {usersPage + 1} · 50 usuarios por página</p>
+              <div className="flex gap-2">
+                <Button type="button" variant="outline" size="sm" disabled={usersPage === 0} onClick={() => void loadUsersPage(usersPage - 1, debouncedSearch)}>
+                  <ChevronLeft className="size-4" />
+                  Anterior
+                </Button>
+                <Button type="button" variant="outline" size="sm" disabled={!usersHasMore} onClick={() => void loadUsersPage(usersPage + 1, debouncedSearch)}>
+                  Siguiente
+                  <ChevronRight className="size-4" />
+                </Button>
+              </div>
+            </div>
           )}
         </div>
         )}
@@ -355,11 +414,26 @@ export function UserManagement() {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="colaborador">Colaborador</SelectItem>
+                  <SelectItem value="presupuestador">Responsable de presupuesto</SelectItem>
                   <SelectItem value="admin">Administrador</SelectItem>
                   <SelectItem value="cliente">Cliente</SelectItem>
                 </SelectContent>
               </Select>
             </div>
+            {!editing && role === "cliente" && (
+              <div className="space-y-2">
+                <Label htmlFor="u-referral-code">Código de referido (opcional)</Label>
+                <Input
+                  id="u-referral-code"
+                  value={referralCode}
+                  onChange={(e) => setReferralCode(e.target.value.toUpperCase())}
+                  placeholder="Ej: A1B2C3D4E5F6"
+                  maxLength={12}
+                  autoComplete="off"
+                />
+                <p className="text-xs text-muted-foreground">Ingresá el código del cliente que recomendó a esta persona.</p>
+              </div>
+            )}
 
             {formError && (
               <div className="flex items-start gap-2 rounded-lg border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive">
