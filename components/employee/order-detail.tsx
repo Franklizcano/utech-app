@@ -25,13 +25,14 @@ import { RepairTimeline } from "@/components/repair-timeline"
 import { ReassignDialog } from "@/components/employee/reassign-dialog"
 import { sendBudgetToClientAction, submitOrderForBudgetAction } from "@/app/actions/budget"
 import { useStore, formatCurrency } from "@/lib/store"
+import { invalidateOperationsCache } from "@/lib/operations-cache"
 import { budgetTotal, getStatusFlow, getStatusLabel, type DeviceType, type Order, type OrderStatus } from "@/lib/types"
 import Image from "next/image"
 
 const DEVICE_TYPES: DeviceType[] = ["PC", "Notebook", "PlayStation", "Xbox", "Nintendo", "Otro"]
 
 export function OrderDetail({ order }: { order: Order }) {
-  const { role, addBudgetItem, removeBudgetItem, advanceStatus, updateOrderDetails, states, users, refreshOrders } = useStore()
+  const { role, currentUser, addBudgetItem, removeBudgetItem, advanceStatus, updateOrderDetails, states, users, refreshOrders } = useStore()
   const [desc, setDesc] = useState("")
   const [amount, setAmount] = useState("")
   const [nextStatus, setNextStatus] = useState<OrderStatus>(order.status)
@@ -349,7 +350,7 @@ export function OrderDetail({ order }: { order: Order }) {
             variant="outline"
             className="w-full gap-2"
             disabled={order.budget.length === 0}
-            onClick={async () => { if (await sendBudgetToClientAction(order.id)) await refreshOrders() }}
+            onClick={async () => { if (await sendBudgetToClientAction(order.id)) { if (currentUser) invalidateOperationsCache(currentUser.id); await refreshOrders() } }}
           >
             <Send className="size-4" />
             Notificar presupuesto al cliente
@@ -357,7 +358,7 @@ export function OrderDetail({ order }: { order: Order }) {
         </div> : <div className="space-y-4 rounded-lg border border-dashed border-border p-4">
           <h4 className="text-sm font-semibold text-foreground">Análisis técnico</h4>
           <p className="text-sm text-muted-foreground">El presupuesto es gestionado por el responsable de presupuestos y no está visible para colaboradores.</p>
-          <Button type="button" className="w-full" disabled={submittingBudget || order.status !== "recibido"} onClick={async () => { setSubmittingBudget(true); try { if (await submitOrderForBudgetAction(order.id)) await refreshOrders() } finally { setSubmittingBudget(false) } }}>
+          <Button type="button" className="w-full" disabled={submittingBudget || order.status !== "recibido"} onClick={async () => { setSubmittingBudget(true); try { if (await submitOrderForBudgetAction(order.id)) { if (currentUser) invalidateOperationsCache(currentUser.id); await refreshOrders() } } finally { setSubmittingBudget(false) } }}>
             {submittingBudget ? "Enviando…" : "Finalizar análisis y enviar a presupuesto"}
           </Button>
         </div>}

@@ -45,6 +45,7 @@ logs
 **/*.back.*
 
 node_modules
+.pnpm-store/
 bower_components
 
 *.sublime*

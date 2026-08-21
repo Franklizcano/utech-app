@@ -20,7 +20,7 @@ export function setOrdersCache(key: string, orders: Order[]): void {
   const current = ordersCache.get(key)
   ordersCache.set(key, {
     orders,
-    updatedAt: current?.updatedAt ?? Date.now(),
+    updatedAt: Date.now(),
     inFlight: current?.inFlight,
   })
 }

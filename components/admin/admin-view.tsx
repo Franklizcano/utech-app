@@ -38,22 +38,22 @@ export function AdminView() {
           Avisos
         </TabsTrigger>
       </TabsList>
-      <TabsContent value="operaciones">
+      <TabsContent value="operaciones" keepMounted>
         <ServiceWorkspace />
       </TabsContent>
-      <TabsContent value="usuarios">
+      <TabsContent value="usuarios" keepMounted>
         <UserManagement />
       </TabsContent>
-      <TabsContent value="empresas">
+      <TabsContent value="empresas" keepMounted>
         <CompanyManagement />
       </TabsContent>
-      <TabsContent value="estados">
+      <TabsContent value="estados" keepMounted>
         <StateManagement />
       </TabsContent>
-      <TabsContent value="estadisticas">
+      <TabsContent value="estadisticas" keepMounted>
         <Stats />
       </TabsContent>
-      <TabsContent value="avisos">
+      <TabsContent value="avisos" keepMounted>
         <AnnouncementManagement />
       </TabsContent>
     </Tabs>

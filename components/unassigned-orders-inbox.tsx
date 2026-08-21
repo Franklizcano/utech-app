@@ -20,6 +20,7 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { useStore } from "@/lib/store"
+import { invalidateOperationsCache, loadCachedAvailableOrders, loadCachedAvailableOrdersCount } from "@/lib/operations-cache"
 import type { Order } from "@/lib/types"
 
 function formatDate(iso: string) {
@@ -54,17 +55,18 @@ export function UnassignedOrdersInbox() {
     if (countCheckKey.current === key) return
     countCheckKey.current = key
 
-    void fetchAvailableOrdersCountAction()
+    void loadCachedAvailableOrdersCount(currentUser.id, fetchAvailableOrdersCountAction)
       .then((count: number) => setAvailableOrdersCount(count))
       .catch((countError: unknown) => {
         console.error("No se pudo contar el buzón de órdenes:", countError)
       })
   }, [currentUser])
 
-  const refreshInbox = useCallback(async () => {
+  const refreshInbox = useCallback(async (force = false) => {
+    if (!currentUser) return
     setLoading(true)
     try {
-      const nextOrders = await fetchAvailableOrdersAction()
+      const nextOrders = await loadCachedAvailableOrders(currentUser.id, fetchAvailableOrdersAction, force)
       setAvailableOrders(nextOrders)
       setAvailableOrdersCount(nextOrders.length)
     } catch (refreshError) {
@@ -73,7 +75,7 @@ export function UnassignedOrdersInbox() {
     } finally {
       setLoading(false)
     }
-  }, [])
+  }, [currentUser])
 
   if (!currentUser || !["admin", "colaborador"].includes(currentUser.role)) return null
 
@@ -93,11 +95,13 @@ export function UnassignedOrdersInbox() {
       const claimed = await claimOrderAction(orderId)
       if (!claimed) {
         setError("La orden ya fue tomada por otro usuario o dejó de estar disponible.")
-        await refreshInbox()
+        if (currentUser) invalidateOperationsCache(currentUser.id)
+        await refreshInbox(true)
         return
       }
 
-      await Promise.all([refreshInbox(), refreshOrders()])
+      if (currentUser) invalidateOperationsCache(currentUser.id)
+      await Promise.all([refreshInbox(true), refreshOrders()])
     } catch (claimError) {
       console.error("No se pudo tomar la orden:", claimError)
       setError("No se pudo tomar la orden. Intentá nuevamente.")
@@ -116,7 +120,8 @@ export function UnassignedOrdersInbox() {
       const assigned = await assignOrderAction(orderId, collaboratorId)
       if (!assigned) {
         setError("La orden ya fue tomada o el colaborador seleccionado no está disponible.")
-        await refreshInbox()
+        if (currentUser) invalidateOperationsCache(currentUser.id)
+        await refreshInbox(true)
         return
       }
 
@@ -125,7 +130,8 @@ export function UnassignedOrdersInbox() {
         delete next[orderId]
         return next
       })
-      await Promise.all([refreshInbox(), refreshOrders()])
+      if (currentUser) invalidateOperationsCache(currentUser.id)
+      await Promise.all([refreshInbox(true), refreshOrders()])
     } catch (assignError) {
       console.error("No se pudo asignar la orden:", assignError)
       setError("No se pudo asignar la orden. Intentá nuevamente.")

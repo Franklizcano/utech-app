@@ -50,6 +50,8 @@ import {
   revalidateOrdersCache,
   setOrdersCache,
 } from "@/lib/order-cache"
+import { invalidateCachedCompanies, invalidateCachedUsers, loadCachedUsersPage } from "@/lib/admin-cache"
+import { invalidateOperationsCache } from "@/lib/operations-cache"
 
 let counter = 100
 function uid(prefix = "id") {
@@ -194,7 +196,12 @@ export function StoreProvider({
     if (!currentUser || !isLoggedIn || currentUser.role === "cliente" || page < 0) return
     setUsersLoading(true)
     try {
-      const result = await fetchUsersAction(page, undefined, search)
+      const result = await loadCachedUsersPage(
+        currentUser.id,
+        page,
+        search,
+        () => fetchUsersAction(page, undefined, search),
+      )
       setUsers(result.users)
       setUsersPage(page)
       setUsersHasMore(result.hasMore)
@@ -271,7 +278,6 @@ export function StoreProvider({
       refreshOrders()
     }
 
-    const intervalId = window.setInterval(refreshOrders, ORDERS_CACHE_TTL_MS)
     const handleVisibilityChange = () => {
       if (document.visibilityState === "visible" && isOrdersCacheStale(ordersCacheKey, ORDERS_CACHE_TTL_MS)) {
         refreshOrders()
@@ -281,7 +287,6 @@ export function StoreProvider({
 
     return () => {
       cancelled = true
-      window.clearInterval(intervalId)
       document.removeEventListener("visibilitychange", handleVisibilityChange)
     }
   }, [currentUser, isLoggedIn, ordersCacheKey])
@@ -306,6 +311,10 @@ export function StoreProvider({
     function logout() {
       logoutAction()
       if (ordersCacheKey) clearOrdersCache(ordersCacheKey)
+      if (currentUser) {
+        invalidateCachedUsers(currentUser.id)
+        invalidateCachedCompanies(currentUser.id)
+      }
       setCurrentUser(null)
       setIsLoggedIn(false)
       setOrdersState([])
@@ -352,6 +361,7 @@ export function StoreProvider({
         } else {
           // Reemplazar la orden temporal con la real (UUID de la DB)
           setOrders((prev) => prev.map((o) => (o.id === tempId ? result.order! : o)))
+          if (currentUser) invalidateOperationsCache(currentUser.id)
         }
       }).catch((error: unknown) => {
         setOrders((prev) => prev.filter((o) => o.id !== tempId))
@@ -388,6 +398,8 @@ export function StoreProvider({
           // Revertir si falló
           setOrders(previousOrders)
           console.error(`No se pudo actualizar el estado de la orden "${orderId}" en la base de datos.`)
+        } else {
+          if (currentUser) invalidateOperationsCache(currentUser.id)
         }
       })
     }
@@ -416,6 +428,8 @@ export function StoreProvider({
           // Revertir si falló
           setOrders(previousOrders)
           console.error(`No se pudo reasignar la orden "${orderId}" en la base de datos.`)
+        } else {
+          if (currentUser) invalidateOperationsCache(currentUser.id)
         }
       })
     }
@@ -533,6 +547,10 @@ export function StoreProvider({
 
         // Reemplazar el usuario temporal con el real (UUID de la DB)
         setUsers((prev) => prev.map((u) => (u.id === tempId ? result.user! : u)))
+        if (currentUser) {
+          invalidateCachedUsers(currentUser.id)
+          invalidateCachedCompanies(currentUser.id)
+        }
         return result
       } catch (error) {
         setUsers((prev) => prev.filter((u) => u.id !== tempId))
@@ -548,6 +566,9 @@ export function StoreProvider({
         if (!ok) {
           setUsers(previousUsers)
           console.error(`No se pudo persistir la actualización del usuario "${id}" en la base de datos.`)
+        } else if (currentUser) {
+          invalidateCachedUsers(currentUser.id)
+          invalidateCachedCompanies(currentUser.id)
         }
       })
     }
@@ -561,6 +582,9 @@ export function StoreProvider({
         if (!ok) {
           setUsers(previousUsers)
           console.error(`No se pudo persistir el cambio de estado del usuario "${id}" en la base de datos.`)
+        } else if (currentUser) {
+          invalidateCachedUsers(currentUser.id)
+          invalidateCachedCompanies(currentUser.id)
         }
       })
     }
@@ -572,6 +596,9 @@ export function StoreProvider({
         if (!ok) {
           setUsers(previousUsers)
           console.error(`No se pudo eliminar el usuario "${id}" en la base de datos.`)
+        } else if (currentUser) {
+          invalidateCachedUsers(currentUser.id)
+          invalidateCachedCompanies(currentUser.id)
         }
       })
     }

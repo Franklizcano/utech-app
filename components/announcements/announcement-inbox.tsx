@@ -14,6 +14,8 @@ import {
 } from "@/components/ui/dialog"
 import type { Announcement } from "@/lib/types"
 import { cn } from "@/lib/utils"
+import { invalidateAnnouncementsCache, loadCachedAnnouncements } from "@/lib/announcements-cache"
+import { useStore } from "@/lib/store"
 
 const ANNOUNCEMENT_STYLES = {
   importante: {
@@ -27,12 +29,16 @@ const ANNOUNCEMENT_STYLES = {
 } as const
 
 export function AnnouncementInbox() {
+  const { currentUser } = useStore()
+  const currentUserId = currentUser?.id
   const [announcements, setAnnouncements] = useState<Announcement[]>([])
   const [open, setOpen] = useState(false)
 
   useEffect(() => {
     let cancelled = false
-    fetchAnnouncementsAction()
+    if (!currentUserId) return
+
+    loadCachedAnnouncements(currentUserId, fetchAnnouncementsAction)
       .then((items) => {
         if (cancelled) return
         setAnnouncements(items)
@@ -43,13 +49,14 @@ export function AnnouncementInbox() {
     return () => {
       cancelled = true
     }
-  }, [])
+  }, [currentUserId])
 
   const unreadAnnouncements = announcements.filter((item) => !item.read)
 
   async function markAsRead(id: string) {
     const ok = await markAnnouncementReadAction(id)
     if (!ok) return
+    if (currentUser) invalidateAnnouncementsCache(currentUser.id)
     setAnnouncements((items) => items.map((item) => (item.id === id ? { ...item, read: true } : item)))
     if (unreadAnnouncements.length <= 1) setOpen(false)
   }

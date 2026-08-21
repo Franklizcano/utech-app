@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { StatusBadge } from "@/components/status-badge"
 import { useStore } from "@/lib/store"
+import { invalidateOperationsCache, loadCachedBudgetOrders } from "@/lib/operations-cache"
 import type { Order } from "@/lib/types"
 
 export function BudgetOrdersInbox() {
@@ -19,7 +20,9 @@ export function BudgetOrdersInbox() {
   async function openInbox() {
     setOpen(true)
     setLoading(true)
-    try { setOrders(await fetchBudgetQueueAction()) } finally { setLoading(false) }
+    try {
+      if (currentUser) setOrders(await loadCachedBudgetOrders(currentUser.id, fetchBudgetQueueAction))
+    } finally { setLoading(false) }
   }
 
   async function claim(orderId: string) {
@@ -27,6 +30,7 @@ export function BudgetOrdersInbox() {
     try {
       if (await claimBudgetOrderAction(orderId)) {
         setOrders((current) => current.filter((order) => order.id !== orderId))
+        if (currentUser) invalidateOperationsCache(currentUser.id)
         await refreshOrders()
       }
     } finally { setClaiming(null) }
