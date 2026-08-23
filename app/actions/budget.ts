@@ -2,7 +2,7 @@
 
 import { getSessionAction } from "@/app/actions/auth"
 import { getSupabaseServerClient } from "@/lib/supabase"
-import { fetchBudgetOrdersForUser, claimBudgetOrderServer } from "@/lib/queries/orders-server"
+import { fetchBudgetOrdersForUser, claimBudgetOrderServer, updateBudgetItemDiscountServer } from "@/lib/queries/orders-server"
 import type { Order } from "@/lib/types"
 
 export async function fetchBudgetQueueAction(): Promise<Order[]> {
@@ -15,6 +15,21 @@ export async function claimBudgetOrderAction(orderId: string): Promise<boolean> 
   const session = await getSessionAction()
   if (!session || !session.active || !["admin", "presupuestador"].includes(session.role)) return false
   return claimBudgetOrderServer(orderId, session.id)
+}
+
+export async function updateBudgetItemDiscountAction(
+  itemId: string,
+  discountType: "fixed" | "percentage" | null,
+  discountValue: number | null,
+): Promise<boolean> {
+  const session = await getSessionAction()
+  if (!session || !session.active || !["admin", "presupuestador"].includes(session.role)) return false
+  if (discountType === null) return updateBudgetItemDiscountServer(itemId, session.id, session.role, null, null)
+  if (discountType !== "fixed" && discountType !== "percentage") return false
+  if (typeof discountValue !== "number" || !Number.isFinite(discountValue) || discountValue < 0) return false
+  if (discountType === "percentage" && discountValue > 100) return false
+
+  return updateBudgetItemDiscountServer(itemId, session.id, session.role, discountType, discountValue)
 }
 
 export async function submitOrderForBudgetAction(orderId: string): Promise<boolean> {
@@ -68,5 +83,4 @@ export async function decideBudgetAction(orderId: string, decision: "aprobado" |
   await supabase.from("notifications").insert({ order_id: orderId, message: decision === "aprobado" ? "El cliente aprobó el presupuesto. La orden está lista para ser tomada." : `El cliente rechazó el presupuesto.${note?.trim() ? ` Motivo: ${note.trim()}` : ""}`, notification_date: now, read: false })
   return true
 }
-
 

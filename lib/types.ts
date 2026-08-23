@@ -117,6 +117,8 @@ export interface BudgetItem {
   id: string
   description: string
   amount: number
+  discountType: "fixed" | "percentage" | null
+  discountValue: number | null
 }
 
 export interface TimelineEvent {
@@ -212,5 +214,27 @@ export interface OrderDetailsInput {
 }
 
 export function budgetTotal(order: Order): number {
+  return order.budget.reduce((sum, item) => sum + budgetItemTotal(item), 0)
+}
+
+export function budgetItemDiscountAmount(item: BudgetItem): number {
+  if (item.discountType === "percentage") {
+    return item.amount * Math.min(100, Math.max(0, item.discountValue ?? 0)) / 100
+  }
+  if (item.discountType === "fixed") {
+    return Math.min(item.amount, Math.max(0, item.discountValue ?? 0))
+  }
+  return 0
+}
+
+export function budgetItemTotal(item: BudgetItem): number {
+  return Math.max(0, item.amount - budgetItemDiscountAmount(item))
+}
+
+export function budgetSubtotal(order: Order): number {
   return order.budget.reduce((sum, item) => sum + item.amount, 0)
+}
+
+export function budgetDiscountTotal(order: Order): number {
+  return order.budget.reduce((sum, item) => sum + budgetItemDiscountAmount(item), 0)
 }

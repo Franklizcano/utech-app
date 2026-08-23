@@ -159,6 +159,10 @@ CREATE TABLE IF NOT EXISTS budget_items (
   order_id UUID NOT NULL REFERENCES orders(id) ON DELETE CASCADE,
   description VARCHAR(255) NOT NULL,
   amount DECIMAL(10, 2) NOT NULL,
+  discount_type TEXT CHECK (discount_type IS NULL OR discount_type IN ('fixed', 'percentage')),
+  discount_value DECIMAL(10, 2) CHECK (discount_value IS NULL OR discount_value >= 0),
+  CONSTRAINT budget_items_discount_amount_check CHECK (discount_type <> 'fixed' OR discount_value IS NULL OR discount_value <= amount),
+  CONSTRAINT budget_items_discount_percentage_check CHECK (discount_type <> 'percentage' OR discount_value IS NULL OR discount_value <= 100),
   created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 
@@ -244,7 +248,13 @@ SELECT
   os.label as status_label,
   os.color as status_color,
   o.assigned_to,
-  COALESCE(SUM(bi.amount), 0)::DECIMAL as budget_total,
+  COALESCE(SUM(
+    bi.amount - CASE
+      WHEN bi.discount_type = 'percentage' THEN bi.amount * COALESCE(bi.discount_value, 0) / 100
+      WHEN bi.discount_type = 'fixed' THEN LEAST(bi.amount, COALESCE(bi.discount_value, 0))
+      ELSE 0
+    END
+  ), 0)::DECIMAL as budget_total,
   o.created_at,
   o.updated_at,
   o.device_serial
@@ -272,8 +282,14 @@ ORDER BY order_id, notification_date DESC;
 -- Función: Obtener total de presupuesto de una orden
 CREATE OR REPLACE FUNCTION get_order_budget_total(order_uuid UUID)
 RETURNS DECIMAL AS $$
-  SELECT COALESCE(SUM(amount), 0)::DECIMAL 
-  FROM budget_items 
+  SELECT COALESCE(SUM(
+    amount - CASE
+      WHEN discount_type = 'percentage' THEN amount * COALESCE(discount_value, 0) / 100
+      WHEN discount_type = 'fixed' THEN LEAST(amount, COALESCE(discount_value, 0))
+      ELSE 0
+    END
+  ), 0)::DECIMAL
+  FROM budget_items
   WHERE order_id = order_uuid;
 $$ LANGUAGE SQL;
 

@@ -2,6 +2,7 @@
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react"
 import { createOrderAction, fetchOrderDetailAction, fetchOrdersAction, markNotificationsReadAction } from "@/app/actions/orders"
+import { updateBudgetItemDiscountAction } from "@/app/actions/budget"
 import { fetchUsersAction } from "@/app/actions/users"
 import {
   type AppNotification,
@@ -14,6 +15,7 @@ import {
   type Role,
   type User,
   DEFAULT_STATES,
+  budgetTotal,
   FINAL_ORDER_STATUS,
   getStatusLabel,
   isProtectedOrderState,
@@ -112,6 +114,7 @@ interface StoreValue {
   reassignOrder: (orderId: string, newAssignee: string) => void
   updateOrderDetails: (orderId: string, input: OrderDetailsInput) => void
   addBudgetItem: (orderId: string, description: string, amount: number) => void
+  updateBudgetItemDiscount: (orderId: string, itemId: string, discountType: "fixed" | "percentage" | null, discountValue: number | null) => void
   removeBudgetItem: (orderId: string, itemId: string) => void
   sendBudgetNotification: (orderId: string) => void
   addUser: (input: { name: string; email: string; phone: string; role: Role; password: string; companyId?: string; referralCode?: string }) => Promise<CreateUserResult>
@@ -451,7 +454,7 @@ export function StoreProvider({
     }
 
     function addBudgetItem(orderId: string, description: string, amount: number) {
-      const tempItem: BudgetItem = { id: uid("bi"), description, amount }
+      const tempItem: BudgetItem = { id: uid("bi"), description, amount, discountType: null, discountValue: null }
 
       // Actualización optimista
       setOrders((prev) => prev.map((o) => (o.id === orderId ? { ...o, budget: [...o.budget, tempItem] } : o)))
@@ -466,6 +469,28 @@ export function StoreProvider({
           // Reemplazar el item temporal con el real (UUID de la DB)
           setOrders((prev) => prev.map((o) => (o.id === orderId ? { ...o, budget: o.budget.map((b) => b.id === tempItem.id ? saved : b) } : o)))
         }
+      })
+    }
+
+    function updateBudgetItemDiscount(
+      orderId: string,
+      itemId: string,
+      discountType: "fixed" | "percentage" | null,
+      discountValue: number | null,
+    ) {
+      const previousOrders = orders
+      setOrders((prev) => prev.map((order) => order.id !== orderId ? order : {
+        ...order,
+        budget: order.budget.map((item) => item.id !== itemId ? item : { ...item, discountType, discountValue }),
+      }))
+
+      updateBudgetItemDiscountAction(itemId, discountType, discountValue).then((ok) => {
+        if (!ok) {
+          setOrders(previousOrders)
+          console.error(`No se pudo actualizar el descuento del item "${itemId}" en la base de datos.`)
+          return
+        }
+        if (currentUser) invalidateOperationsCache(currentUser.id)
       })
     }
 
@@ -491,7 +516,7 @@ export function StoreProvider({
       const order = orders.find((o) => o.id === orderId)
       if (!order) return
 
-      const total = order.budget.reduce((s, b) => s + b.amount, 0)
+      const total = budgetTotal(order)
       const message = `Presupuesto actualizado disponible en tu portal. Total: ${formatCurrency(total)}.`
       const tempNotif: AppNotification = {
         id: uid("nt"),
@@ -752,6 +777,7 @@ export function StoreProvider({
       reassignOrder,
       updateOrderDetails,
       addBudgetItem,
+      updateBudgetItemDiscount,
       removeBudgetItem,
       sendBudgetNotification,
       addUser,

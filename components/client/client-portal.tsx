@@ -18,7 +18,7 @@ import { StatusBadge } from "@/components/status-badge"
 import { RepairTimeline } from "@/components/repair-timeline"
 import { ClientOrderForm } from "@/components/client/client-order-form"
 import { useStore, formatCurrency } from "@/lib/store"
-import { budgetTotal, type Order } from "@/lib/types"
+import { budgetItemDiscountAmount, budgetItemTotal, budgetTotal, type Order } from "@/lib/types"
 import { cn } from "@/lib/utils"
 import { decideBudgetAction } from "@/app/actions/budget"
 
@@ -92,8 +92,11 @@ function ClientOrderDetail({ order, showBudget, onDecisionAction }: { order: Ord
                 <div className="space-y-3">
                   {order.budget.map((item) => (
                     <div key={item.id} className="flex items-start justify-between gap-3 text-sm">
-                      <span className="text-muted-foreground">{item.description}</span>
-                      <span className="font-medium tabular-nums text-foreground">{formatCurrency(item.amount)}</span>
+                      <div>
+                        <span className="text-muted-foreground">{item.description}</span>
+                        {item.discountType && <p className="text-xs text-emerald-600 dark:text-emerald-400">Descuento: -{formatCurrency(budgetItemDiscountAmount(item))}</p>}
+                      </div>
+                      <span className="font-medium tabular-nums text-foreground">{formatCurrency(budgetItemTotal(item))}</span>
                     </div>
                   ))}
                   <Separator />
