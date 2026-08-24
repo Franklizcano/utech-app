@@ -6,6 +6,8 @@ function rowToBudgetItem(row: Record<string, unknown>): BudgetItem {
     id: row.id as string,
     description: row.description as string,
     amount: Number(row.amount),
+    discountType: row.discount_type === "fixed" || row.discount_type === "percentage" ? row.discount_type : null,
+    discountValue: row.discount_value === null || row.discount_value === undefined ? null : Number(row.discount_value),
   }
 }
 
@@ -412,5 +414,35 @@ export async function claimBudgetOrderServer(orderId: string, userId: string): P
     .select("id")
     .maybeSingle()
   return !error && Boolean(data)
+}
+
+export async function updateBudgetItemDiscountServer(
+  itemId: string,
+  userId: string,
+  role: Role,
+  discountType: "fixed" | "percentage" | null,
+  discountValue: number | null,
+): Promise<boolean> {
+  if (!itemId || !userId || !["admin", "presupuestador"].includes(role)) return false
+
+  const supabase = getSupabaseServerClient()
+  const { data: item, error: itemError } = await supabase
+    .from("budget_items")
+    .select("id, amount, order_id")
+    .eq("id", itemId)
+    .maybeSingle()
+  if (itemError || !item) return false
+  if (discountType === "fixed" && discountValue !== null && discountValue > Number(item.amount)) return false
+
+  let orderQuery = supabase.from("orders").select("id").eq("id", item.order_id)
+  if (role === "presupuestador") orderQuery = orderQuery.eq("budget_assigned_to", userId)
+  const { data: order, error: orderError } = await orderQuery.maybeSingle()
+  if (orderError || !order) return false
+
+  const { error } = await supabase
+    .from("budget_items")
+    .update({ discount_type: discountType, discount_value: discountValue })
+    .eq("id", itemId)
+  return !error
 }
 

@@ -13,6 +13,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog"
 import { useStore, formatCurrency } from "@/lib/store"
+import { loadCachedCompletedOrders } from "@/lib/operations-cache"
 import { budgetTotal, type Order } from "@/lib/types"
 
 function formatDate(iso: string) {
@@ -40,14 +41,14 @@ export function CompletedOrdersInbox({ onSelectOrderAction }: { onSelectOrderAct
     setLoading(true)
     setError("")
     try {
-      setCompletedOrders(await fetchCompletedOrdersAction())
+      if (currentUser) setCompletedOrders(await loadCachedCompletedOrders(currentUser.id, fetchCompletedOrdersAction))
     } catch (refreshError) {
       console.error("No se pudieron cargar las órdenes finalizadas:", refreshError)
       setError("No se pudo actualizar el buzón.")
     } finally {
       setLoading(false)
     }
-  }, [])
+  }, [currentUser])
 
   function handleOpenChange(nextOpen: boolean) {
     setOpen(nextOpen)

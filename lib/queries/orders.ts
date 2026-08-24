@@ -9,6 +9,8 @@ function rowToBudgetItem(row: any): BudgetItem {
     id: row.id,
     description: row.description,
     amount: parseFloat(row.amount),
+    discountType: row.discount_type === "fixed" || row.discount_type === "percentage" ? row.discount_type : null,
+    discountValue: row.discount_value === null || row.discount_value === undefined ? null : parseFloat(row.discount_value),
   }
 }
 
@@ -216,6 +218,9 @@ export async function deleteBudgetItemRemote(itemId: string): Promise<boolean> {
   }
 }
 
+/**
+ * Actualiza el descuento de un ítem de presupuesto.
+ */
 /**
  * Crea una notificación para una orden
  */

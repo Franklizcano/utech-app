@@ -25,13 +25,14 @@ import { RepairTimeline } from "@/components/repair-timeline"
 import { ReassignDialog } from "@/components/employee/reassign-dialog"
 import { sendBudgetToClientAction, submitOrderForBudgetAction } from "@/app/actions/budget"
 import { useStore, formatCurrency } from "@/lib/store"
-import { budgetTotal, getStatusFlow, getStatusLabel, type DeviceType, type Order, type OrderStatus } from "@/lib/types"
+import { invalidateOperationsCache } from "@/lib/operations-cache"
+import { budgetDiscountTotal, budgetItemDiscountAmount, budgetItemTotal, budgetSubtotal, budgetTotal, getStatusFlow, getStatusLabel, type DeviceType, type Order, type OrderStatus } from "@/lib/types"
 import Image from "next/image"
 
 const DEVICE_TYPES: DeviceType[] = ["PC", "Notebook", "PlayStation", "Xbox", "Nintendo", "Otro"]
 
 export function OrderDetail({ order }: { order: Order }) {
-  const { role, addBudgetItem, removeBudgetItem, advanceStatus, updateOrderDetails, states, users, refreshOrders } = useStore()
+  const { role, currentUser, addBudgetItem, updateBudgetItemDiscount, removeBudgetItem, advanceStatus, updateOrderDetails, states, users, refreshOrders } = useStore()
   const [desc, setDesc] = useState("")
   const [amount, setAmount] = useState("")
   const [nextStatus, setNextStatus] = useState<OrderStatus>(order.status)
@@ -44,6 +45,7 @@ export function OrderDetail({ order }: { order: Order }) {
   const [draftDeviceSerial, setDraftDeviceSerial] = useState(order.deviceSerial ?? "")
   const [draftFault, setDraftFault] = useState(order.fault)
   const [submittingBudget, setSubmittingBudget] = useState(false)
+  const [discountDrafts, setDiscountDrafts] = useState<Record<string, string>>({})
 
   const total = budgetTotal(order)
   const canManageBudget = role === "admin" || role === "presupuestador"
@@ -285,10 +287,52 @@ export function OrderDetail({ order }: { order: Order }) {
               </p>
             )}
             {order.budget.map((item) => (
-              <div key={item.id} className="flex items-center justify-between gap-2 rounded-md border border-border bg-card px-3 py-2">
-                <span className="text-sm text-foreground">{item.description}</span>
-                <div className="flex items-center gap-2">
+              <div key={item.id} className="space-y-2 rounded-md border border-border bg-card px-3 py-3">
+                <div className="flex items-start justify-between gap-2">
+                  <span className="text-sm text-foreground">{item.description}</span>
                   <span className="text-sm font-medium tabular-nums text-foreground">{formatCurrency(item.amount)}</span>
+                </div>
+                <div className="flex flex-wrap items-end gap-2 border-t border-border pt-2">
+                  <div className="min-w-40 flex-1 space-y-1">
+                    <Label className="text-[11px] text-muted-foreground">Descuento</Label>
+                    <Select
+                      value={item.discountType ?? "none"}
+                      onValueChange={(value) => {
+                        const nextType = value === "none" ? null : value as "fixed" | "percentage"
+                        const nextValue = nextType === null ? null : item.discountType === nextType ? item.discountValue ?? 0 : 0
+                        setDiscountDrafts((current) => ({ ...current, [item.id]: nextValue === null ? "" : String(nextValue) }))
+                        updateBudgetItemDiscount(order.id, item.id, nextType, nextValue)
+                      }}
+                    >
+                      <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Sin descuento" /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="none">Sin descuento</SelectItem>
+                        <SelectItem value="fixed">Importe fijo (ARS)</SelectItem>
+                        <SelectItem value="percentage">Porcentaje (%)</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  {item.discountType && (
+                    <div className="w-28 space-y-1">
+                      <Label htmlFor={`discount-${item.id}`} className="text-[11px] text-muted-foreground">Valor</Label>
+                      <Input
+                        id={`discount-${item.id}`}
+                        type="number"
+                        min="0"
+                        max={item.discountType === "percentage" ? "100" : String(item.amount)}
+                        step="0.01"
+                        value={discountDrafts[item.id] ?? String(item.discountValue ?? "")}
+                        onChange={(event) => setDiscountDrafts((current) => ({ ...current, [item.id]: event.target.value }))}
+                        onBlur={() => {
+                          const value = Number.parseFloat(discountDrafts[item.id] ?? "")
+                          if (Number.isFinite(value) && value >= 0) {
+                            updateBudgetItemDiscount(order.id, item.id, item.discountType, value)
+                          }
+                        }}
+                        aria-label={`Valor del descuento para ${item.description}`}
+                      />
+                    </div>
+                  )}
                   <Button
                     type="button"
                     size="icon"
@@ -300,14 +344,30 @@ export function OrderDetail({ order }: { order: Order }) {
                     <Trash2 className="size-4" />
                   </Button>
                 </div>
+                {item.discountType && (
+                  <div className="flex items-center justify-between border-t border-border pt-2 text-xs">
+                    <span className="text-muted-foreground">Descuento: -{formatCurrency(budgetItemDiscountAmount(item))}</span>
+                    <span className="font-medium tabular-nums text-primary">Subtotal: {formatCurrency(budgetItemTotal(item))}</span>
+                  </div>
+                )}
               </div>
             ))}
           </div>
 
           {order.budget.length > 0 && (
-            <div className="flex items-center justify-between rounded-md bg-primary/10 px-3 py-2">
-              <span className="text-sm font-medium text-foreground">Total</span>
-              <span className="text-base font-semibold tabular-nums text-primary">{formatCurrency(total)}</span>
+            <div className="space-y-1 rounded-md bg-primary/10 px-3 py-2">
+              <div className="flex items-center justify-between text-sm text-muted-foreground">
+                <span>Subtotal</span>
+                <span className="tabular-nums">{formatCurrency(budgetSubtotal(order))}</span>
+              </div>
+              <div className="flex items-center justify-between text-sm text-muted-foreground">
+                <span>Descuentos</span>
+                <span className="tabular-nums">-{formatCurrency(budgetDiscountTotal(order))}</span>
+              </div>
+              <div className="flex items-center justify-between border-t border-primary/20 pt-1">
+                <span className="text-sm font-medium text-foreground">Total final</span>
+                <span className="text-base font-semibold tabular-nums text-primary">{formatCurrency(total)}</span>
+              </div>
             </div>
           )}
 
@@ -349,7 +409,7 @@ export function OrderDetail({ order }: { order: Order }) {
             variant="outline"
             className="w-full gap-2"
             disabled={order.budget.length === 0}
-            onClick={async () => { if (await sendBudgetToClientAction(order.id)) await refreshOrders() }}
+            onClick={async () => { if (await sendBudgetToClientAction(order.id)) { if (currentUser) invalidateOperationsCache(currentUser.id); await refreshOrders() } }}
           >
             <Send className="size-4" />
             Notificar presupuesto al cliente
@@ -357,7 +417,7 @@ export function OrderDetail({ order }: { order: Order }) {
         </div> : <div className="space-y-4 rounded-lg border border-dashed border-border p-4">
           <h4 className="text-sm font-semibold text-foreground">Análisis técnico</h4>
           <p className="text-sm text-muted-foreground">El presupuesto es gestionado por el responsable de presupuestos y no está visible para colaboradores.</p>
-          <Button type="button" className="w-full" disabled={submittingBudget || order.status !== "recibido"} onClick={async () => { setSubmittingBudget(true); try { if (await submitOrderForBudgetAction(order.id)) await refreshOrders() } finally { setSubmittingBudget(false) } }}>
+          <Button type="button" className="w-full" disabled={submittingBudget || order.status !== "recibido"} onClick={async () => { setSubmittingBudget(true); try { if (await submitOrderForBudgetAction(order.id)) { if (currentUser) invalidateOperationsCache(currentUser.id); await refreshOrders() } } finally { setSubmittingBudget(false) } }}>
             {submittingBudget ? "Enviando…" : "Finalizar análisis y enviar a presupuesto"}
           </Button>
         </div>}

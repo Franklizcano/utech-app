@@ -210,13 +210,15 @@ ORDER BY os.position ASC;
 
 ### Agregar item de presupuesto
 ```sql
-INSERT INTO budget_items (order_id, description, amount)
+INSERT INTO budget_items (order_id, description, amount, discount_type, discount_value)
 VALUES (
   (SELECT id FROM orders WHERE code = 'CP-2407010001'),
   'Reemplazo de batería',
-  15000
+  15000,
+  'percentage',
+  10
 )
-RETURNING id, description, amount;
+RETURNING id, description, amount, discount_type, discount_value;
 ```
 
 ### Ver presupuesto de una orden
@@ -224,7 +226,13 @@ RETURNING id, description, amount;
 SELECT 
   description,
   amount,
-  ROUND(amount::numeric / (SELECT SUM(amount) FROM budget_items WHERE order_id = o.id) * 100, 1) as porcentaje
+  discount_type,
+  discount_value,
+  amount - CASE
+    WHEN discount_type = 'percentage' THEN amount * COALESCE(discount_value, 0) / 100
+    WHEN discount_type = 'fixed' THEN LEAST(amount, COALESCE(discount_value, 0))
+    ELSE 0
+  END AS total_final
 FROM budget_items bi
 JOIN orders o ON bi.order_id = o.id
 WHERE o.code = 'CP-2407010001'

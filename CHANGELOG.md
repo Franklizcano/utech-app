@@ -1,5 +1,12 @@
 # CHANGELOG
 
+### [0.1.11] - 2026-08-20
+- Moved pnpm dependency overrides to the workspace configuration so they are applied correctly and the package-manager warning is resolved.
+- Added short-lived, session-scoped caches for administrative user and company pages, with invalidation after related changes.
+- Added a short-lived cache for operational inboxes and their pending-order count, with invalidation after order assignments and budget workflow changes.
+- Replaced periodic order polling with cache revalidation on tab focus and after order changes.
+- Cached the authenticated announcement inbox to avoid an unrelated database request whenever the application shell mounts.
+
 ### [0.1.10] - 2026-08-17
 - Add filters to statistics view.
 - Added referral codes to users and added visualization to admin view.

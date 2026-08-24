@@ -157,9 +157,13 @@ id (UUID, PK)              -- Identificador único del item
 order_id (FK → orders.id)  -- Referencia a la orden
 description (VARCHAR)      -- Descripción del item (ej: "Cambio de pantalla")
 amount (DECIMAL)           -- Monto en pesos argentinos
+discount_type (TEXT)       -- NULL, 'fixed' o 'percentage'
+discount_value (DECIMAL)   -- Importe fijo o porcentaje (0 a 100)
 
 created_at (TIMESTAMP)     -- Fecha de creación
 ```
+
+El total final de cada ítem es `amount` menos el descuento. Los descuentos fijos no pueden superar el importe base y los porcentuales no pueden superar el 100%.
 
 **Índice:**
 - `order_id` - Items de una orden específica
