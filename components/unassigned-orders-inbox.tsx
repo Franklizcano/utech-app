@@ -22,6 +22,7 @@ import {
 import { useStore } from "@/lib/store"
 import { invalidateOperationsCache, loadCachedAvailableOrders, loadCachedAvailableOrdersCount } from "@/lib/operations-cache"
 import type { Order } from "@/lib/types"
+import { getOrderExpirationCardClass, getOrderExpirationLabel, getOrderExpirationState, getOrderExpirationDate } from "@/lib/order-expiration"
 
 function formatDate(iso: string) {
   return new Date(iso).toLocaleDateString("es-AR", {
@@ -33,7 +34,7 @@ function formatDate(iso: string) {
 }
 
 export function UnassignedOrdersInbox() {
-  const { currentUser, employees, ordersLoading, refreshOrders } = useStore()
+  const { currentUser, employees, orderExpirationDays, ordersLoading, refreshOrders } = useStore()
   const [open, setOpen] = useState(false)
   const [availableOrders, setAvailableOrders] = useState<Order[]>([])
   const [availableOrdersCount, setAvailableOrdersCount] = useState(0)
@@ -43,10 +44,16 @@ export function UnassignedOrdersInbox() {
   const [selectedAssignees, setSelectedAssignees] = useState<Record<string, string>>({})
   const [error, setError] = useState("")
   const countCheckKey = useRef<string | null>(null)
+  const [now, setNow] = useState(() => Date.now())
+
+  useEffect(() => {
+    const interval = window.setInterval(() => setNow(Date.now()), 60_000)
+    return () => window.clearInterval(interval)
+  }, [])
 
   useEffect(() => {
     const role = currentUser?.role
-    if (!currentUser || !currentUser.active || (role !== "admin" && role !== "colaborador")) {
+    if (!currentUser || !currentUser.active || !["admin", "colaborador", "presupuestador"].includes(role ?? "")) {
       countCheckKey.current = null
       return
     }
@@ -77,7 +84,7 @@ export function UnassignedOrdersInbox() {
     }
   }, [currentUser])
 
-  if (!currentUser || !["admin", "colaborador"].includes(currentUser.role)) return null
+  if (!currentUser || !["admin", "colaborador", "presupuestador"].includes(currentUser.role)) return null
 
   function handleOpenChange(nextOpen: boolean) {
     setOpen(nextOpen)
@@ -175,8 +182,10 @@ export function UnassignedOrdersInbox() {
             </div>
           ) : (
             <div className="grid gap-3 md:grid-cols-2">
-              {availableOrders.map((order) => (
-                <div key={order.id} className="rounded-lg border border-border bg-secondary/20 p-4">
+              {[...availableOrders].sort((left, right) => getOrderExpirationDate(left, orderExpirationDays).getTime() - getOrderExpirationDate(right, orderExpirationDays).getTime()).map((order) => {
+                const expirationState = getOrderExpirationState(order, orderExpirationDays, now)
+                return (
+                <div key={order.id} className={`rounded-lg border bg-secondary/20 p-4 ${getOrderExpirationCardClass(expirationState)}`}>
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0">
                       <p className="truncate font-medium text-foreground">{order.clientName}</p>
@@ -187,6 +196,7 @@ export function UnassignedOrdersInbox() {
                   <p className="mt-3 truncate text-sm text-muted-foreground">{order.deviceType} · {order.deviceBrand} {order.deviceModel}</p>
                   <p className="mt-1 line-clamp-2 text-xs text-muted-foreground/80">{order.fault}</p>
                   <p className="mt-2 text-xs text-muted-foreground/70">Creada {formatDate(order.createdAt)}</p>
+                  <p className="mt-1 text-xs font-medium">{getOrderExpirationLabel(order, orderExpirationDays, now)}</p>
                   <Button
                     type="button"
                     className="mt-4 w-full gap-2"
@@ -199,7 +209,7 @@ export function UnassignedOrdersInbox() {
                   {currentUser?.role === "admin" && (
                     <div className="mt-3 space-y-2 border-t border-border pt-3">
                       <p className="text-xs font-medium text-muted-foreground">Asignar a un colaborador</p>
-                      {employees.filter((employee) => employee.role === "colaborador" && employee.active).length === 0 ? (
+                              {employees.filter((employee) => ["colaborador", "presupuestador"].includes(employee.role) && employee.active).length === 0 ? (
                         <p className="text-xs text-muted-foreground">No hay colaboradores activos disponibles.</p>
                       ) : (
                         <>
@@ -216,7 +226,7 @@ export function UnassignedOrdersInbox() {
                             </SelectTrigger>
                             <SelectContent>
                               {employees
-                                .filter((employee) => employee.role === "colaborador" && employee.active)
+                                .filter((employee) => ["colaborador", "presupuestador"].includes(employee.role) && employee.active)
                                 .map((employee) => (
                                   <SelectItem key={employee.id} value={employee.id}>
                                     {employee.name}
@@ -239,7 +249,8 @@ export function UnassignedOrdersInbox() {
                     </div>
                   )}
                 </div>
-              ))}
+                )
+              })}
             </div>
           )}
         </div>

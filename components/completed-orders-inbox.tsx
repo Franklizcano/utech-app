@@ -35,7 +35,7 @@ export function CompletedOrdersInbox({ onSelectOrderAction }: { onSelectOrderAct
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState("")
 
-  const isCollaborator = currentUser?.role === "colaborador"
+  const isCollaborator = currentUser?.role === "colaborador" || currentUser?.role === "presupuestador"
 
   const refreshInbox = useCallback(async () => {
     setLoading(true)

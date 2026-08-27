@@ -252,6 +252,26 @@ export async function fetchAvailableOrdersCount(): Promise<number> {
   return count ?? 0
 }
 
+export async function fetchBudgetOrdersCountForUser(userId: string, role: Role): Promise<number> {
+  if (!userId || !["admin", "presupuestador"].includes(role)) return 0
+
+  const supabase = getSupabaseServerClient()
+  let query = supabase
+    .from("orders")
+    .select("id", { count: "exact", head: true })
+    .in("status", ["pendiente_presupuesto", "presupuesto_rechazado"])
+
+  if (role === "presupuestador") query = query.or(`budget_assigned_to.is.null,budget_assigned_to.eq.${userId}`)
+
+  const { count, error } = await query
+  if (error) {
+    console.error("Error al contar órdenes pendientes de presupuesto:", error.message)
+    throw new Error("No se pudo contar el buzón de presupuestos.")
+  }
+
+  return count ?? 0
+}
+
 /**
  * Busca el estado público de un ticket perteneciente a un cliente ocasional.
  * Nunca devuelve órdenes asociadas a usuarios registrados ni datos sensibles.
@@ -296,7 +316,8 @@ export async function fetchOrdersForUser(userId: string, role: Role, assignedTo?
     const lastMonth = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString()
     ordersQuery = ordersQuery.eq("assigned_to", assignedTo).neq("status", FINAL_ORDER_STATUS).gte("updated_at", lastMonth)
   } else if (role === "presupuestador") {
-    ordersQuery = ordersQuery.eq("budget_assigned_to", userId).in("status", ["pendiente_presupuesto", "presupuesto_rechazado"])
+    if (!assignedTo) return []
+    ordersQuery = ordersQuery.or(`assigned_to.eq.${assignedTo},budget_assigned_to.eq.${userId}`)
   }
 
   const normalizedSearch = search.trim()
@@ -350,7 +371,8 @@ export async function fetchOrderDetailForUser(
     const lastMonth = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString()
     orderQuery = orderQuery.eq("assigned_to", assignedTo).neq("status", FINAL_ORDER_STATUS).gte("updated_at", lastMonth)
   } else if (role === "presupuestador") {
-    orderQuery = orderQuery.eq("budget_assigned_to", userId)
+    if (!assignedTo) return null
+    orderQuery = orderQuery.or(`assigned_to.eq.${assignedTo},budget_assigned_to.eq.${userId}`)
   }
 
   const { data, error } = await orderQuery.maybeSingle()
@@ -366,7 +388,7 @@ export async function fetchOrderDetailForUser(
 }
 
 export async function fetchCompletedOrdersForUser(userId: string, role: Role, assignedTo?: string): Promise<Order[]> {
-  if (!userId || !["admin", "colaborador"].includes(role)) return []
+  if (!userId || !["admin", "colaborador", "presupuestador"].includes(role)) return []
 
   const supabase = getSupabaseServerClient()
   let ordersQuery = supabase
@@ -376,7 +398,7 @@ export async function fetchCompletedOrdersForUser(userId: string, role: Role, as
     .not("assigned_to", "is", null)
     .order("updated_at", { ascending: false })
 
-  if (role === "colaborador") {
+  if (role === "colaborador" || role === "presupuestador") {
     if (!assignedTo) return []
 
     const lastMonth = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString()

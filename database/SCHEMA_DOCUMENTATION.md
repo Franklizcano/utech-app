@@ -147,7 +147,11 @@ Asignado a: Martín Gómez
 
 ---
 
-### 5. **budget_items** - Items de presupuesto
+### 5. **app_settings** - Configuración global
+
+Almacena valores enteros de configuración administrados desde la aplicación. La clave `order_expiration_days` define cuántos días después de `orders.created_at` se considera vencida una orden; su valor predeterminado es 30.
+
+### 6. **budget_items** - Items de presupuesto
 
 Almacena los items de costo asociados a cada orden.
 

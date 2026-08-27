@@ -101,19 +101,19 @@ export async function createOrderAction(input: OrderCreationInput): Promise<Crea
 
 export async function fetchAvailableOrdersAction(): Promise<Order[]> {
   const session = await getSessionAction()
-  if (!session || !session.active || !["admin", "colaborador"].includes(session.role)) return []
+  if (!session || !session.active || !["admin", "colaborador", "presupuestador"].includes(session.role)) return []
   return fetchAvailableOrdersForCollaborator()
 }
 
 export async function fetchAvailableOrdersCountAction(): Promise<number> {
   const session = await getSessionAction()
-  if (!session || !session.active || !["admin", "colaborador"].includes(session.role)) return 0
+  if (!session || !session.active || !["admin", "colaborador", "presupuestador"].includes(session.role)) return 0
   return fetchAvailableOrdersCount()
 }
 
 export async function claimOrderAction(orderId: string): Promise<boolean> {
   const session = await getSessionAction()
-  if (!session || !session.active || !["admin", "colaborador"].includes(session.role)) return false
+  if (!session || !session.active || !["admin", "colaborador", "presupuestador"].includes(session.role)) return false
   return claimOrderServer(orderId, session.name)
 }
 
@@ -126,7 +126,7 @@ export async function assignOrderAction(orderId: string, collaboratorId: string)
     .from("users")
     .select("name")
     .eq("id", collaboratorId)
-    .eq("role", "colaborador")
+    .in("role", ["colaborador", "presupuestador"])
     .eq("active", true)
     .maybeSingle()
 
@@ -155,7 +155,7 @@ export async function fetchOrderDetailAction(orderId: string): Promise<Order | n
 
 export async function fetchCompletedOrdersAction(): Promise<Order[]> {
   const session = await getSessionAction()
-  if (!session || !session.active || !["admin", "colaborador"].includes(session.role)) return []
+  if (!session || !session.active || !["admin", "colaborador", "presupuestador"].includes(session.role)) return []
 
   return fetchCompletedOrdersForUser(session.id, session.role, session.name)
 }

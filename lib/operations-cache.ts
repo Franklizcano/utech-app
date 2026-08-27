@@ -47,6 +47,10 @@ export function loadCachedBudgetOrders(userId: string, loader: () => Promise<Ord
   return loadCached(key(userId, "budget-orders"), loader, force)
 }
 
+export function loadCachedBudgetOrdersCount(userId: string, loader: () => Promise<number>): Promise<number> {
+  return loadCached(key(userId, "budget-count"), loader)
+}
+
 export function loadCachedCompletedOrders(userId: string, loader: () => Promise<Order[]>, force = false): Promise<Order[]> {
   return loadCached(key(userId, "completed-orders"), loader, force)
 }

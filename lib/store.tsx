@@ -2,6 +2,7 @@
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react"
 import { createOrderAction, fetchOrderDetailAction, fetchOrdersAction, markNotificationsReadAction } from "@/app/actions/orders"
+import { fetchOrderExpirationDaysAction } from "@/app/actions/order-settings"
 import { updateBudgetItemDiscountAction } from "@/app/actions/budget"
 import { fetchUsersAction } from "@/app/actions/users"
 import {
@@ -104,6 +105,8 @@ interface StoreValue {
   ordersLoading: boolean
   ordersLoadingMore: boolean
   ordersHasMore: boolean
+  orderExpirationDays: number
+  setOrderExpirationDays: (days: number) => void
   refreshOrders: () => Promise<void>
   loadMoreOrders: (query?: string) => Promise<void>
   searchOrders: (query: string) => Promise<void>
@@ -153,6 +156,7 @@ export function StoreProvider({
   const [ordersLoading, setOrdersLoading] = useState(true)
   const [ordersLoadingMore, setOrdersLoadingMore] = useState(false)
   const [ordersHasMore, setOrdersHasMore] = useState(true)
+  const [orderExpirationDays, setOrderExpirationDays] = useState(30)
   const ordersRef = useRef(orders)
   useEffect(() => {
     ordersRef.current = orders
@@ -194,6 +198,17 @@ export function StoreProvider({
       cancelled = true
     }
   }, [])
+
+  useEffect(() => {
+    if (!currentUser || !isLoggedIn) return
+    let cancelled = false
+    fetchOrderExpirationDaysAction().then((days) => {
+      if (!cancelled) setOrderExpirationDays(days)
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [currentUser, isLoggedIn])
 
   const loadUsersPage = useCallback(async (page: number, search = "") => {
     if (!currentUser || !isLoggedIn || currentUser.role === "cliente" || page < 0) return
@@ -744,6 +759,8 @@ export function StoreProvider({
       logout,
       users,
       orders,
+      orderExpirationDays,
+      setOrderExpirationDays,
       employees,
       states,
       archivedStates,
@@ -791,7 +808,7 @@ export function StoreProvider({
       restoreState,
       reorderStates,
     }
-  }, [role, currentUser, isLoggedIn, users, orders, states, archivedStates, statesLoading, usersLoading, usersPage, usersHasMore, ordersLoading, ordersLoadingMore, ordersHasMore, ordersCacheKey, searchOrders, loadOrderDetail, loadUsersPage])
+  }, [role, currentUser, isLoggedIn, users, orders, orderExpirationDays, states, archivedStates, statesLoading, usersLoading, usersPage, usersHasMore, ordersLoading, ordersLoadingMore, ordersHasMore, ordersCacheKey, searchOrders, loadOrderDetail, loadUsersPage])
 
   return <StoreContext.Provider value={value}>{children}</StoreContext.Provider>
 }

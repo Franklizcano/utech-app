@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useRef } from "react"
+import { useState, useEffect, useRef, useMemo } from "react"
 import { Plus, Inbox, Loader2, Search } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
@@ -21,14 +21,37 @@ import { OrderDetail } from "@/components/employee/order-detail"
 import { useStore, formatCurrency } from "@/lib/store"
 import { budgetTotal, type Order } from "@/lib/types"
 import { cn } from "@/lib/utils"
+import { getOrderExpirationCardClass, getOrderExpirationLabel, getOrderExpirationState, getOrderExpirationDate } from "@/lib/order-expiration"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+} from "@/components/ui/select"
+
+type OrderSort = "expiration" | "created" | "status" | "client"
+
+const orderSortLabels: Record<OrderSort, string> = {
+  expiration: "Expiración más próxima",
+  created: "Creación más reciente",
+  status: "Estado A-Z",
+  client: "Cliente A-Z",
+}
 
 export function ServiceWorkspace() {
-  const { role, orders, ordersLoading, ordersLoadingMore, ordersHasMore, loadMoreOrders, searchOrders, loadOrderDetail } = useStore()
+  const { role, orders, orderExpirationDays, ordersLoading, ordersLoadingMore, ordersHasMore, loadMoreOrders, searchOrders, loadOrderDetail } = useStore()
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [selectedDetail, setSelectedDetail] = useState<Order | null>(null)
   const [dialogOpen, setDialogOpen] = useState(false)
   const [searchQuery, setSearchQuery] = useState("")
+  const [orderSort, setOrderSort] = useState<OrderSort>("expiration")
+  const [now, setNow] = useState(() => Date.now())
   const initialSearchEffect = useRef(true)
+
+  useEffect(() => {
+    const interval = window.setInterval(() => setNow(Date.now()), 60_000)
+    return () => window.clearInterval(interval)
+  }, [])
 
   useEffect(() => {
     if (initialSearchEffect.current) {
@@ -43,6 +66,12 @@ export function ServiceWorkspace() {
   }, [searchQuery, searchOrders])
 
   const selected = orders.find((o) => o.id === selectedId) ?? null
+  const sortedOrders = useMemo(() => [...orders].sort((left, right) => {
+    if (orderSort === "expiration") return getOrderExpirationDate(left, orderExpirationDays).getTime() - getOrderExpirationDate(right, orderExpirationDays).getTime()
+    if (orderSort === "created") return new Date(right.createdAt).getTime() - new Date(left.createdAt).getTime()
+    if (orderSort === "status") return left.status.localeCompare(right.status, "es")
+    return left.clientName.localeCompare(right.clientName, "es")
+  }), [orders, orderExpirationDays, orderSort])
 
   useEffect(() => {
     if (!selected?.id) {
@@ -94,16 +123,29 @@ export function ServiceWorkspace() {
         {/* Lista de pedidos */}
         <div className="space-y-4">
           {/* Buscador */}
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-            <Input
-              type="text"
-              placeholder="Buscar por código, cliente o serial..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              disabled={ordersLoading}
-              className="pl-9"
-            />
+          <div className={cn("flex flex-col gap-2", !selected && "sm:flex-row")}>
+            <div className={cn("relative min-w-0", selected ? "w-full" : "flex-1")}>
+              <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+              <Input
+                type="text"
+                placeholder="Buscar por código, cliente o serial..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                disabled={ordersLoading}
+                className="w-full pl-9"
+              />
+            </div>
+            <Select value={orderSort} onValueChange={(value) => setOrderSort(value as OrderSort)}>
+              <SelectTrigger className={cn("w-full", !selected && "sm:w-52")} aria-label="Ordenar órdenes">
+                <span className="flex-1 text-left">{orderSortLabels[orderSort]}</span>
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="expiration">Expiración más próxima</SelectItem>
+                <SelectItem value="created">Creación más reciente</SelectItem>
+                <SelectItem value="status">Estado A-Z</SelectItem>
+                <SelectItem value="client">Cliente A-Z</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
 
           {/* Lista filtrada */}
@@ -119,9 +161,10 @@ export function ServiceWorkspace() {
               <p className="text-sm text-muted-foreground">No se encontraron órdenes</p>
             </div>
           ) : (
-            orders.map((order) => {
+            sortedOrders.map((order) => {
               const total = budgetTotal(order)
               const isActive = order.id === selected?.id
+              const expirationState = getOrderExpirationState(order, orderExpirationDays, now)
               return (
                 <button
                   key={order.id}
@@ -132,6 +175,7 @@ export function ServiceWorkspace() {
                     isActive
                       ? "border-primary/60 ring-1 ring-primary/40"
                       : "border-border hover:border-primary/30 hover:bg-secondary/40",
+                    getOrderExpirationCardClass(expirationState),
                   )}
                 >
                   {role === "colaborador" ? (
@@ -155,7 +199,15 @@ export function ServiceWorkspace() {
                           <span className="text-xs font-medium tabular-nums text-foreground">{formatCurrency(total)}</span>
                         )}
                       </div>
+                      <p className={cn("mt-2 text-xs font-medium", expirationState === "expired" ? "text-rose-700 dark:text-rose-300" : expirationState === "urgent" ? "text-orange-700 dark:text-orange-300" : expirationState === "warning" ? "text-amber-700 dark:text-amber-300" : "text-muted-foreground/70")}>
+                        {getOrderExpirationLabel(order, orderExpirationDays, now)}
+                      </p>
                     </>
+                  )}
+                  {role === "colaborador" && (
+                    <p className={cn("mt-2 text-xs font-medium", expirationState === "expired" ? "text-rose-700 dark:text-rose-300" : expirationState === "urgent" ? "text-orange-700 dark:text-orange-300" : expirationState === "warning" ? "text-amber-700 dark:text-amber-300" : "text-muted-foreground/70")}>
+                      {getOrderExpirationLabel(order, orderExpirationDays, now)}
+                    </p>
                   )}
                 </button>
               )

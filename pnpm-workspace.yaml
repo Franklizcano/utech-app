@@ -1,6 +1,7 @@
 allowBuilds:
   msw: set this to true or false
   sharp: set this to true or false
+  unrs-resolver: true
 overrides:
   hono: 4.12.25
   postcss: 8.5.25

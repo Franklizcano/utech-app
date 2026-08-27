@@ -141,6 +141,18 @@ CREATE INDEX IF NOT EXISTS idx_orders_created_at ON orders(created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_orders_device_serial ON orders(device_serial);
 CREATE INDEX IF NOT EXISTS idx_orders_unassigned ON orders(created_at DESC) WHERE assigned_to IS NULL;
 
+CREATE TABLE IF NOT EXISTS app_settings (
+  key TEXT PRIMARY KEY,
+  value_integer INTEGER NOT NULL,
+  updated_by UUID REFERENCES users(id) ON DELETE SET NULL,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+INSERT INTO app_settings (key, value_integer)
+VALUES ('order_expiration_days', 30)
+ON CONFLICT (key) DO NOTHING;
+
 CREATE TABLE IF NOT EXISTS order_code_counter (
   id BOOLEAN PRIMARY KEY DEFAULT true CHECK (id),
   current_value BIGINT NOT NULL DEFAULT 0 CHECK (current_value >= 0)
