@@ -1,5 +1,11 @@
 # CHANGELOG
 
+### [0.2.0] - 2026-08-24
+- Added configurable order expiration, with a default 30-day period managed by administrators.
+- Added progressive card colors and expiration labels as orders approach or pass their expiration date.
+- Added order sorting by expiration, creation date, status, and client in the operations workspace.
+- Added expiration highlighting to unassigned-order and budget-order inboxes.
+
 ### [0.1.11] - 2026-08-20
 - Moved pnpm dependency overrides to the workspace configuration so they are applied correctly and the package-manager warning is resolved.
 - Added short-lived, session-scoped caches for administrative user and company pages, with invalidation after related changes.

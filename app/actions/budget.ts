@@ -2,13 +2,19 @@
 
 import { getSessionAction } from "@/app/actions/auth"
 import { getSupabaseServerClient } from "@/lib/supabase"
-import { fetchBudgetOrdersForUser, claimBudgetOrderServer, updateBudgetItemDiscountServer } from "@/lib/queries/orders-server"
+import { fetchBudgetOrdersCountForUser, fetchBudgetOrdersForUser, claimBudgetOrderServer, updateBudgetItemDiscountServer } from "@/lib/queries/orders-server"
 import type { Order } from "@/lib/types"
 
 export async function fetchBudgetQueueAction(): Promise<Order[]> {
   const session = await getSessionAction()
   if (!session || !session.active || !["admin", "presupuestador"].includes(session.role)) return []
   return fetchBudgetOrdersForUser(session.id, session.role)
+}
+
+export async function fetchBudgetQueueCountAction(): Promise<number> {
+  const session = await getSessionAction()
+  if (!session || !session.active || !["admin", "presupuestador"].includes(session.role)) return 0
+  return fetchBudgetOrdersCountForUser(session.id, session.role)
 }
 
 export async function claimBudgetOrderAction(orderId: string): Promise<boolean> {
@@ -34,7 +40,7 @@ export async function updateBudgetItemDiscountAction(
 
 export async function submitOrderForBudgetAction(orderId: string): Promise<boolean> {
   const session = await getSessionAction()
-  if (!session || !session.active || session.role !== "colaborador") return false
+  if (!session || !session.active || !["colaborador", "presupuestador"].includes(session.role)) return false
   const supabase = getSupabaseServerClient()
   const { data, error } = await supabase
     .from("orders")

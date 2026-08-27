@@ -1,6 +1,6 @@
 "use client"
 
-import { LayoutGrid, Users, BarChart3, Settings, Building2, Megaphone } from "lucide-react"
+import { LayoutGrid, Users, BarChart3, Settings, Building2, Megaphone, SlidersHorizontal } from "lucide-react"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { ServiceWorkspace } from "@/components/service-workspace"
 import { UserManagement } from "@/components/admin/user-management"
@@ -8,6 +8,7 @@ import { Stats } from "@/components/admin/stats"
 import { StateManagement } from "@/components/admin/state-management"
 import { CompanyManagement } from "@/components/admin/company-management"
 import { AnnouncementManagement } from "@/components/admin/announcement-management"
+import { OrderSettings } from "@/components/admin/order-settings"
 
 export function AdminView() {
   return (
@@ -37,6 +38,10 @@ export function AdminView() {
           <Megaphone className="size-4" />
           Avisos
         </TabsTrigger>
+        <TabsTrigger value="configuracion" className="gap-2">
+          <SlidersHorizontal className="size-4" />
+          Configuración
+        </TabsTrigger>
       </TabsList>
       <TabsContent value="operaciones" keepMounted>
         <ServiceWorkspace />
@@ -55,6 +60,9 @@ export function AdminView() {
       </TabsContent>
       <TabsContent value="avisos" keepMounted>
         <AnnouncementManagement />
+      </TabsContent>
+      <TabsContent value="configuracion" keepMounted>
+        <OrderSettings />
       </TabsContent>
     </Tabs>
   )
