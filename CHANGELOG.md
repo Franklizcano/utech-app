@@ -9,7 +9,7 @@
 - Changed administrative tabs to mount sections only when selected, preserving loading feedback for each section.
 - Extended order caching to search results so repeated searches within the cache TTL do not request the database again; explicit order changes still revalidate data immediately.
 - Added public ticket detail pages at `/ticket/[code]` with current status, grouped timeline updates, distinct notes, and compacted note-free dates.
-- Added authenticated internal ticket URLs at `/gestion/ticket/[code]`, with server-side session, role, and order-scope validation for administrators, collaborators, and budget managers.
+- Kept public occasional-ticket access at `/ticket/[code]` for the login lookup, while `/gestion/ticket/[code]` remains the internal detail route with server-side session, role, and order-scope validation for administrators, collaborators, and budget managers.
 - Updated the management workspace so selecting a ticket changes the URL without leaving the split list-and-detail view; browser back/forward navigation remains synchronized with the selected ticket.
 - Added a sticky desktop detail panel, clearer selected-ticket styling, a compact ticket toolbar with copy-link actions, and a mobile close-detail control.
 - Added a custom 404 page for invalid or unauthorized routes.
