@@ -3,6 +3,8 @@ allowBuilds:
   sharp: set this to true or false
   unrs-resolver: true
 overrides:
-  hono: 4.12.25
-  postcss: 8.5.25
-  sharp: 0.35.3
+  hono: 4.13.5
+  js-yaml: 4.3.2
+  postcss: 8.5.26
+  qs: 6.16.0
+  sharp: 0.35.4
