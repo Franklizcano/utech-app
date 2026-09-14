@@ -47,7 +47,7 @@ export function Stats() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState("")
 
-  const responsibleUsers = users.filter((user) => user.role === "colaborador" || user.role === "admin")
+  const responsibleUsers = users.filter((user) => user.role === "colaborador" || user.role === "presupuestador" || user.role === "admin")
 
   function startFiltering() {
     setLoading(true)
@@ -114,7 +114,7 @@ export function Stats() {
                 <SelectItem value="todos">Todos los responsables</SelectItem>
                 {responsibleUsers.map((user) => (
                   <SelectItem key={user.id} value={user.name}>
-                    {user.name} · {user.role === "admin" ? "Administrador" : "Colaborador"}
+                    {user.name} · {user.role === "admin" ? "Administrador" : user.role === "presupuestador" ? "Presupuestador" : "Colaborador"}
                   </SelectItem>
                 ))}
               </SelectContent>

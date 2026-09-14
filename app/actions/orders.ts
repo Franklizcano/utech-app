@@ -71,7 +71,7 @@ export async function createOrderAction(input: OrderCreationInput): Promise<Crea
         clientEmail: session.email,
         assignedTo: null,
       }
-    } else if (session.role === "admin" || session.role === "colaborador") {
+    } else if (session.role === "admin" || session.role === "colaborador" || session.role === "presupuestador") {
       const clientName = normalizeText(input?.clientName)
       const clientPhone = normalizeText(input?.clientPhone)
       const clientEmail = normalizeText(input?.clientEmail)
@@ -188,7 +188,7 @@ export async function markNotificationsReadAction(orderId: string): Promise<bool
 
   if (session.role === "cliente") {
     orderQuery = orderQuery.eq("client_id", session.id)
-  } else if (session.role !== "admin" && session.role !== "colaborador") {
+  } else if (session.role !== "admin" && session.role !== "colaborador" && session.role !== "presupuestador") {
     return false
   }
 

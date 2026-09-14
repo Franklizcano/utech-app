@@ -1,5 +1,5 @@
 import { getSupabaseClient } from "@/lib/supabase"
-import type { Role } from "@/lib/types"
+import type { CompanyRole, Role } from "@/lib/types"
 
 export async function updateUserRemote(
   id: string,
@@ -10,6 +10,7 @@ export async function updateUserRemote(
     role: Role
     active: boolean
     companyId?: string
+    companyRole?: CompanyRole
   },
 ): Promise<boolean> {
   const supabase = getSupabaseClient()
@@ -22,6 +23,7 @@ export async function updateUserRemote(
       role: input.role,
       active: input.active,
       company_id: input.companyId ?? null,
+      company_role: input.companyId && input.role === "cliente" ? input.companyRole ?? "member" : "member",
       updated_at: new Date().toISOString(),
     })
     .eq("id", id)

@@ -120,8 +120,8 @@ interface StoreValue {
   updateBudgetItemDiscount: (orderId: string, itemId: string, discountType: "fixed" | "percentage" | null, discountValue: number | null) => void
   removeBudgetItem: (orderId: string, itemId: string) => void
   sendBudgetNotification: (orderId: string) => void
-  addUser: (input: { name: string; email: string; phone: string; role: Role; password: string; companyId?: string; referralCode?: string }) => Promise<CreateUserResult>
-  updateUser: (id: string, input: { name: string; email: string; phone: string; role: Role; active: boolean; companyId?: string }) => void
+  addUser: (input: { name: string; email: string; phone: string; role: Role; password: string; companyId?: string; companyRole?: "member" | "manager"; referralCode?: string }) => Promise<CreateUserResult>
+  updateUser: (id: string, input: { name: string; email: string; phone: string; role: Role; active: boolean; companyId?: string; companyRole?: "member" | "manager" }) => void
   toggleUserActive: (id: string) => void
   deleteUser: (id: string) => void
   markNotificationsRead: (orderId: string) => void
@@ -173,17 +173,27 @@ export function StoreProvider({
     return detail
   }, [])
   const searchOrders = useCallback(async (query: string): Promise<void> => {
+    if (!currentUser || !isLoggedIn) return
+    const cacheKey = getOrdersCacheKey(currentUser.id, currentUser.role, query)
+    const cachedOrders = getOrdersCache(cacheKey)
+    if (cachedOrders && !isOrdersCacheStale(cacheKey, ORDERS_CACHE_TTL_MS)) {
+      setOrdersState(cachedOrders)
+      setOrdersHasMore(cachedOrders.length >= ORDERS_PAGE_SIZE)
+      setOrdersLoading(false)
+      return
+    }
+
     setOrdersLoading(true)
     try {
-      const results = await fetchOrdersAction(0, ORDERS_PAGE_SIZE, query)
+      const results = await revalidateOrdersCache(cacheKey, () => fetchOrdersAction(0, ORDERS_PAGE_SIZE, query))
       setOrdersState(results)
-      setOrdersHasMore(results.length === ORDERS_PAGE_SIZE)
+      setOrdersHasMore(results.length >= ORDERS_PAGE_SIZE)
     } catch (error: unknown) {
       console.error("No se pudieron buscar las órdenes:", error)
     } finally {
       setOrdersLoading(false)
     }
-  }, [])
+  }, [currentUser, isLoggedIn])
 
   // Carga los estados de orden reales desde Supabase al montar el provider.
   useEffect(() => {
@@ -561,7 +571,7 @@ export function StoreProvider({
       })
     }
 
-    async function addUser(input: { name: string; email: string; phone: string; role: Role; password: string; companyId?: string; referralCode?: string }): Promise<CreateUserResult> {
+    async function addUser(input: { name: string; email: string; phone: string; role: Role; password: string; companyId?: string; companyRole?: "member" | "manager"; referralCode?: string }): Promise<CreateUserResult> {
       const tempId = uid("u")
       const tempUser: User = {
         id: tempId,
@@ -599,7 +609,7 @@ export function StoreProvider({
       }
     }
 
-    function updateUser(id: string, input: { name: string; email: string; phone: string; role: Role; active: boolean; companyId?: string }) {
+    function updateUser(id: string, input: { name: string; email: string; phone: string; role: Role; active: boolean; companyId?: string; companyRole?: "member" | "manager" }) {
       const previousUsers = users
       setUsers((prev) => prev.map((u) => (u.id === id ? { ...u, ...input } : u)))
       updateUserRemote(id, input).then((ok) => {

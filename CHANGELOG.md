@@ -1,5 +1,14 @@
 # CHANGELOG
 
+### [0.2.1] - 2026-08-27
+- Added signed HS256 JWT sessions stored in secure, HTTP-only cookies, with server-side validation of session claims without querying the database on each request.
+- Added scalable corporate roles with `member` and `manager`, including a single manager per company enforced by the server.
+- Added corporate user management for managers: add, edit, and remove members from their company without access to change the company user quota.
+- Added administrator controls to assign or revoke the company manager role from the company members dropdown.
+- Completed `presupuestador` access across collaborator capabilities, including order creation, user lookup, notifications, announcements, and statistics responsibility filters, while preserving budget-management access.
+- Changed administrative tabs to mount sections only when selected, preserving loading feedback for each section.
+- Extended order caching to search results so repeated searches within the cache TTL do not request the database again; explicit order changes still revalidate data immediately.
+
 ### [0.2.0] - 2026-08-24
 - Added configurable order expiration, with a default 30-day period managed by administrators.
 - Added progressive card colors and expiration labels as orders approach or pass their expiration date.

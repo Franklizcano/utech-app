@@ -36,6 +36,9 @@ CREATE TABLE IF NOT EXISTS users (
   phone VARCHAR(20) NOT NULL,
   role TEXT NOT NULL REFERENCES roles(id),
   password_hash TEXT NOT NULL DEFAULT '',
+  company_role TEXT NOT NULL DEFAULT 'member' CHECK (
+    company_role = 'member' OR (company_role = 'manager' AND role = 'cliente')
+  ),
   active BOOLEAN DEFAULT true,
   referral_code VARCHAR(12) NOT NULL UNIQUE DEFAULT upper(encode(gen_random_bytes(6), 'hex')),
   referred_by UUID REFERENCES users(id) ON DELETE SET NULL,

@@ -1,4 +1,5 @@
 export type Role = "admin" | "colaborador" | "presupuestador" | "cliente"
+export type CompanyRole = "member" | "manager"
 
 export type AnnouncementAudience = "personal" | "admin" | "colaborador" | "cliente_particular" | "cliente_corporativo"
 export type AnnouncementPriority = "normal" | "importante"
@@ -74,6 +75,7 @@ export interface User {
   role: Role
   active: boolean
   companyId?: string
+  companyRole?: CompanyRole
   company?: CompanySummary
   referralCode: string
   referredBy?: string
