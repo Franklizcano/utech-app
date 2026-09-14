@@ -13,6 +13,12 @@
 - Updated the management workspace so selecting a ticket changes the URL without leaving the split list-and-detail view; browser back/forward navigation remains synchronized with the selected ticket.
 - Added a sticky desktop detail panel, clearer selected-ticket styling, a compact ticket toolbar with copy-link actions, and a mobile close-detail control.
 - Added a custom 404 page for invalid or unauthorized routes.
+- Expanded the profile dropdown with profile details, pending announcements, corporate-company access, theme preferences, help, password changes, and logout.
+- Moved secondary administrator sections (companies, states, announcements, and configuration) out of the main tab list and added shortcuts to them in the administrator menu.
+- Fixed the administrator dropdown runtime error by placing its label and items inside the required Base UI menu group.
+- Extended the public ticket lookup to search occasional orders by ticket code or equipment serial while returning only the matching code and status.
+- Defaulted new internal orders to the logged-in technician when available, while keeping reassignment available for another technician.
+- Redacted client names, contact details, and client identifiers from order data delivered to collaborators and budgeters; ticket views now omit the client name entirely, including placeholder labels.
 
 ### [0.2.0] - 2026-08-24
 - Added configurable order expiration, with a default 30-day period managed by administrators.

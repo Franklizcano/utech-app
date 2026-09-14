@@ -358,13 +358,14 @@ export function StoreProvider({
     function addOrder(input: NewOrderInput): Order {
       const tempId = uid("o")
       const tempCode = `TEMP-${tempId}`
+      const canSeeClientData = role === "admin" || role === "cliente"
       const tempOrder: Order = {
         id: tempId,
         code: tempCode,
-        clientId: input.clientId,
-        clientName: input.clientName,
-        clientPhone: input.clientPhone,
-        clientEmail: input.clientEmail,
+        clientId: canSeeClientData ? input.clientId : null,
+        clientName: canSeeClientData ? input.clientName : "",
+        clientPhone: canSeeClientData ? input.clientPhone : "",
+        clientEmail: canSeeClientData ? input.clientEmail : "",
         deviceType: input.deviceType,
         deviceBrand: input.deviceBrand,
         deviceModel: input.deviceModel,

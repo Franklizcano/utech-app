@@ -14,7 +14,7 @@ import type { OccasionalTicketStatus } from "@/lib/types"
 
 export function OccasionalTicketLookup() {
   const router = useRouter()
-  const [code, setCode] = useState("")
+  const [query, setQuery] = useState("")
   const [tickets, setTickets] = useState<OccasionalTicketStatus[]>([])
   const [error, setError] = useState("")
   const [loading, setLoading] = useState(false)
@@ -26,7 +26,7 @@ export function OccasionalTicketLookup() {
     setLoading(true)
 
     try {
-      const result = await lookupOccasionalTicketAction(code)
+      const result = await lookupOccasionalTicketAction(query)
       if (result.success && result.tickets) {
         if (result.tickets.length === 1) {
           router.push(`/ticket/${encodeURIComponent(result.tickets[0].code)}`)
@@ -52,24 +52,24 @@ export function OccasionalTicketLookup() {
           Consultá tu ticket
         </CardTitle>
         <CardDescription>
-          Ingresá el código de seguimiento para ver el estado de tu orden.
+          Buscá por código de seguimiento o por serial del equipo para ver el estado de tu orden.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
         <form onSubmit={handleSubmit} className="space-y-3">
           <div className="space-y-2">
-            <Label htmlFor="occasional-ticket-code">Código del ticket</Label>
+            <Label htmlFor="occasional-ticket-query">Código del ticket o serial</Label>
             <Input
-              id="occasional-ticket-code"
-              value={code}
-              onChange={(event) => setCode(event.target.value)}
-              placeholder="Ej: CO-2608120001 o 2608120001"
+              id="occasional-ticket-query"
+              value={query}
+              onChange={(event) => setQuery(event.target.value)}
+              placeholder="Ej: CO-2608120001 o SN123456789"
               autoComplete="off"
               aria-invalid={!!error}
               disabled={loading}
             />
           </div>
-          <Button type="submit" className="w-full gap-2" disabled={loading || !code.trim()}>
+          <Button type="submit" className="w-full gap-2" disabled={loading || !query.trim()}>
             {loading ? <Loader2 className="size-4 animate-spin" /> : <Search className="size-4" />}
             {loading ? "Consultando..." : "Consultar estado"}
           </Button>
@@ -85,7 +85,7 @@ export function OccasionalTicketLookup() {
         {tickets.length > 0 && (
           <div role="status" aria-live="polite" className="space-y-2">
             <p className="text-xs text-muted-foreground">
-              {tickets.length === 1 ? "Ticket consultado" : `${tickets.length} tickets encontrados`}
+              {tickets.length === 1 ? "Coincidencia encontrada" : `${tickets.length} coincidencias encontradas`}
             </p>
             {tickets.map((ticket) => (
               <Link

@@ -242,7 +242,7 @@ export function ServiceWorkspace() {
                   ) : (
                     <>
                       <div className="flex items-center justify-between gap-2">
-                        <span className="font-medium text-foreground">{order.clientName}</span>
+                        {order.clientName && <span className="font-medium text-foreground">{order.clientName}</span>}
                         <span className="font-mono text-xs text-muted-foreground">{order.code}</span>
                       </div>
                       <p className="mt-0.5 truncate text-sm text-muted-foreground">

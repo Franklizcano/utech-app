@@ -188,7 +188,7 @@ export function UnassignedOrdersInbox() {
                 <div key={order.id} className={`rounded-lg border bg-secondary/20 p-4 ${getOrderExpirationCardClass(expirationState)}`}>
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0">
-                      <p className="truncate font-medium text-foreground">{order.clientName}</p>
+                      {order.clientName && <p className="truncate font-medium text-foreground">{order.clientName}</p>}
                       <p className="font-mono text-xs text-muted-foreground">{order.code}</p>
                     </div>
                     <StatusBadge status={order.status} />

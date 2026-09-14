@@ -64,7 +64,7 @@ export function CompanyUsersManagement() {
     setUsers((current) => current.filter((user) => user.id !== id))
   }
 
-  return <Card>
+  return <Card id="company-members">
     <CardHeader className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
       <div><CardTitle className="flex items-center gap-2"><Building2 className="size-5 text-primary" />Integrantes de mi empresa</CardTitle><p className="mt-1 text-sm text-muted-foreground">Administrá los accesos sin modificar el cupo de la empresa.</p></div>
       <Button type="button" className="gap-2" onClick={openCreate}><UserPlus className="size-4" />Agregar integrante</Button>

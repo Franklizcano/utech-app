@@ -56,10 +56,23 @@ function rowToOrder(row: Record<string, unknown>): Order {
   }
 }
 
+export function redactOrderClientData(order: Order, role: Role): Order {
+  if (role !== "colaborador" && role !== "presupuestador") return order
+
+  return {
+    ...order,
+    clientId: null,
+    clientName: "",
+    clientPhone: "",
+    clientEmail: "",
+  }
+}
+
 async function hydrateOrders(
   ordersData: Array<Record<string, unknown>>,
   supabase: ReturnType<typeof getSupabaseServerClient>,
   includeBudget = true,
+  viewerRole?: Role,
 ): Promise<Order[]> {
   if (!ordersData.length) return []
 
@@ -109,7 +122,7 @@ async function hydrateOrders(
   }
 
   return ordersData.map((row) => {
-    const order = rowToOrder(row)
+    const order = redactOrderClientData(rowToOrder(row), viewerRole ?? "admin")
         order.budget = includeBudget ? budgets.get(order.id) ?? [] : []
     order.timeline = timelines.get(order.id) ?? []
     order.notifications = notifications.get(order.id) ?? []
@@ -217,7 +230,7 @@ export async function claimOrderServer(orderId: string, assignee: string): Promi
   return true
 }
 
-export async function fetchAvailableOrdersForCollaborator(): Promise<Order[]> {
+export async function fetchAvailableOrdersForCollaborator(role: Role): Promise<Order[]> {
   const supabase = getSupabaseServerClient()
   const { data, error } = await supabase
     .from("orders")
@@ -232,7 +245,7 @@ export async function fetchAvailableOrdersForCollaborator(): Promise<Order[]> {
     throw new Error("No se pudieron cargar las órdenes disponibles.")
   }
 
-  return hydrateOrders((data ?? []) as Array<Record<string, unknown>>, supabase, false)
+  return hydrateOrders((data ?? []) as Array<Record<string, unknown>>, supabase, false, role)
 }
 
 export async function fetchAvailableOrdersCount(): Promise<number> {
@@ -273,12 +286,12 @@ export async function fetchBudgetOrdersCountForUser(userId: string, role: Role):
 }
 
 /**
- * Busca el estado público de un ticket perteneciente a un cliente ocasional.
+ * Busca el estado público de tickets de clientes ocasionales por código o serial.
  * Nunca devuelve órdenes asociadas a usuarios registrados ni datos sensibles.
  */
-export async function fetchOccasionalTicketStatus(code: string): Promise<OccasionalTicketStatus[]> {
+export async function fetchOccasionalTicketStatus(query: string): Promise<OccasionalTicketStatus[]> {
   const supabase = getSupabaseServerClient()
-  const { data, error } = await supabase.rpc("search_occasional_tickets", { p_query: code.trim() })
+  const { data, error } = await supabase.rpc("search_occasional_tickets", { p_query: query.trim() })
 
   if (error) {
     console.error("Error al consultar el estado público del ticket:", error.message)
@@ -415,7 +428,7 @@ export async function fetchOrdersForUser(userId: string, role: Role, assignedTo?
     throw new Error("No se pudieron cargar las órdenes.")
   }
 
-  return ((ordersData ?? []) as Array<Record<string, unknown>>).map(rowToOrder)
+  return ((ordersData ?? []) as Array<Record<string, unknown>>).map((row) => redactOrderClientData(rowToOrder(row), role))
 }
 
 export async function fetchOrderDetailForUser(
@@ -451,7 +464,7 @@ export async function fetchOrderDetailForUser(
   if (!data) return null
 
   const canSeeBudget = role === "admin" || role === "presupuestador" || (role === "cliente" && !companyId && ["presupuesto_enviado", "presupuesto_aprobado", "presupuesto_rechazado"].includes(data.status))
-  const [order] = await hydrateOrders([data as Record<string, unknown>], supabase, canSeeBudget)
+  const [order] = await hydrateOrders([data as Record<string, unknown>], supabase, canSeeBudget, role)
   return order ?? null
 }
 
@@ -504,7 +517,7 @@ export async function fetchCompletedOrdersForUser(userId: string, role: Role, as
     throw new Error("No se pudieron cargar las órdenes finalizadas.")
   }
 
-  return hydrateOrders((ordersData ?? []) as Array<Record<string, unknown>>, supabase, role === "admin")
+  return hydrateOrders((ordersData ?? []) as Array<Record<string, unknown>>, supabase, role === "admin", role)
 }
 
 export async function fetchBudgetOrdersForUser(userId: string, role: Role): Promise<Order[]> {
@@ -514,7 +527,7 @@ export async function fetchBudgetOrdersForUser(userId: string, role: Role): Prom
   if (role === "presupuestador") query = query.or(`budget_assigned_to.is.null,budget_assigned_to.eq.${userId}`)
   const { data, error } = await query
   if (error) throw new Error("No se pudieron cargar las órdenes pendientes de presupuesto.")
-  return hydrateOrders((data ?? []) as Array<Record<string, unknown>>, supabase)
+  return hydrateOrders((data ?? []) as Array<Record<string, unknown>>, supabase, true, role)
 }
 
 export async function claimBudgetOrderServer(orderId: string, userId: string): Promise<boolean> {

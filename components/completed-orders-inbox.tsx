@@ -109,7 +109,7 @@ export function CompletedOrdersInbox({ onSelectOrderAction }: { onSelectOrderAct
                   <div key={order.id} className="rounded-xl border border-border bg-secondary/20 p-4 transition-[background-color,border-color,box-shadow,transform] duration-200 hover:-translate-y-0.5 hover:border-primary/30 hover:bg-secondary/35 hover:shadow-lg hover:shadow-black/10">
                     <div className="flex items-start justify-between gap-3">
                       <div className="min-w-0">
-                        <p className="truncate font-medium text-foreground">{order.clientName}</p>
+                        {order.clientName && <p className="truncate font-medium text-foreground">{order.clientName}</p>}
                         <p className="font-mono text-xs text-muted-foreground">{order.code}</p>
                       </div>
                       <StatusBadge status={order.status} />

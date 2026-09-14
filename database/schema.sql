@@ -545,7 +545,10 @@ SET search_path = public
 AS $$
   SELECT o.code, o.status FROM orders o
   WHERE o.client_id IS NULL
-    AND upper(regexp_replace(o.code, '[-[:space:]]', '', 'g')) LIKE '%' || upper(regexp_replace(trim(p_query), '[-[:space:]]', '', 'g')) || '%'
+    AND (
+      upper(regexp_replace(o.code, '[-[:space:]]', '', 'g')) LIKE '%' || upper(regexp_replace(trim(p_query), '[-[:space:]]', '', 'g')) || '%'
+      OR upper(regexp_replace(COALESCE(o.device_serial, ''), '[-[:space:]]', '', 'g')) = upper(regexp_replace(trim(p_query), '[-[:space:]]', '', 'g'))
+    )
   ORDER BY o.created_at DESC
   LIMIT 50;
 $$;
