@@ -1,6 +1,7 @@
 "use client"
 
 import { useState } from "react"
+import { useRouter } from "next/navigation"
 import { Cpu, ShieldCheck, Wrench, UserRound, LogOut, KeyRound, ChevronDown, Calculator } from "lucide-react"
 import { useStore } from "@/lib/store"
 import { ServiceWorkspace } from "@/components/service-workspace"
@@ -29,6 +30,7 @@ const ROLE_ICON: Record<Role, typeof ShieldCheck> = {
 }
 
 export function AppShell() {
+  const router = useRouter()
   const { role, currentUser, isLoggedIn, logout } = useStore()
   const [passwordDialogOpen, setPasswordDialogOpen] = useState(false)
 
@@ -39,6 +41,11 @@ export function AppShell() {
   const RoleIcon = ROLE_ICON[role]
   const displayName = currentUser?.name ?? (role === "colaborador" ? "Colaborador" : role === "admin" ? "Admin" : "Cliente")
   const roleLabel = role === "colaborador" ? "Colaborador" : role === "presupuestador" ? "Presupuestos" : role === "admin" ? "Admin" : "Cliente"
+
+  function handleLogout() {
+    logout()
+    router.replace("/")
+  }
 
   return (
     <div className="min-h-screen bg-background">
@@ -87,7 +94,7 @@ export function AppShell() {
                   <KeyRound />
                   Cambiar contraseña
                 </DropdownMenuItem>
-                <DropdownMenuItem variant="destructive" onClick={logout}>
+                <DropdownMenuItem variant="destructive" onClick={handleLogout}>
                   <LogOut />
                   Cerrar sesión
                 </DropdownMenuItem>

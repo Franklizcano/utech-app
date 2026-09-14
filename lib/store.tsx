@@ -74,7 +74,7 @@ export function formatCurrency(value: number) {
   }).format(value)
 }
 
-const initialOrders: Order[] = []
+const emptyOrders: Order[] = []
 const ORDERS_PAGE_SIZE = 50
 const DEFAULT_ORDERS_CACHE_TTL_SECONDS = 120
 const configuredOrdersCacheTtlSeconds = Number(process.env.NEXT_PUBLIC_ORDERS_CACHE_TTL_SECONDS)
@@ -138,15 +138,17 @@ const StoreContext = createContext<StoreValue | null>(null)
 export function StoreProvider({
   children,
   initialSession = null,
+  initialOrders: seededOrders = emptyOrders,
 }: {
   children: ReactNode
   initialSession?: AuthUser | null
+  initialOrders?: Order[]
 }) {
   const [role, setRole] = useState<Role>(initialSession?.role ?? "colaborador")
   const [currentUser, setCurrentUser] = useState<AuthUser | null>(initialSession)
   const [isLoggedIn, setIsLoggedIn] = useState(initialSession !== null)
   const [users, setUsers] = useState<User[]>([])
-  const [orders, setOrdersState] = useState<Order[]>(initialOrders)
+  const [orders, setOrdersState] = useState<Order[]>(seededOrders)
   const [states, setStates] = useState<OrderState[]>(DEFAULT_STATES)
   const [archivedStates, setArchivedStates] = useState<OrderState[]>([])
   const [statesLoading, setStatesLoading] = useState(true)
@@ -158,6 +160,11 @@ export function StoreProvider({
   const [ordersHasMore, setOrdersHasMore] = useState(true)
   const [orderExpirationDays, setOrderExpirationDays] = useState(30)
   const ordersRef = useRef(orders)
+  const mergeSeededOrders = useCallback((remoteOrders: Order[]) => {
+    const remoteIds = new Set(remoteOrders.map((order) => order.id))
+    return [...seededOrders.filter((order) => !remoteIds.has(order.id)), ...remoteOrders]
+  }, [seededOrders])
+
   useEffect(() => {
     ordersRef.current = orders
   }, [orders])
@@ -281,7 +288,7 @@ export function StoreProvider({
     Promise.resolve().then(() => {
       if (cancelled) return
       if (cachedOrders) {
-        setOrdersState(cachedOrders)
+        setOrdersState(mergeSeededOrders(cachedOrders))
         setOrdersLoading(false)
         setOrdersHasMore(cachedOrders.length >= ORDERS_PAGE_SIZE)
       } else {
@@ -292,7 +299,7 @@ export function StoreProvider({
     const refreshOrders = () => {
       revalidateOrdersCache(ordersCacheKey, fetchOrdersAction).then((remoteOrders) => {
         if (cancelled) return
-        setOrdersState(remoteOrders)
+        setOrdersState(mergeSeededOrders(remoteOrders))
         setOrdersLoading(false)
         setOrdersHasMore(remoteOrders.length === ORDERS_PAGE_SIZE)
       }).catch((error: unknown) => {
@@ -317,7 +324,7 @@ export function StoreProvider({
       cancelled = true
       document.removeEventListener("visibilitychange", handleVisibilityChange)
     }
-  }, [currentUser, isLoggedIn, ordersCacheKey])
+  }, [currentUser, isLoggedIn, mergeSeededOrders, ordersCacheKey])
 
   const value = useMemo<StoreValue>(() => {
     const employees = users.filter((u) => u.role === "colaborador" || u.role === "presupuestador" || u.role === "admin")
@@ -678,7 +685,7 @@ export function StoreProvider({
 
       try {
         const remoteOrders = await revalidateOrdersCache(ordersCacheKey, fetchOrdersAction)
-        setOrdersState(remoteOrders)
+        setOrdersState(mergeSeededOrders(remoteOrders))
         setOrdersLoading(false)
       } catch (error: unknown) {
         console.error("No se pudieron actualizar las órdenes:", error)
@@ -818,7 +825,7 @@ export function StoreProvider({
       restoreState,
       reorderStates,
     }
-  }, [role, currentUser, isLoggedIn, users, orders, orderExpirationDays, states, archivedStates, statesLoading, usersLoading, usersPage, usersHasMore, ordersLoading, ordersLoadingMore, ordersHasMore, ordersCacheKey, searchOrders, loadOrderDetail, loadUsersPage])
+  }, [role, currentUser, isLoggedIn, users, orders, orderExpirationDays, states, archivedStates, statesLoading, usersLoading, usersPage, usersHasMore, ordersLoading, ordersLoadingMore, ordersHasMore, ordersCacheKey, searchOrders, loadOrderDetail, loadUsersPage, mergeSeededOrders])
 
   return <StoreContext.Provider value={value}>{children}</StoreContext.Provider>
 }

@@ -1,6 +1,8 @@
 "use client"
 
 import { useState } from "react"
+import { useRouter } from "next/navigation"
+import Link from "next/link"
 import { AlertCircle, Loader2, Search } from "lucide-react"
 import { lookupOccasionalTicketAction } from "@/app/actions/orders"
 import { StatusBadge } from "@/components/status-badge"
@@ -11,6 +13,7 @@ import { Label } from "@/components/ui/label"
 import type { OccasionalTicketStatus } from "@/lib/types"
 
 export function OccasionalTicketLookup() {
+  const router = useRouter()
   const [code, setCode] = useState("")
   const [tickets, setTickets] = useState<OccasionalTicketStatus[]>([])
   const [error, setError] = useState("")
@@ -25,6 +28,11 @@ export function OccasionalTicketLookup() {
     try {
       const result = await lookupOccasionalTicketAction(code)
       if (result.success && result.tickets) {
+        if (result.tickets.length === 1) {
+          router.push(`/ticket/${encodeURIComponent(result.tickets[0].code)}`)
+          return
+        }
+
         setTickets(result.tickets)
       } else {
         setError(result.error ?? "No se pudo consultar el ticket.")
@@ -80,10 +88,14 @@ export function OccasionalTicketLookup() {
               {tickets.length === 1 ? "Ticket consultado" : `${tickets.length} tickets encontrados`}
             </p>
             {tickets.map((ticket) => (
-              <div key={ticket.code} className="flex items-center justify-between gap-3 rounded-lg border border-primary/30 bg-primary/5 p-4">
+              <Link
+                key={ticket.code}
+                href={`/ticket/${encodeURIComponent(ticket.code)}`}
+                className="flex items-center justify-between gap-3 rounded-lg border border-primary/30 bg-primary/5 p-4 transition-colors hover:bg-primary/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              >
                 <p className="font-mono text-sm font-medium text-foreground">{ticket.code}</p>
                 <StatusBadge status={ticket.status} className="text-sm" />
-              </div>
+              </Link>
             ))}
           </div>
         )}

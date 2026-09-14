@@ -1,7 +1,8 @@
 "use client"
 
 import { useState, useEffect, useRef, useMemo } from "react"
-import { Plus, Inbox, Loader2, Search } from "lucide-react"
+import { Check, Clipboard, ExternalLink, Plus, Inbox, Loader2, Search, X } from "lucide-react"
+import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
@@ -38,6 +39,15 @@ const orderSortLabels: Record<OrderSort, string> = {
   client: "Cliente A-Z",
 }
 
+function normalizeOrderCode(code: string) {
+  return code.replace(/[-\s]/g, "").toUpperCase()
+}
+
+function getTicketCodeFromPath(pathname: string) {
+  const match = pathname.match(/^\/gestion\/ticket\/([^/]+)\/?$/)
+  return match ? decodeURIComponent(match[1]) : null
+}
+
 export function ServiceWorkspace() {
   const { role, orders, orderExpirationDays, ordersLoading, ordersLoadingMore, ordersHasMore, loadMoreOrders, searchOrders, loadOrderDetail } = useStore()
   const [selectedId, setSelectedId] = useState<string | null>(null)
@@ -46,7 +56,32 @@ export function ServiceWorkspace() {
   const [searchQuery, setSearchQuery] = useState("")
   const [orderSort, setOrderSort] = useState<OrderSort>("expiration")
   const [now, setNow] = useState(() => Date.now())
+  const [copiedCode, setCopiedCode] = useState(false)
   const initialSearchEffect = useRef(true)
+
+  function openInternalTicket(order: Order) {
+    setSelectedId(order.id)
+    setSelectedDetail(order.fault ? order : null)
+    const path = `/gestion/ticket/${encodeURIComponent(order.code)}`
+    if (window.location.pathname !== path) {
+      window.history.pushState({ ticketCode: order.code }, "", path)
+    }
+  }
+
+  function closeTicket() {
+    setSelectedId(null)
+    setSelectedDetail(null)
+    setCopiedCode(false)
+    if (window.location.pathname !== "/gestion") {
+      window.history.pushState({}, "", "/gestion")
+    }
+  }
+
+  async function copyTicketCode(code: string) {
+    await navigator.clipboard.writeText(code)
+    setCopiedCode(true)
+    window.setTimeout(() => setCopiedCode(false), 1800)
+  }
 
   useEffect(() => {
     const interval = window.setInterval(() => setNow(Date.now()), 60_000)
@@ -65,7 +100,28 @@ export function ServiceWorkspace() {
     return () => window.clearTimeout(timeoutId)
   }, [searchQuery, searchOrders])
 
-  const selected = orders.find((o) => o.id === selectedId) ?? null
+  useEffect(() => {
+    function syncTicketFromUrl() {
+      const code = getTicketCodeFromPath(window.location.pathname)
+      if (!code) {
+        setSelectedId(null)
+        setSelectedDetail(null)
+        return
+      }
+
+      const matchedOrder = orders.find((order) => normalizeOrderCode(order.code) === normalizeOrderCode(code))
+      if (matchedOrder) {
+        setSelectedId(matchedOrder.id)
+        setSelectedDetail((current) => current?.id === matchedOrder.id ? current : null)
+      }
+    }
+
+    syncTicketFromUrl()
+    window.addEventListener("popstate", syncTicketFromUrl)
+    return () => window.removeEventListener("popstate", syncTicketFromUrl)
+  }, [orders])
+
+  const selected = orders.find((o) => o.id === selectedId) ?? (selectedDetail?.id === selectedId ? selectedDetail : null)
   const sortedOrders = useMemo(() => [...orders].sort((left, right) => {
     if (orderSort === "expiration") return getOrderExpirationDate(left, orderExpirationDays).getTime() - getOrderExpirationDate(right, orderExpirationDays).getTime()
     if (orderSort === "created") return new Date(right.createdAt).getTime() - new Date(left.createdAt).getTime()
@@ -74,7 +130,7 @@ export function ServiceWorkspace() {
   }), [orders, orderExpirationDays, orderSort])
 
   useEffect(() => {
-    if (!selected?.id) {
+    if (!selected?.id || selectedDetail?.id === selected.id) {
       return
     }
 
@@ -91,7 +147,7 @@ export function ServiceWorkspace() {
     return () => {
       cancelled = true
     }
-  }, [selected?.id, loadOrderDetail])
+  }, [selected?.id, selectedDetail?.id, loadOrderDetail])
 
   const displayedDetail = selected?.fault
     ? selected
@@ -116,7 +172,7 @@ export function ServiceWorkspace() {
       <div className="flex flex-wrap items-center gap-2">
         <UnassignedOrdersInbox />
         <BudgetOrdersInbox />
-        <CompletedOrdersInbox onSelectOrderAction={setSelectedId} />
+        <CompletedOrdersInbox onSelectOrderAction={openInternalTicket} />
       </div>
 
       <div className={cn("grid gap-5", selected ? "lg:grid-cols-[340px_1fr]" : "grid-cols-1")}>
@@ -169,11 +225,11 @@ export function ServiceWorkspace() {
                 <button
                   key={order.id}
                   type="button"
-                  onClick={() => setSelectedId(order.id)}
+                  onClick={() => openInternalTicket(order)}
                   className={cn(
-                    "w-full rounded-xl border bg-card p-4 text-left transition-[background-color,border-color,box-shadow,transform] duration-200 hover:-translate-y-0.5 hover:shadow-lg hover:shadow-black/10",
+                    "w-full rounded-xl border bg-card p-3 text-left transition-[background-color,border-color,box-shadow,transform] duration-200 hover:-translate-y-0.5 hover:shadow-lg hover:shadow-black/10",
                     isActive
-                      ? "border-primary/60 ring-1 ring-primary/40"
+                      ? "border-primary/60 border-l-4 border-l-primary ring-1 ring-primary/40"
                       : "border-border hover:border-primary/30 hover:bg-secondary/40",
                     getOrderExpirationCardClass(expirationState),
                   )}
@@ -222,8 +278,39 @@ export function ServiceWorkspace() {
         </div>
 
         {/* Detalle */}
-        {selected && <Card>
-          <CardContent className="pt-6">
+        {selected && <Card className="lg:sticky lg:top-24 lg:max-h-[calc(100vh-7rem)] lg:overflow-y-auto">
+          <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border/70 px-4 py-3 sm:px-6">
+            <div className="min-w-0">
+              <p className="text-[11px] font-medium uppercase tracking-[0.14em] text-muted-foreground">Ticket seleccionado</p>
+              <p className="truncate font-mono text-sm font-semibold text-foreground">{selected.code}</p>
+            </div>
+            <div className="flex items-center gap-1.5">
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                className="gap-1.5"
+                onClick={() => void copyTicketCode(selected.code)}
+                title="Copiar código"
+              >
+                {copiedCode ? <Check className="size-3.5" /> : <Clipboard className="size-3.5" />}
+                <span className="hidden sm:inline">{copiedCode ? "Copiado" : "Copiar"}</span>
+              </Button>
+              <Link
+                href={`/gestion/ticket/${encodeURIComponent(selected.code)}`}
+                className="inline-flex h-8 items-center gap-1.5 rounded-md px-2.5 text-xs font-medium text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                title="Abrir esta URL directamente"
+              >
+                <ExternalLink className="size-3.5" />
+                <span className="hidden sm:inline">URL</span>
+              </Link>
+              <Button type="button" variant="ghost" size="sm" className="gap-1.5 lg:hidden" onClick={closeTicket}>
+                <X className="size-3.5" />
+                Cerrar
+              </Button>
+            </div>
+          </div>
+          <CardContent className="pt-4 sm:pt-6">
             {detailLoading ? (
               <div role="status" aria-live="polite" className="flex items-center justify-center gap-2 py-16 text-sm text-muted-foreground">
                 <Loader2 className="size-5 animate-spin text-primary" />

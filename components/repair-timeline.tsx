@@ -4,7 +4,7 @@ import { useSyncExternalStore } from "react"
 import { Check } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { useStore } from "@/lib/store"
-import { getStatusFlow, getStatusLabel, type Order } from "@/lib/types"
+import { compactTimelineEvents, getStatusFlow, getStatusLabel, type Order } from "@/lib/types"
 
 function formatDate(iso: string) {
   return new Date(iso).toLocaleDateString("es-AR", {
@@ -32,7 +32,7 @@ export function RepairTimeline({ order }: { order: Order }) {
   return (
     <ol className="relative space-y-6">
       {steps.map((step, index) => {
-        const event = [...order.timeline].reverse().find((e) => e.status === step)
+        const events = compactTimelineEvents(order.timeline.filter((event) => event.status === step))
         const completed = index < currentIndex
         const current = index === currentIndex
         const isLast = index === steps.length - 1
@@ -71,9 +71,18 @@ export function RepairTimeline({ order }: { order: Order }) {
               >
                 {getStatusLabel(step, states)}
               </p>
-              {event?.note && <p className="mt-0.5 text-sm text-muted-foreground">{event.note}</p>}
-              {event && mounted && <p className="mt-1 text-xs text-muted-foreground/70">{formatDate(event.date)}</p>}
-              {!event && current && <p className="mt-0.5 text-sm text-muted-foreground">En curso...</p>}
+              {events.length > 0 ? (
+                <div className="mt-1.5 space-y-2">
+                  {events.map((event, eventIndex) => (
+                    <div key={`${event.id}-${eventIndex}`} className="rounded-md border border-border/70 bg-secondary/20 px-3 py-2">
+                      {event.note && <p className="text-sm text-muted-foreground">{event.note}</p>}
+                      {mounted && <p className="mt-1 text-xs text-muted-foreground/70">{formatDate(event.date)}</p>}
+                    </div>
+                  ))}
+                </div>
+              ) : current ? (
+                <p className="mt-0.5 text-sm text-muted-foreground">En curso...</p>
+              ) : null}
             </div>
           </li>
         )

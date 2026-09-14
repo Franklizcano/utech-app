@@ -1,6 +1,6 @@
 # CHANGELOG
 
-### [0.2.1] - 2026-08-27
+### [0.2.1] - 2026-09-14
 - Added signed HS256 JWT sessions stored in secure, HTTP-only cookies, with server-side validation of session claims without querying the database on each request.
 - Added scalable corporate roles with `member` and `manager`, including a single manager per company enforced by the server.
 - Added corporate user management for managers: add, edit, and remove members from their company without access to change the company user quota.
@@ -8,6 +8,11 @@
 - Completed `presupuestador` access across collaborator capabilities, including order creation, user lookup, notifications, announcements, and statistics responsibility filters, while preserving budget-management access.
 - Changed administrative tabs to mount sections only when selected, preserving loading feedback for each section.
 - Extended order caching to search results so repeated searches within the cache TTL do not request the database again; explicit order changes still revalidate data immediately.
+- Added public ticket detail pages at `/ticket/[code]` with current status, grouped timeline updates, distinct notes, and compacted note-free dates.
+- Added authenticated internal ticket URLs at `/gestion/ticket/[code]`, with server-side session, role, and order-scope validation for administrators, collaborators, and budget managers.
+- Updated the management workspace so selecting a ticket changes the URL without leaving the split list-and-detail view; browser back/forward navigation remains synchronized with the selected ticket.
+- Added a sticky desktop detail panel, clearer selected-ticket styling, a compact ticket toolbar with copy-link actions, and a mobile close-detail control.
+- Added a custom 404 page for invalid or unauthorized routes.
 
 ### [0.2.0] - 2026-08-24
 - Added configurable order expiration, with a default 30-day period managed by administrators.

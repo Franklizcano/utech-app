@@ -1,5 +1,5 @@
 import { getSupabaseServerClient } from "@/lib/supabase"
-import { FINAL_ORDER_STATUS, type AppNotification, type BudgetItem, type OccasionalTicketStatus, type Order, type OrderCreationInput, type OrderStatus, type TimelineEvent, type Role } from "@/lib/types"
+import { FINAL_ORDER_STATUS, type AppNotification, type BudgetItem, type OccasionalTicketDetail, type OccasionalTicketStatus, type Order, type OrderCreationInput, type OrderStatus, type TimelineEvent, type Role } from "@/lib/types"
 
 function rowToBudgetItem(row: Record<string, unknown>): BudgetItem {
   return {
@@ -291,6 +291,74 @@ export async function fetchOccasionalTicketStatus(code: string): Promise<Occasio
   }))
 }
 
+function normalizeTicketCode(code: string): string {
+  return code.replace(/[-\s]/g, "").toUpperCase()
+}
+
+/**
+ * Obtiene la ficha pública de un ticket ocasional sin incluir datos personales
+ * ni información del equipo. La consulta se limita explícitamente a órdenes
+ * sin cliente registrado.
+ */
+export async function fetchOccasionalTicketDetail(code: string): Promise<OccasionalTicketDetail | null> {
+  const matches = await fetchOccasionalTicketStatus(code)
+  const normalizedCode = normalizeTicketCode(code.trim())
+  const match = matches.find((ticket) => normalizeTicketCode(ticket.code) === normalizedCode)
+
+  if (!match) return null
+
+  const supabase = getSupabaseServerClient()
+  const { data: order, error: orderError } = await supabase
+    .from("orders")
+    .select("id, code, status, created_at")
+    .is("client_id", null)
+    .eq("code", match.code)
+    .maybeSingle()
+
+  if (orderError) {
+    console.error("Error al cargar el detalle público del ticket:", orderError.message)
+    throw new Error("No se pudo cargar el detalle del ticket.")
+  }
+
+  if (!order) return null
+
+  const { data: timelineRows, error: timelineError } = await supabase
+    .from("timeline_events")
+    .select("status, note, event_date")
+    .eq("order_id", order.id)
+    .order("event_date", { ascending: true })
+
+  if (timelineError) {
+    console.error("Error al cargar el historial público del ticket:", timelineError.message)
+    throw new Error("No se pudo cargar el historial del ticket.")
+  }
+
+  const statuses = [...new Set((timelineRows ?? []).map((row) => row.status as string).concat(order.status as string))]
+  const { data: stateRows, error: statesError } = await supabase
+    .from("order_states")
+    .select("id, label")
+    .in("id", statuses)
+
+  if (statesError) {
+    console.error("Error al cargar los estados públicos del ticket:", statesError.message)
+    throw new Error("No se pudo cargar el historial del ticket.")
+  }
+
+  const labels = new Map((stateRows ?? []).map((row) => [row.id as string, row.label as string]))
+
+  return {
+    code: order.code as string,
+    status: order.status as OrderStatus,
+    createdAt: order.created_at as string,
+    timeline: (timelineRows ?? []).map((row) => ({
+      status: row.status as OrderStatus,
+      label: labels.get(row.status as string) ?? (row.status as string),
+      date: row.event_date as string,
+      note: (row.note as string | null) ?? undefined,
+    })),
+  }
+}
+
 /**
  * Obtiene únicamente las órdenes permitidas para la sesión autenticada.
  * Esta función solo debe importarse desde Server Actions o código server-side.
@@ -385,6 +453,30 @@ export async function fetchOrderDetailForUser(
   const canSeeBudget = role === "admin" || role === "presupuestador" || (role === "cliente" && !companyId && ["presupuesto_enviado", "presupuesto_aprobado", "presupuesto_rechazado"].includes(data.status))
   const [order] = await hydrateOrders([data as Record<string, unknown>], supabase, canSeeBudget)
   return order ?? null
+}
+
+/**
+ * Busca una orden por su código reutilizando las mismas reglas de alcance
+ * que la vista autenticada de órdenes.
+ */
+export async function fetchOrderDetailByCodeForUser(
+  code: string,
+  userId: string,
+  role: Role,
+  assignedTo?: string,
+  companyId?: string,
+): Promise<Order | null> {
+  const normalizedCode = code.trim().replace(/[-\s]/g, "").toUpperCase()
+  if (!normalizedCode) return null
+
+  const candidates = await fetchOrdersForUser(userId, role, assignedTo, 0, 50, code.trim())
+  const candidate = candidates.find((order) => order.code.replace(/[-\s]/g, "").toUpperCase() === normalizedCode)
+  if (candidate) {
+    return fetchOrderDetailForUser(candidate.id, userId, role, assignedTo, companyId)
+  }
+
+  const completedOrders = await fetchCompletedOrdersForUser(userId, role, assignedTo)
+  return completedOrders.find((order) => order.code.replace(/[-\s]/g, "").toUpperCase() === normalizedCode) ?? null
 }
 
 export async function fetchCompletedOrdersForUser(userId: string, role: Role, assignedTo?: string): Promise<Order[]> {
