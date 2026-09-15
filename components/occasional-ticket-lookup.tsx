@@ -1,6 +1,8 @@
 "use client"
 
 import { useState } from "react"
+import { useRouter } from "next/navigation"
+import Link from "next/link"
 import { AlertCircle, Loader2, Search } from "lucide-react"
 import { lookupOccasionalTicketAction } from "@/app/actions/orders"
 import { StatusBadge } from "@/components/status-badge"
@@ -11,7 +13,8 @@ import { Label } from "@/components/ui/label"
 import type { OccasionalTicketStatus } from "@/lib/types"
 
 export function OccasionalTicketLookup() {
-  const [code, setCode] = useState("")
+  const router = useRouter()
+  const [query, setQuery] = useState("")
   const [tickets, setTickets] = useState<OccasionalTicketStatus[]>([])
   const [error, setError] = useState("")
   const [loading, setLoading] = useState(false)
@@ -23,8 +26,13 @@ export function OccasionalTicketLookup() {
     setLoading(true)
 
     try {
-      const result = await lookupOccasionalTicketAction(code)
+      const result = await lookupOccasionalTicketAction(query)
       if (result.success && result.tickets) {
+        if (result.tickets.length === 1) {
+          router.push(`/ticket/${encodeURIComponent(result.tickets[0].code)}`)
+          return
+        }
+
         setTickets(result.tickets)
       } else {
         setError(result.error ?? "No se pudo consultar el ticket.")
@@ -44,24 +52,24 @@ export function OccasionalTicketLookup() {
           Consultá tu ticket
         </CardTitle>
         <CardDescription>
-          Ingresá el código de seguimiento para ver el estado de tu orden.
+          Buscá por código de seguimiento o por serial del equipo para ver el estado de tu orden.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
         <form onSubmit={handleSubmit} className="space-y-3">
           <div className="space-y-2">
-            <Label htmlFor="occasional-ticket-code">Código del ticket</Label>
+            <Label htmlFor="occasional-ticket-query">Código del ticket o serial</Label>
             <Input
-              id="occasional-ticket-code"
-              value={code}
-              onChange={(event) => setCode(event.target.value)}
-              placeholder="Ej: CO-2608120001 o 2608120001"
+              id="occasional-ticket-query"
+              value={query}
+              onChange={(event) => setQuery(event.target.value)}
+              placeholder="Ej: CO-2608120001 o SN123456789"
               autoComplete="off"
               aria-invalid={!!error}
               disabled={loading}
             />
           </div>
-          <Button type="submit" className="w-full gap-2" disabled={loading || !code.trim()}>
+          <Button type="submit" className="w-full gap-2" disabled={loading || !query.trim()}>
             {loading ? <Loader2 className="size-4 animate-spin" /> : <Search className="size-4" />}
             {loading ? "Consultando..." : "Consultar estado"}
           </Button>
@@ -77,13 +85,17 @@ export function OccasionalTicketLookup() {
         {tickets.length > 0 && (
           <div role="status" aria-live="polite" className="space-y-2">
             <p className="text-xs text-muted-foreground">
-              {tickets.length === 1 ? "Ticket consultado" : `${tickets.length} tickets encontrados`}
+              {tickets.length === 1 ? "Coincidencia encontrada" : `${tickets.length} coincidencias encontradas`}
             </p>
             {tickets.map((ticket) => (
-              <div key={ticket.code} className="flex items-center justify-between gap-3 rounded-lg border border-primary/30 bg-primary/5 p-4">
+              <Link
+                key={ticket.code}
+                href={`/ticket/${encodeURIComponent(ticket.code)}`}
+                className="flex items-center justify-between gap-3 rounded-lg border border-primary/30 bg-primary/5 p-4 transition-colors hover:bg-primary/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              >
                 <p className="font-mono text-sm font-medium text-foreground">{ticket.code}</p>
                 <StatusBadge status={ticket.status} className="text-sm" />
-              </div>
+              </Link>
             ))}
           </div>
         )}

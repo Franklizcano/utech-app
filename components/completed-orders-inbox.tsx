@@ -28,7 +28,7 @@ function getCompletionDate(order: Order) {
   return order.timeline.findLast((event) => event.status === "entregado")?.date ?? order.createdAt
 }
 
-export function CompletedOrdersInbox({ onSelectOrderAction }: { onSelectOrderAction: (orderId: string) => void }) {
+export function CompletedOrdersInbox({ onSelectOrderAction }: { onSelectOrderAction: (order: Order) => void }) {
   const { currentUser } = useStore()
   const [open, setOpen] = useState(false)
   const [completedOrders, setCompletedOrders] = useState<Order[]>([])
@@ -55,9 +55,9 @@ export function CompletedOrdersInbox({ onSelectOrderAction }: { onSelectOrderAct
     if (nextOpen) void refreshInbox()
   }
 
-  function handleSelectOrder(orderId: string) {
+  function handleSelectOrder(order: Order) {
     setOpen(false)
-    onSelectOrderAction(orderId)
+    onSelectOrderAction(order)
   }
 
   return (
@@ -109,7 +109,7 @@ export function CompletedOrdersInbox({ onSelectOrderAction }: { onSelectOrderAct
                   <div key={order.id} className="rounded-xl border border-border bg-secondary/20 p-4 transition-[background-color,border-color,box-shadow,transform] duration-200 hover:-translate-y-0.5 hover:border-primary/30 hover:bg-secondary/35 hover:shadow-lg hover:shadow-black/10">
                     <div className="flex items-start justify-between gap-3">
                       <div className="min-w-0">
-                        <p className="truncate font-medium text-foreground">{order.clientName}</p>
+                        {order.clientName && <p className="truncate font-medium text-foreground">{order.clientName}</p>}
                         <p className="font-mono text-xs text-muted-foreground">{order.code}</p>
                       </div>
                       <StatusBadge status={order.status} />
@@ -119,7 +119,7 @@ export function CompletedOrdersInbox({ onSelectOrderAction }: { onSelectOrderAct
                       <span>Entregada {formatDate(getCompletionDate(order))}</span>
                       {total > 0 && <span className="font-medium tabular-nums text-foreground">{formatCurrency(total)}</span>}
                     </div>
-                    <Button type="button" variant="secondary" className="mt-4 w-full gap-2" onClick={() => handleSelectOrder(order.id)}>
+                    <Button type="button" variant="secondary" className="mt-4 w-full gap-2" onClick={() => handleSelectOrder(order)}>
                       Ver detalle
                       <ArrowUpRight className="size-4" />
                     </Button>

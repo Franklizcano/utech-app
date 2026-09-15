@@ -1,6 +1,7 @@
 "use client"
 
 import { useState } from "react"
+import { useRouter } from "next/navigation"
 import { Cpu, ArrowRight, Loader2, Mail, Lock, AlertCircle } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { useStore } from "@/lib/store"
@@ -10,6 +11,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 
 export function LoginScreen() {
+  const router = useRouter()
   const { login } = useStore()
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
@@ -25,6 +27,9 @@ export function LoginScreen() {
       const result = await loginAction(email, password)
       if (result.success && result.user) {
         login(result.user)
+        if (["admin", "colaborador", "presupuestador"].includes(result.user.role)) {
+          router.replace("/gestion")
+        }
       } else {
         setError(result.error ?? "Error desconocido.")
       }

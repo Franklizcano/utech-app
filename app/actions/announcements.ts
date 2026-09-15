@@ -27,9 +27,9 @@ function rowToAnnouncement(row: Record<string, unknown>, read = false): Announce
 }
 
 function matchesAudience(audience: AnnouncementAudience, role: Role, companyId?: string) {
-  if (audience === "personal") return role === "admin" || role === "colaborador"
+  if (audience === "personal") return role === "admin" || role === "colaborador" || role === "presupuestador"
   if (audience === "admin") return role === "admin"
-  if (audience === "colaborador") return role === "colaborador"
+  if (audience === "colaborador") return role === "colaborador" || role === "presupuestador"
   if (audience === "cliente_corporativo") return role === "cliente" && Boolean(companyId)
   return role === "cliente" && !companyId
 }

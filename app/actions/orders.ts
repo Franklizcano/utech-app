@@ -11,6 +11,7 @@ import {
   fetchOrdersForUser,
   fetchOrderDetailForUser,
   insertOrderServer,
+  redactOrderClientData,
 } from "@/lib/queries/orders-server"
 import type { OccasionalTicketStatus, Order, OrderCreationInput } from "@/lib/types"
 
@@ -71,7 +72,7 @@ export async function createOrderAction(input: OrderCreationInput): Promise<Crea
         clientEmail: session.email,
         assignedTo: null,
       }
-    } else if (session.role === "admin" || session.role === "colaborador") {
+    } else if (session.role === "admin" || session.role === "colaborador" || session.role === "presupuestador") {
       const clientName = normalizeText(input?.clientName)
       const clientPhone = normalizeText(input?.clientPhone)
       const clientEmail = normalizeText(input?.clientEmail)
@@ -92,7 +93,7 @@ export async function createOrderAction(input: OrderCreationInput): Promise<Crea
     }
 
     const order = await insertOrderServer(orderInput)
-    return order ? { success: true, order } : { success: false, error: "No se pudo crear la orden." }
+    return order ? { success: true, order: redactOrderClientData(order, session.role) } : { success: false, error: "No se pudo crear la orden." }
   } catch (error) {
     console.error("Error al crear la orden:", error)
     return { success: false, error: "No se pudo crear la orden." }
@@ -102,7 +103,7 @@ export async function createOrderAction(input: OrderCreationInput): Promise<Crea
 export async function fetchAvailableOrdersAction(): Promise<Order[]> {
   const session = await getSessionAction()
   if (!session || !session.active || !["admin", "colaborador", "presupuestador"].includes(session.role)) return []
-  return fetchAvailableOrdersForCollaborator()
+  return fetchAvailableOrdersForCollaborator(session.role)
 }
 
 export async function fetchAvailableOrdersCountAction(): Promise<number> {
@@ -160,15 +161,19 @@ export async function fetchCompletedOrdersAction(): Promise<Order[]> {
   return fetchCompletedOrdersForUser(session.id, session.role, session.name)
 }
 
-export async function lookupOccasionalTicketAction(code: string): Promise<OccasionalTicketLookupResult> {
-  if (typeof code !== "string" || !code.trim()) {
-    return { success: false, error: "Ingresá el código de tu ticket." }
+export async function lookupOccasionalTicketAction(query: string): Promise<OccasionalTicketLookupResult> {
+  const normalizedQuery = normalizeText(query)
+  if (!normalizedQuery) {
+    return { success: false, error: "Ingresá el código del ticket o el serial del equipo." }
+  }
+  if (normalizedQuery.length > 255) {
+    return { success: false, error: "La búsqueda no puede superar los 255 caracteres." }
   }
 
   try {
-    const ticket = await fetchOccasionalTicketStatus(code)
+    const ticket = await fetchOccasionalTicketStatus(normalizedQuery)
     if (ticket.length === 0) {
-      return { success: false, error: "No encontramos un ticket ocasional con ese código." }
+      return { success: false, error: "No encontramos órdenes ocasionales con ese código o serial." }
     }
 
     return { success: true, tickets: ticket }
@@ -188,7 +193,7 @@ export async function markNotificationsReadAction(orderId: string): Promise<bool
 
   if (session.role === "cliente") {
     orderQuery = orderQuery.eq("client_id", session.id)
-  } else if (session.role !== "admin" && session.role !== "colaborador") {
+  } else if (session.role !== "admin" && session.role !== "colaborador" && session.role !== "presupuestador") {
     return false
   }
 

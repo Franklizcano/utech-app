@@ -2,20 +2,20 @@
 
 import { getSessionAction } from "@/app/actions/auth"
 import { getSupabaseServerClient } from "@/lib/supabase"
-import type { Role, User } from "@/lib/types"
+import type { CompanyRole, Role, User } from "@/lib/types"
 
 const USERS_PAGE_SIZE = 50
 
 export async function fetchUsersAction(page = 0, pageSize = USERS_PAGE_SIZE, search = ""): Promise<{ users: User[]; hasMore: boolean }> {
   const session = await getSessionAction()
-  if (!session || !session.active || (session.role !== "admin" && session.role !== "colaborador")) {
+  if (!session || !session.active || !["admin", "colaborador", "presupuestador"].includes(session.role)) {
     return { users: [], hasMore: false }
   }
 
   const supabase = getSupabaseServerClient()
   let usersQuery = supabase
     .from("users")
-    .select("id, name, email, phone, role, active, company_id, referral_code, referred_by, created_at, company:companies(name, logo)")
+    .select("id, name, email, phone, role, active, company_id, company_role, referral_code, referred_by, created_at, company:companies(name, logo)")
     .order("created_at", { ascending: true })
 
   const normalizedSearch = search.trim()
@@ -44,6 +44,7 @@ export async function fetchUsersAction(page = 0, pageSize = USERS_PAGE_SIZE, sea
     role: row.role as Role,
     active: row.active as boolean,
     companyId: (row.company_id as string) ?? undefined,
+    companyRole: (row.company_role === "manager" ? "manager" : "member") as CompanyRole,
     company: Array.isArray(row.company) && row.company[0]
       ? { name: row.company[0].name as string, logo: (row.company[0].logo as string | null) ?? undefined }
       : undefined,

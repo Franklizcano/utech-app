@@ -4,7 +4,8 @@ import { cookies } from "next/headers"
 import bcrypt from "bcryptjs"
 import { randomBytes } from "node:crypto"
 import { getSupabaseServerClient } from "@/lib/supabase"
-import type { CompanySummary, Role, User } from "@/lib/types"
+import { createSessionToken, verifySessionToken, type SessionUser } from "@/lib/session-token"
+import type { CompanyRole, Role, User } from "@/lib/types"
 
 const MIN_PASSWORD_LENGTH = 8
 
@@ -15,6 +16,7 @@ type UserInput = {
   role: Role
   companyId?: string
   referralCode?: string
+  companyRole?: CompanyRole
 }
 
 export interface CreateUserResult {
@@ -51,6 +53,7 @@ function rowToUser(row: Record<string, unknown>): User {
     role: row.role as Role,
     active: row.active as boolean,
     companyId: (row.company_id as string) ?? undefined,
+    companyRole: row.company_role === "manager" ? "manager" : "member",
     company: company?.name ? { name: company.name, logo: company.logo ?? undefined } : undefined,
     referralCode: row.referral_code as string,
     referredBy: (row.referred_by as string | null) ?? undefined,
@@ -58,21 +61,9 @@ function rowToUser(row: Record<string, unknown>): User {
   }
 }
 
-const safeUserSelect = "id, name, email, phone, role, active, company_id, referral_code, referred_by, created_at, company:companies(name, logo)"
+const safeUserSelect = "id, name, email, phone, role, active, company_id, company_role, referral_code, referred_by, created_at, company:companies(name, logo)"
 
-export interface AuthUser {
-  id: string
-  name: string
-  email: string
-  phone: string
-  role: Role
-  active: boolean
-  companyId?: string
-  company?: CompanySummary
-  referralCode: string
-  referredBy?: string
-  createdAt: string
-}
+export type AuthUser = SessionUser
 
 interface LoginResult {
   success: boolean
@@ -91,7 +82,7 @@ export async function loginAction(email: string, password: string): Promise<Logi
 
     const { data, error } = await supabase
       .from("users")
-      .select("id, name, email, phone, role, active, password_hash, company_id, referral_code, referred_by, created_at, company:companies(name, logo)")
+      .select("id, name, email, phone, role, active, password_hash, company_id, company_role, referral_code, referred_by, created_at, company:companies(name, logo)")
       .eq("email", email.toLowerCase().trim())
       .single()
 
@@ -128,6 +119,7 @@ export async function loginAction(email: string, password: string): Promise<Logi
       role: data.role as Role,
       active: data.active,
       companyId: data.company_id ?? undefined,
+      companyRole: data.company_role === "manager" ? "manager" : "member",
       company: company?.name
         ? { name: company.name, logo: company.logo ?? undefined }
         : undefined,
@@ -138,8 +130,7 @@ export async function loginAction(email: string, password: string): Promise<Logi
 
     // Set session cookie (httpOnly, secure, 7 days)
     const cookieStore = await cookies()
-    const sessionData = JSON.stringify(user)
-    cookieStore.set("session", sessionData, {
+    cookieStore.set("session", createSessionToken(user), {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
       sameSite: "lax",
@@ -206,6 +197,16 @@ export async function createUserWithPasswordAction(
       if ((count ?? 0) >= company.user_limit) {
         return { success: false, error: `La empresa ${company.name} alcanzó su límite de ${company.user_limit} usuarios corporativos.` }
       }
+      if (input.companyRole === "manager") {
+        const { count: managerCount, error: managerError } = await supabase
+          .from("users")
+          .select("id", { count: "exact", head: true })
+          .eq("company_id", input.companyId)
+          .eq("role", "cliente")
+          .eq("company_role", "manager")
+        if (managerError) return { success: false, error: "No se pudo verificar el manager de la empresa." }
+        if ((managerCount ?? 0) > 0) return { success: false, error: "Esta empresa ya tiene un manager asignado." }
+      }
     }
     const passwordHash = await bcrypt.hash(input.password, 10)
     let data: Record<string, unknown> | null = null
@@ -221,6 +222,7 @@ export async function createUserWithPasswordAction(
           active: true,
           password_hash: passwordHash,
           company_id: input.companyId || null,
+          company_role: input.companyId && input.role === "cliente" ? input.companyRole ?? "member" : "member",
           referral_code: generateReferralCode(),
           referred_by: referredBy,
         })
@@ -310,7 +312,7 @@ export async function getSessionAction(): Promise<AuthUser | null> {
     const cookieStore = await cookies()
     const session = cookieStore.get("session")
     if (!session?.value) return null
-    return JSON.parse(session.value) as AuthUser
+    return verifySessionToken(session.value)
   } catch {
     return null
   }

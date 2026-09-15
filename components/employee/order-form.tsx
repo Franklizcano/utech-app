@@ -28,7 +28,7 @@ function normalizeSearchText(value: string) {
 }
 
 export function OrderForm({ onCreatedAction }: { onCreatedAction?: (orderId: string) => void }) {
-  const { addOrder, employees, users } = useStore()
+  const { addOrder, currentUser, employees, users } = useStore()
   const activeEmployees = employees.filter((e) => e.active)
   const clients = users.filter((u) => u.role === "cliente")
 
@@ -43,7 +43,9 @@ export function OrderForm({ onCreatedAction }: { onCreatedAction?: (orderId: str
   const [deviceModel, setDeviceModel] = useState("")
   const [deviceSerial, setDeviceSerial] = useState("")
   const [fault, setFault] = useState("")
-  const [assignedTo, setAssignedTo] = useState(activeEmployees[0]?.name ?? "")
+  const [assignedTo, setAssignedTo] = useState("")
+  const canAssignToCurrentUser = Boolean(currentUser?.active && ["admin", "colaborador", "presupuestador"].includes(currentUser.role))
+  const defaultAssignee = canAssignToCurrentUser && currentUser ? currentUser.name : activeEmployees[0]?.name ?? ""
 
   const selectedClient = clients.find((c) => c.id === clientId)
   const normalizedClientSearch = normalizeSearchText(clientSearch)
@@ -89,7 +91,7 @@ export function OrderForm({ onCreatedAction }: { onCreatedAction?: (orderId: str
       deviceModel,
       deviceSerial: deviceSerial.trim() || null,
       fault,
-      assignedTo,
+      assignedTo: assignedTo || defaultAssignee,
     })
     
     // Reset form
@@ -317,7 +319,7 @@ export function OrderForm({ onCreatedAction }: { onCreatedAction?: (orderId: str
         {activeEmployees.length > 0 && (
           <div className="space-y-2 sm:max-w-xs">
             <Label>Técnico asignado</Label>
-            <Select value={assignedTo} onValueChange={(v) => setAssignedTo(v || "")}>
+            <Select value={assignedTo || defaultAssignee} onValueChange={(v) => setAssignedTo(v || "")}>
               <SelectTrigger>
                 <SelectValue />
               </SelectTrigger>

@@ -1,4 +1,5 @@
 export type Role = "admin" | "colaborador" | "presupuestador" | "cliente"
+export type CompanyRole = "member" | "manager"
 
 export type AnnouncementAudience = "personal" | "admin" | "colaborador" | "cliente_particular" | "cliente_corporativo"
 export type AnnouncementPriority = "normal" | "importante"
@@ -74,6 +75,7 @@ export interface User {
   role: Role
   active: boolean
   companyId?: string
+  companyRole?: CompanyRole
   company?: CompanySummary
   referralCode: string
   referredBy?: string
@@ -203,6 +205,51 @@ export interface AdminStatsResult {
 export interface OccasionalTicketStatus {
   code: string
   status: OrderStatus
+}
+
+export interface OccasionalTicketTimelineEvent {
+  status: OrderStatus
+  label: string
+  date: string
+  note?: string
+}
+
+export interface OccasionalTicketDetail extends OccasionalTicketStatus {
+  createdAt: string
+  timeline: OccasionalTicketTimelineEvent[]
+}
+
+/**
+ * Compacta actualizaciones repetidas de un mismo estado para su presentación.
+ * Las notas distintas se conservan; los eventos sin nota se representan con
+ * una sola fecha, tomando la actualización más reciente.
+ */
+export function compactTimelineEvents<T extends { date: string; note?: string }>(events: T[]): T[] {
+  const uniqueEvents = events.filter((event, index, allEvents) => {
+    const note = event.note?.trim() ?? ""
+    return allEvents.findIndex((candidate) => candidate.date === event.date && (candidate.note?.trim() ?? "") === note) === index
+  })
+
+  const eventsWithNotes = uniqueEvents.filter((event) => Boolean(event.note?.trim()))
+  const eventsWithoutNotes = uniqueEvents.filter((event) => !event.note?.trim())
+
+  if (eventsWithNotes.length === 0) {
+    const latestEvent = eventsWithoutNotes.reduce<T | undefined>((latest, event) => {
+      if (!latest || new Date(event.date).getTime() > new Date(latest.date).getTime()) return event
+      return latest
+    }, undefined)
+
+    return latestEvent ? [latestEvent] : []
+  }
+
+  const latestEventWithoutNote = eventsWithoutNotes.reduce<T | undefined>((latest, event) => {
+    if (!latest || new Date(event.date).getTime() > new Date(latest.date).getTime()) return event
+    return latest
+  }, undefined)
+
+  return [...eventsWithNotes, ...(latestEventWithoutNote ? [latestEventWithoutNote] : [])].sort(
+    (a, b) => new Date(a.date).getTime() - new Date(b.date).getTime(),
+  )
 }
 
 export interface OrderDetailsInput {

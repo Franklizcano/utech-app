@@ -49,8 +49,9 @@ export function OrderDetail({ order }: { order: Order }) {
 
   const total = budgetTotal(order)
   const canManageBudget = role === "admin" || role === "presupuestador"
+  const canSeeClientData = role !== "colaborador" && role !== "presupuestador"
   const statusFlow = getStatusFlow(states).filter((status) => canManageBudget || !status.startsWith("presupuesto") && status !== "pendiente_presupuesto")
-  const client = users.find((u) => u.id === order.clientId)
+  const client = canSeeClientData ? users.find((u) => u.id === order.clientId) : undefined
   const detailsChanged =
     draftDeviceType !== order.deviceType ||
     draftDeviceBrand !== order.deviceBrand ||
@@ -116,7 +117,7 @@ export function OrderDetail({ order }: { order: Order }) {
             )}
             <div>
               <div className="flex items-center gap-2">
-                <h3 className="text-lg font-semibold text-foreground">{order.clientName}</h3>
+                {canSeeClientData && order.clientName && <h3 className="text-lg font-semibold text-foreground">{order.clientName}</h3>}
                 <span className="rounded-md bg-secondary px-2 py-0.5 font-mono text-xs text-secondary-foreground">
                   {order.code}
                 </span>
@@ -242,12 +243,12 @@ export function OrderDetail({ order }: { order: Order }) {
       </div>
 
       <div className="flex flex-wrap gap-x-6 gap-y-1 text-sm text-muted-foreground">
-        {order.clientPhone && (
+        {canSeeClientData && order.clientPhone && (
           <span className="inline-flex items-center gap-1.5">
             <Phone className="size-3.5" /> {order.clientPhone}
           </span>
         )}
-        {order.clientEmail && (
+        {canSeeClientData && order.clientEmail && (
           <span className="inline-flex items-center gap-1.5">
             <Mail className="size-3.5" /> {order.clientEmail}
           </span>

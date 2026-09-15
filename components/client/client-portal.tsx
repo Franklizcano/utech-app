@@ -21,6 +21,7 @@ import { useStore, formatCurrency } from "@/lib/store"
 import { budgetItemDiscountAmount, budgetItemTotal, budgetTotal, type Order } from "@/lib/types"
 import { cn } from "@/lib/utils"
 import { decideBudgetAction } from "@/app/actions/budget"
+import { CompanyUsersManagement } from "@/components/client/company-users-management"
 
 function formatDate(iso: string) {
   return new Date(iso).toLocaleDateString("es-AR", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })
@@ -251,6 +252,8 @@ export function ClientPortal() {
           </div>
         </CardContent>
       </Card>
+
+      <CompanyUsersManagement />
 
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>

@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useEffect, useRef, useState } from "react"
 import { Bell, Check, Megaphone, TriangleAlert } from "lucide-react"
 import { fetchAnnouncementsAction, markAnnouncementReadAction } from "@/app/actions/announcements"
 import { Button } from "@/components/ui/button"
@@ -28,11 +28,18 @@ const ANNOUNCEMENT_STYLES = {
   },
 } as const
 
-export function AnnouncementInbox() {
+interface AnnouncementInboxProps {
+  open?: boolean
+  onOpenChange?: (open: boolean) => void
+  onUnreadCountChange?: (count: number) => void
+}
+
+export function AnnouncementInbox({ open, onOpenChange, onUnreadCountChange }: AnnouncementInboxProps) {
   const { currentUser } = useStore()
   const currentUserId = currentUser?.id
   const [announcements, setAnnouncements] = useState<Announcement[]>([])
-  const [open, setOpen] = useState(false)
+  const [internalOpen, setInternalOpen] = useState(false)
+  const isControlled = useRef(open !== undefined)
 
   useEffect(() => {
     let cancelled = false
@@ -42,7 +49,7 @@ export function AnnouncementInbox() {
       .then((items) => {
         if (cancelled) return
         setAnnouncements(items)
-        setOpen(items.some((item) => !item.read))
+        if (!isControlled.current) setInternalOpen(items.some((item) => !item.read))
       })
       .catch((error: unknown) => console.error("No se pudieron cargar los avisos:", error))
 
@@ -53,18 +60,25 @@ export function AnnouncementInbox() {
 
   const unreadAnnouncements = announcements.filter((item) => !item.read)
 
+  useEffect(() => {
+    onUnreadCountChange?.(unreadAnnouncements.length)
+  }, [onUnreadCountChange, unreadAnnouncements.length])
+
+  const dialogOpen = open ?? internalOpen
+  const handleOpenChange = onOpenChange ?? setInternalOpen
+
   async function markAsRead(id: string) {
     const ok = await markAnnouncementReadAction(id)
     if (!ok) return
     if (currentUser) invalidateAnnouncementsCache(currentUser.id)
     setAnnouncements((items) => items.map((item) => (item.id === id ? { ...item, read: true } : item)))
-    if (unreadAnnouncements.length <= 1) setOpen(false)
+    if (unreadAnnouncements.length <= 1) handleOpenChange(false)
   }
 
   if (unreadAnnouncements.length === 0) return null
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
+    <Dialog open={dialogOpen} onOpenChange={handleOpenChange}>
       <DialogContent className="max-h-[min(680px,calc(100vh-2rem))] overflow-y-auto p-4 sm:max-w-lg sm:p-5">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
@@ -105,7 +119,7 @@ export function AnnouncementInbox() {
           ))}
         </div>
         <DialogFooter className="-mx-4 -mb-4 sm:-mx-5 sm:-mb-5">
-          <Button type="button" variant="ghost" className="text-foreground hover:bg-primary/10 hover:text-primary" onClick={() => setOpen(false)}>
+          <Button type="button" variant="ghost" className="text-foreground hover:bg-primary/10 hover:text-primary" onClick={() => handleOpenChange(false)}>
             Revisar más tarde
           </Button>
         </DialogFooter>

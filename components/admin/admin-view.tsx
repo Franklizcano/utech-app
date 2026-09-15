@@ -1,6 +1,6 @@
 "use client"
 
-import { LayoutGrid, Users, BarChart3, Settings, Building2, Megaphone, SlidersHorizontal } from "lucide-react"
+import { LayoutGrid, Users, BarChart3 } from "lucide-react"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { ServiceWorkspace } from "@/components/service-workspace"
 import { UserManagement } from "@/components/admin/user-management"
@@ -10,9 +10,16 @@ import { CompanyManagement } from "@/components/admin/company-management"
 import { AnnouncementManagement } from "@/components/admin/announcement-management"
 import { OrderSettings } from "@/components/admin/order-settings"
 
-export function AdminView() {
+export type AdminSection = "operaciones" | "usuarios" | "empresas" | "estados" | "estadisticas" | "avisos" | "configuracion"
+
+interface AdminViewProps {
+  activeTab: AdminSection
+  onTabChange: (value: AdminSection) => void
+}
+
+export function AdminView({ activeTab, onTabChange }: AdminViewProps) {
   return (
-    <Tabs defaultValue="operaciones" className="animate-utech-enter space-y-6">
+    <Tabs value={activeTab} onValueChange={(value) => onTabChange(value as AdminSection)} className="animate-utech-enter space-y-6">
       <TabsList>
         <TabsTrigger value="operaciones" className="gap-2">
           <LayoutGrid className="size-4" />
@@ -22,46 +29,30 @@ export function AdminView() {
           <Users className="size-4" />
           Usuarios
         </TabsTrigger>
-        <TabsTrigger value="empresas" className="gap-2">
-          <Building2 className="size-4" />
-          Empresas
-        </TabsTrigger>
-        <TabsTrigger value="estados" className="gap-2">
-          <Settings className="size-4" />
-          Estados
-        </TabsTrigger>
         <TabsTrigger value="estadisticas" className="gap-2">
           <BarChart3 className="size-4" />
           Estadísticas
         </TabsTrigger>
-        <TabsTrigger value="avisos" className="gap-2">
-          <Megaphone className="size-4" />
-          Avisos
-        </TabsTrigger>
-        <TabsTrigger value="configuracion" className="gap-2">
-          <SlidersHorizontal className="size-4" />
-          Configuración
-        </TabsTrigger>
       </TabsList>
-      <TabsContent value="operaciones" keepMounted>
+      <TabsContent value="operaciones">
         <ServiceWorkspace />
       </TabsContent>
-      <TabsContent value="usuarios" keepMounted>
+      <TabsContent value="usuarios">
         <UserManagement />
       </TabsContent>
-      <TabsContent value="empresas" keepMounted>
+      <TabsContent value="empresas">
         <CompanyManagement />
       </TabsContent>
-      <TabsContent value="estados" keepMounted>
+      <TabsContent value="estados">
         <StateManagement />
       </TabsContent>
-      <TabsContent value="estadisticas" keepMounted>
+      <TabsContent value="estadisticas">
         <Stats />
       </TabsContent>
-      <TabsContent value="avisos" keepMounted>
+      <TabsContent value="avisos">
         <AnnouncementManagement />
       </TabsContent>
-      <TabsContent value="configuracion" keepMounted>
+      <TabsContent value="configuracion">
         <OrderSettings />
       </TabsContent>
     </Tabs>

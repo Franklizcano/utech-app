@@ -74,7 +74,7 @@ export function formatCurrency(value: number) {
   }).format(value)
 }
 
-const initialOrders: Order[] = []
+const emptyOrders: Order[] = []
 const ORDERS_PAGE_SIZE = 50
 const DEFAULT_ORDERS_CACHE_TTL_SECONDS = 120
 const configuredOrdersCacheTtlSeconds = Number(process.env.NEXT_PUBLIC_ORDERS_CACHE_TTL_SECONDS)
@@ -120,8 +120,8 @@ interface StoreValue {
   updateBudgetItemDiscount: (orderId: string, itemId: string, discountType: "fixed" | "percentage" | null, discountValue: number | null) => void
   removeBudgetItem: (orderId: string, itemId: string) => void
   sendBudgetNotification: (orderId: string) => void
-  addUser: (input: { name: string; email: string; phone: string; role: Role; password: string; companyId?: string; referralCode?: string }) => Promise<CreateUserResult>
-  updateUser: (id: string, input: { name: string; email: string; phone: string; role: Role; active: boolean; companyId?: string }) => void
+  addUser: (input: { name: string; email: string; phone: string; role: Role; password: string; companyId?: string; companyRole?: "member" | "manager"; referralCode?: string }) => Promise<CreateUserResult>
+  updateUser: (id: string, input: { name: string; email: string; phone: string; role: Role; active: boolean; companyId?: string; companyRole?: "member" | "manager" }) => void
   toggleUserActive: (id: string) => void
   deleteUser: (id: string) => void
   markNotificationsRead: (orderId: string) => void
@@ -138,15 +138,17 @@ const StoreContext = createContext<StoreValue | null>(null)
 export function StoreProvider({
   children,
   initialSession = null,
+  initialOrders: seededOrders = emptyOrders,
 }: {
   children: ReactNode
   initialSession?: AuthUser | null
+  initialOrders?: Order[]
 }) {
   const [role, setRole] = useState<Role>(initialSession?.role ?? "colaborador")
   const [currentUser, setCurrentUser] = useState<AuthUser | null>(initialSession)
   const [isLoggedIn, setIsLoggedIn] = useState(initialSession !== null)
   const [users, setUsers] = useState<User[]>([])
-  const [orders, setOrdersState] = useState<Order[]>(initialOrders)
+  const [orders, setOrdersState] = useState<Order[]>(seededOrders)
   const [states, setStates] = useState<OrderState[]>(DEFAULT_STATES)
   const [archivedStates, setArchivedStates] = useState<OrderState[]>([])
   const [statesLoading, setStatesLoading] = useState(true)
@@ -158,6 +160,11 @@ export function StoreProvider({
   const [ordersHasMore, setOrdersHasMore] = useState(true)
   const [orderExpirationDays, setOrderExpirationDays] = useState(30)
   const ordersRef = useRef(orders)
+  const mergeSeededOrders = useCallback((remoteOrders: Order[]) => {
+    const remoteIds = new Set(remoteOrders.map((order) => order.id))
+    return [...seededOrders.filter((order) => !remoteIds.has(order.id)), ...remoteOrders]
+  }, [seededOrders])
+
   useEffect(() => {
     ordersRef.current = orders
   }, [orders])
@@ -173,17 +180,27 @@ export function StoreProvider({
     return detail
   }, [])
   const searchOrders = useCallback(async (query: string): Promise<void> => {
+    if (!currentUser || !isLoggedIn) return
+    const cacheKey = getOrdersCacheKey(currentUser.id, currentUser.role, query)
+    const cachedOrders = getOrdersCache(cacheKey)
+    if (cachedOrders && !isOrdersCacheStale(cacheKey, ORDERS_CACHE_TTL_MS)) {
+      setOrdersState(cachedOrders)
+      setOrdersHasMore(cachedOrders.length >= ORDERS_PAGE_SIZE)
+      setOrdersLoading(false)
+      return
+    }
+
     setOrdersLoading(true)
     try {
-      const results = await fetchOrdersAction(0, ORDERS_PAGE_SIZE, query)
+      const results = await revalidateOrdersCache(cacheKey, () => fetchOrdersAction(0, ORDERS_PAGE_SIZE, query))
       setOrdersState(results)
-      setOrdersHasMore(results.length === ORDERS_PAGE_SIZE)
+      setOrdersHasMore(results.length >= ORDERS_PAGE_SIZE)
     } catch (error: unknown) {
       console.error("No se pudieron buscar las órdenes:", error)
     } finally {
       setOrdersLoading(false)
     }
-  }, [])
+  }, [currentUser, isLoggedIn])
 
   // Carga los estados de orden reales desde Supabase al montar el provider.
   useEffect(() => {
@@ -271,7 +288,7 @@ export function StoreProvider({
     Promise.resolve().then(() => {
       if (cancelled) return
       if (cachedOrders) {
-        setOrdersState(cachedOrders)
+        setOrdersState(mergeSeededOrders(cachedOrders))
         setOrdersLoading(false)
         setOrdersHasMore(cachedOrders.length >= ORDERS_PAGE_SIZE)
       } else {
@@ -282,7 +299,7 @@ export function StoreProvider({
     const refreshOrders = () => {
       revalidateOrdersCache(ordersCacheKey, fetchOrdersAction).then((remoteOrders) => {
         if (cancelled) return
-        setOrdersState(remoteOrders)
+        setOrdersState(mergeSeededOrders(remoteOrders))
         setOrdersLoading(false)
         setOrdersHasMore(remoteOrders.length === ORDERS_PAGE_SIZE)
       }).catch((error: unknown) => {
@@ -307,7 +324,7 @@ export function StoreProvider({
       cancelled = true
       document.removeEventListener("visibilitychange", handleVisibilityChange)
     }
-  }, [currentUser, isLoggedIn, ordersCacheKey])
+  }, [currentUser, isLoggedIn, mergeSeededOrders, ordersCacheKey])
 
   const value = useMemo<StoreValue>(() => {
     const employees = users.filter((u) => u.role === "colaborador" || u.role === "presupuestador" || u.role === "admin")
@@ -341,13 +358,14 @@ export function StoreProvider({
     function addOrder(input: NewOrderInput): Order {
       const tempId = uid("o")
       const tempCode = `TEMP-${tempId}`
+      const canSeeClientData = role === "admin" || role === "cliente"
       const tempOrder: Order = {
         id: tempId,
         code: tempCode,
-        clientId: input.clientId,
-        clientName: input.clientName,
-        clientPhone: input.clientPhone,
-        clientEmail: input.clientEmail,
+        clientId: canSeeClientData ? input.clientId : null,
+        clientName: canSeeClientData ? input.clientName : "",
+        clientPhone: canSeeClientData ? input.clientPhone : "",
+        clientEmail: canSeeClientData ? input.clientEmail : "",
         deviceType: input.deviceType,
         deviceBrand: input.deviceBrand,
         deviceModel: input.deviceModel,
@@ -561,7 +579,7 @@ export function StoreProvider({
       })
     }
 
-    async function addUser(input: { name: string; email: string; phone: string; role: Role; password: string; companyId?: string; referralCode?: string }): Promise<CreateUserResult> {
+    async function addUser(input: { name: string; email: string; phone: string; role: Role; password: string; companyId?: string; companyRole?: "member" | "manager"; referralCode?: string }): Promise<CreateUserResult> {
       const tempId = uid("u")
       const tempUser: User = {
         id: tempId,
@@ -599,7 +617,7 @@ export function StoreProvider({
       }
     }
 
-    function updateUser(id: string, input: { name: string; email: string; phone: string; role: Role; active: boolean; companyId?: string }) {
+    function updateUser(id: string, input: { name: string; email: string; phone: string; role: Role; active: boolean; companyId?: string; companyRole?: "member" | "manager" }) {
       const previousUsers = users
       setUsers((prev) => prev.map((u) => (u.id === id ? { ...u, ...input } : u)))
       updateUserRemote(id, input).then((ok) => {
@@ -668,7 +686,7 @@ export function StoreProvider({
 
       try {
         const remoteOrders = await revalidateOrdersCache(ordersCacheKey, fetchOrdersAction)
-        setOrdersState(remoteOrders)
+        setOrdersState(mergeSeededOrders(remoteOrders))
         setOrdersLoading(false)
       } catch (error: unknown) {
         console.error("No se pudieron actualizar las órdenes:", error)
@@ -808,7 +826,7 @@ export function StoreProvider({
       restoreState,
       reorderStates,
     }
-  }, [role, currentUser, isLoggedIn, users, orders, orderExpirationDays, states, archivedStates, statesLoading, usersLoading, usersPage, usersHasMore, ordersLoading, ordersLoadingMore, ordersHasMore, ordersCacheKey, searchOrders, loadOrderDetail, loadUsersPage])
+  }, [role, currentUser, isLoggedIn, users, orders, orderExpirationDays, states, archivedStates, statesLoading, usersLoading, usersPage, usersHasMore, ordersLoading, ordersLoadingMore, ordersHasMore, ordersCacheKey, searchOrders, loadOrderDetail, loadUsersPage, mergeSeededOrders])
 
   return <StoreContext.Provider value={value}>{children}</StoreContext.Provider>
 }

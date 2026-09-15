@@ -36,6 +36,9 @@ CREATE TABLE IF NOT EXISTS users (
   phone VARCHAR(20) NOT NULL,
   role TEXT NOT NULL REFERENCES roles(id),
   password_hash TEXT NOT NULL DEFAULT '',
+  company_role TEXT NOT NULL DEFAULT 'member' CHECK (
+    company_role = 'member' OR (company_role = 'manager' AND role = 'cliente')
+  ),
   active BOOLEAN DEFAULT true,
   referral_code VARCHAR(12) NOT NULL UNIQUE DEFAULT upper(encode(gen_random_bytes(6), 'hex')),
   referred_by UUID REFERENCES users(id) ON DELETE SET NULL,
@@ -542,7 +545,10 @@ SET search_path = public
 AS $$
   SELECT o.code, o.status FROM orders o
   WHERE o.client_id IS NULL
-    AND upper(regexp_replace(o.code, '[-[:space:]]', '', 'g')) LIKE '%' || upper(regexp_replace(trim(p_query), '[-[:space:]]', '', 'g')) || '%'
+    AND (
+      upper(regexp_replace(o.code, '[-[:space:]]', '', 'g')) LIKE '%' || upper(regexp_replace(trim(p_query), '[-[:space:]]', '', 'g')) || '%'
+      OR upper(regexp_replace(COALESCE(o.device_serial, ''), '[-[:space:]]', '', 'g')) = upper(regexp_replace(trim(p_query), '[-[:space:]]', '', 'g'))
+    )
   ORDER BY o.created_at DESC
   LIMIT 50;
 $$;
