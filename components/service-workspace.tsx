@@ -317,7 +317,7 @@ export function ServiceWorkspace() {
                 Cargando detalle…
               </div>
             ) : displayedDetail ? (
-              <OrderDetail key={displayedDetail.id} order={displayedDetail} />
+              <OrderDetail key={displayedDetail.id} order={displayedDetail} showCode={false} />
             ) : (
               <div className="flex flex-col items-center justify-center gap-3 py-16 text-center">
                 <Inbox className="size-10 text-muted-foreground" />

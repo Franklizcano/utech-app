@@ -463,7 +463,7 @@ export async function fetchOrderDetailForUser(
   }
   if (!data) return null
 
-  const canSeeBudget = role === "admin" || role === "presupuestador" || (role === "cliente" && !companyId && ["presupuesto_enviado", "presupuesto_aprobado", "presupuesto_rechazado"].includes(data.status))
+  const canSeeBudget = role === "admin" || role === "presupuestador" || (role === "cliente" && ["presupuesto_enviado", "presupuesto_aprobado", "presupuesto_rechazado"].includes(data.status))
   const [order] = await hydrateOrders([data as Record<string, unknown>], supabase, canSeeBudget, role)
   return order ?? null
 }
@@ -536,7 +536,7 @@ export async function claimBudgetOrderServer(orderId: string, userId: string): P
     .from("orders")
     .update({ budget_assigned_to: userId, updated_at: new Date().toISOString() })
     .eq("id", orderId)
-    .eq("status", "pendiente_presupuesto")
+    .in("status", ["pendiente_presupuesto", "presupuesto_rechazado"])
     .is("budget_assigned_to", null)
     .select("id")
     .maybeSingle()
@@ -561,7 +561,7 @@ export async function updateBudgetItemDiscountServer(
   if (itemError || !item) return false
   if (discountType === "fixed" && discountValue !== null && discountValue > Number(item.amount)) return false
 
-  let orderQuery = supabase.from("orders").select("id").eq("id", item.order_id)
+  let orderQuery = supabase.from("orders").select("id, status").eq("id", item.order_id).in("status", ["recibido", "pendiente_presupuesto", "presupuesto_rechazado"])
   if (role === "presupuestador") orderQuery = orderQuery.eq("budget_assigned_to", userId)
   const { data: order, error: orderError } = await orderQuery.maybeSingle()
   if (orderError || !order) return false

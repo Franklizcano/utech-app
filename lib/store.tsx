@@ -3,7 +3,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react"
 import { createOrderAction, fetchOrderDetailAction, fetchOrdersAction, markNotificationsReadAction } from "@/app/actions/orders"
 import { fetchOrderExpirationDaysAction } from "@/app/actions/order-settings"
-import { updateBudgetItemDiscountAction } from "@/app/actions/budget"
+import { addBudgetItemAction, deleteBudgetItemAction, updateBudgetItemDiscountAction } from "@/app/actions/budget"
 import { fetchUsersAction } from "@/app/actions/users"
 import {
   type AppNotification,
@@ -41,8 +41,6 @@ import {
   updateOrderStatusRemote,
   updateOrderAssigneeRemote,
   updateOrderDetailsRemote,
-  insertBudgetItemRemote,
-  deleteBudgetItemRemote,
   insertNotificationRemote,
 } from "@/lib/queries/orders"
 import {
@@ -110,7 +108,7 @@ interface StoreValue {
   refreshOrders: () => Promise<void>
   loadMoreOrders: (query?: string) => Promise<void>
   searchOrders: (query: string) => Promise<void>
-  loadOrderDetail: (orderId: string) => Promise<Order | null>
+  loadOrderDetail: (orderId: string, force?: boolean) => Promise<Order | null>
   // acciones
   addOrder: (input: NewOrderInput) => Order
   advanceStatus: (orderId: string, status: OrderStatus, note?: string) => void
@@ -169,9 +167,9 @@ export function StoreProvider({
     ordersRef.current = orders
   }, [orders])
   const ordersCacheKey = currentUser && isLoggedIn ? getOrdersCacheKey(currentUser.id, currentUser.role) : null
-  const loadOrderDetail = useCallback(async (orderId: string): Promise<Order | null> => {
+  const loadOrderDetail = useCallback(async (orderId: string, force = false): Promise<Order | null> => {
     const cachedDetail = ordersRef.current.find((order) => order.id === orderId)
-    if (cachedDetail?.fault) return cachedDetail
+    if (!force && cachedDetail?.fault) return cachedDetail
 
     const detail = await fetchOrderDetailAction(orderId)
     if (detail) {
@@ -493,7 +491,7 @@ export function StoreProvider({
       setOrders((prev) => prev.map((o) => (o.id === orderId ? { ...o, budget: [...o.budget, tempItem] } : o)))
 
       // Persistir en la base de datos
-      insertBudgetItemRemote(orderId, description, amount).then((saved) => {
+      addBudgetItemAction(orderId, description, amount).then((saved) => {
         if (!saved) {
           // Revertir si falló
           setOrders((prev) => prev.map((o) => (o.id === orderId ? { ...o, budget: o.budget.filter((b) => b.id !== tempItem.id) } : o)))
@@ -536,7 +534,7 @@ export function StoreProvider({
       )
 
       // Persistir en la base de datos
-      deleteBudgetItemRemote(itemId).then((ok) => {
+      deleteBudgetItemAction(itemId).then((ok) => {
         if (!ok) {
           // Revertir si falló
           setOrders(previousOrders)

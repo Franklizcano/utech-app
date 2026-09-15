@@ -31,7 +31,7 @@ import Image from "next/image"
 
 const DEVICE_TYPES: DeviceType[] = ["PC", "Notebook", "PlayStation", "Xbox", "Nintendo", "Otro"]
 
-export function OrderDetail({ order }: { order: Order }) {
+export function OrderDetail({ order, showCode = true }: { order: Order; showCode?: boolean }) {
   const { role, currentUser, addBudgetItem, updateBudgetItemDiscount, removeBudgetItem, advanceStatus, updateOrderDetails, states, users, refreshOrders } = useStore()
   const [desc, setDesc] = useState("")
   const [amount, setAmount] = useState("")
@@ -49,6 +49,7 @@ export function OrderDetail({ order }: { order: Order }) {
 
   const total = budgetTotal(order)
   const canManageBudget = role === "admin" || role === "presupuestador"
+  const canEditBudget = canManageBudget && ["recibido", "pendiente_presupuesto", "presupuesto_rechazado"].includes(order.status)
   const canSeeClientData = role !== "colaborador" && role !== "presupuestador"
   const statusFlow = getStatusFlow(states).filter((status) => canManageBudget || !status.startsWith("presupuesto") && status !== "pendiente_presupuesto")
   const client = canSeeClientData ? users.find((u) => u.id === order.clientId) : undefined
@@ -118,9 +119,11 @@ export function OrderDetail({ order }: { order: Order }) {
             <div>
               <div className="flex items-center gap-2">
                 {canSeeClientData && order.clientName && <h3 className="text-lg font-semibold text-foreground">{order.clientName}</h3>}
-                <span className="rounded-md bg-secondary px-2 py-0.5 font-mono text-xs text-secondary-foreground">
-                  {order.code}
-                </span>
+                {showCode && (
+                  <span className="rounded-md bg-secondary px-2 py-0.5 font-mono text-xs text-secondary-foreground">
+                    {order.code}
+                  </span>
+                )}
               </div>
               {client?.companyId && client.company?.name && (
                 <p className="mt-0.5 text-sm text-muted-foreground">{client.company.name}</p>
@@ -298,6 +301,7 @@ export function OrderDetail({ order }: { order: Order }) {
                     <Label className="text-[11px] text-muted-foreground">Descuento</Label>
                     <Select
                       value={item.discountType ?? "none"}
+                      disabled={!canEditBudget}
                       onValueChange={(value) => {
                         const nextType = value === "none" ? null : value as "fixed" | "percentage"
                         const nextValue = nextType === null ? null : item.discountType === nextType ? item.discountValue ?? 0 : 0
@@ -323,6 +327,7 @@ export function OrderDetail({ order }: { order: Order }) {
                         max={item.discountType === "percentage" ? "100" : String(item.amount)}
                         step="0.01"
                         value={discountDrafts[item.id] ?? String(item.discountValue ?? "")}
+                        disabled={!canEditBudget}
                         onChange={(event) => setDiscountDrafts((current) => ({ ...current, [item.id]: event.target.value }))}
                         onBlur={() => {
                           const value = Number.parseFloat(discountDrafts[item.id] ?? "")
@@ -339,6 +344,7 @@ export function OrderDetail({ order }: { order: Order }) {
                     size="icon"
                     variant="ghost"
                     className="size-7 text-muted-foreground hover:text-destructive"
+                    disabled={!canEditBudget}
                     onClick={() => removeBudgetItem(order.id, item.id)}
                     aria-label="Eliminar ítem"
                   >
@@ -380,6 +386,7 @@ export function OrderDetail({ order }: { order: Order }) {
               <Input
                 id="bi-desc"
                 value={desc}
+                disabled={!canEditBudget}
                 onChange={(e) => setDesc(e.target.value)}
                 placeholder="Ej: Cambio de módulo HDMI de PS5"
               />
@@ -394,11 +401,12 @@ export function OrderDetail({ order }: { order: Order }) {
                   type="number"
                   min="0"
                   value={amount}
+                  disabled={!canEditBudget}
                   onChange={(e) => setAmount(e.target.value)}
                   placeholder="0"
                 />
               </div>
-              <Button type="submit" variant="secondary" className="gap-1">
+              <Button type="submit" variant="secondary" className="gap-1" disabled={!canEditBudget}>
                 <Plus className="size-4" />
                 Agregar
               </Button>
@@ -409,7 +417,7 @@ export function OrderDetail({ order }: { order: Order }) {
             type="button"
             variant="outline"
             className="w-full gap-2"
-            disabled={order.budget.length === 0}
+            disabled={order.budget.length === 0 || !["pendiente_presupuesto", "presupuesto_rechazado"].includes(order.status)}
             onClick={async () => { if (await sendBudgetToClientAction(order.id)) { if (currentUser) invalidateOperationsCache(currentUser.id); await refreshOrders() } }}
           >
             <Send className="size-4" />

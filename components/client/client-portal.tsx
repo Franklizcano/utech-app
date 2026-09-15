@@ -31,6 +31,22 @@ function ClientOrderDetail({ order, showBudget, onDecisionAction }: { order: Ord
   const notifications = [...order.notifications].reverse()
   const [decisionNote, setDecisionNote] = useState("")
   const [deciding, setDeciding] = useState(false)
+  const [decisionError, setDecisionError] = useState<string | null>(null)
+
+  async function handleDecision(decision: "aprobado" | "rechazado") {
+    setDeciding(true)
+    setDecisionError(null)
+    try {
+      const ok = await decideBudgetAction(order.id, decision, decisionNote)
+      if (!ok) {
+        setDecisionError("No se pudo registrar tu respuesta. Actualizá la página e intentá nuevamente.")
+        return
+      }
+      await onDecisionAction()
+    } finally {
+      setDeciding(false)
+    }
+  }
 
   return (
     <div className="animate-utech-enter space-y-6">
@@ -81,7 +97,7 @@ function ClientOrderDetail({ order, showBudget, onDecisionAction }: { order: Ord
             <CardHeader>
               <CardTitle className="flex items-center gap-2 text-base">
                 <Receipt className="size-4 text-primary" />
-                Presupuesto
+                Presupuesto finalizado
               </CardTitle>
             </CardHeader>
             <CardContent>
@@ -110,11 +126,12 @@ function ClientOrderDetail({ order, showBudget, onDecisionAction }: { order: Ord
             </CardContent>
             {showBudget && order.status === "presupuesto_enviado" && (
               <div className="mt-4 space-y-3 rounded-lg border border-primary/25 bg-primary/5 p-3">
-                <p className="text-sm font-medium text-foreground">¿Querés aprobar este presupuesto?</p>
+                <p className="text-sm font-medium text-foreground">Revisá el detalle y elegí una opción.</p>
                 <Input value={decisionNote} onChange={(event) => setDecisionNote(event.target.value)} placeholder="Comentario opcional" />
+                {decisionError && <p role="alert" className="text-sm text-destructive">{decisionError}</p>}
                 <div className="flex gap-2">
-                  <Button type="button" className="flex-1" disabled={deciding} onClick={async () => { setDeciding(true); try { if (await decideBudgetAction(order.id, "aprobado", decisionNote)) await onDecisionAction() } finally { setDeciding(false) } }}>Aprobar</Button>
-                  <Button type="button" variant="outline" className="flex-1" disabled={deciding} onClick={async () => { setDeciding(true); try { if (await decideBudgetAction(order.id, "rechazado", decisionNote)) await onDecisionAction() } finally { setDeciding(false) } }}>Rechazar</Button>
+                  <Button type="button" className="flex-1" disabled={deciding} onClick={() => void handleDecision("aprobado")}>{deciding ? "Guardando…" : "Aceptar presupuesto"}</Button>
+                  <Button type="button" variant="outline" className="flex-1" disabled={deciding} onClick={() => void handleDecision("rechazado")}>Rechazar presupuesto</Button>
                 </div>
               </div>
             )}
@@ -335,7 +352,10 @@ export function ClientPortal() {
                 Cargando detalle…
               </div>
             ) : selectedOrderDetail ? (
-              <ClientOrderDetail key={selectedOrderDetail.id} order={selectedOrderDetail} showBudget={!currentUser?.companyId} onDecisionAction={refreshOrders} />
+              <ClientOrderDetail key={selectedOrderDetail.id} order={selectedOrderDetail} showBudget={true} onDecisionAction={async () => {
+                await refreshOrders()
+                if (selectedOrderId) setSelectedOrderDetail(await loadOrderDetail(selectedOrderId, true))
+              }} />
             ) : (
               <div className="flex flex-col items-center justify-center gap-3 py-16 text-center">
                 <Inbox className="size-10 text-muted-foreground" />
