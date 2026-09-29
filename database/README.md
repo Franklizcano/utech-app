@@ -81,7 +81,8 @@ orders         → Órdenes de reparación
 order_states   → Estados del flujo
 budget_items   → Items de presupuesto
 timeline_events → Historial de cambios
-notifications  → Notificaciones a clientes
+notifications  → Notificaciones in-app dirigidas a usuarios
+notification_preferences → Preferencias in-app por usuario
 ```
 
 ### ✅ 2 Vistas SQL
@@ -280,6 +281,7 @@ Usa los queries de `QUERIES_GUIDE.md` para operaciones comunes.
 - `budget_items` - Items de costo
 - `timeline_events` - Historial
 - `notifications` - Notificaciones
+- `notification_preferences` - Preferencias de notificaciones por usuario
 
 ### Queries Más Usadas
 

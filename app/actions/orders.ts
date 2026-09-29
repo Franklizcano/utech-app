@@ -103,7 +103,7 @@ export async function createOrderAction(input: OrderCreationInput): Promise<Crea
 export async function fetchAvailableOrdersAction(): Promise<Order[]> {
   const session = await getSessionAction()
   if (!session || !session.active || !["admin", "colaborador", "presupuestador"].includes(session.role)) return []
-  return fetchAvailableOrdersForCollaborator(session.role)
+  return fetchAvailableOrdersForCollaborator(session.id, session.role)
 }
 
 export async function fetchAvailableOrdersCountAction(): Promise<number> {
@@ -115,7 +115,7 @@ export async function fetchAvailableOrdersCountAction(): Promise<number> {
 export async function claimOrderAction(orderId: string): Promise<boolean> {
   const session = await getSessionAction()
   if (!session || !session.active || !["admin", "colaborador", "presupuestador"].includes(session.role)) return false
-  return claimOrderServer(orderId, session.name)
+  return claimOrderServer(orderId, session.name, session.id)
 }
 
 export async function assignOrderAction(orderId: string, collaboratorId: string): Promise<boolean> {
@@ -136,7 +136,7 @@ export async function assignOrderAction(orderId: string, collaboratorId: string)
     return false
   }
 
-  return claimOrderServer(orderId, collaborator.name as string)
+  return claimOrderServer(orderId, collaborator.name as string, collaboratorId)
 }
 
 export async function fetchOrdersAction(offset = 0, limit = 50, search = "") {
@@ -202,8 +202,9 @@ export async function markNotificationsReadAction(orderId: string): Promise<bool
 
   const { error } = await supabase
     .from("notifications")
-    .update({ read: true })
+    .update({ read: true, read_at: new Date().toISOString() })
     .eq("order_id", order.id)
+    .eq("recipient_user_id", session.id)
     .eq("read", false)
 
   if (error) {

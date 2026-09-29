@@ -121,6 +121,21 @@ export function ServiceWorkspace() {
     return () => window.removeEventListener("popstate", syncTicketFromUrl)
   }, [orders])
 
+  useEffect(() => {
+    function openNotificationOrder(event: Event) {
+      const orderId = (event as CustomEvent<{ orderId?: string }>).detail?.orderId
+      const order = orderId ? orders.find((candidate) => candidate.id === orderId) : null
+      if (!order) return
+      setSelectedId(order.id)
+      setSelectedDetail(order.fault ? order : null)
+      const path = `/gestion/ticket/${encodeURIComponent(order.code)}`
+      if (window.location.pathname !== path) window.history.pushState({ ticketCode: order.code }, "", path)
+    }
+
+    window.addEventListener("utech:select-order", openNotificationOrder)
+    return () => window.removeEventListener("utech:select-order", openNotificationOrder)
+  }, [orders])
+
   const selected = orders.find((o) => o.id === selectedId) ?? (selectedDetail?.id === selectedId ? selectedDetail : null)
   const sortedOrders = useMemo(() => [...orders].sort((left, right) => {
     if (orderSort === "expiration") return getOrderExpirationDate(left, orderExpirationDays).getTime() - getOrderExpirationDate(right, orderExpirationDays).getTime()

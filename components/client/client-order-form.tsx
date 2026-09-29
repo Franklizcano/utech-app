@@ -84,7 +84,6 @@ export function ClientOrderForm({ onCreatedAction }: { onCreatedAction?: (orderI
               id="client-order-brand"
               value={deviceBrand}
               onChange={(event) => setDeviceBrand(event.target.value)}
-              placeholder="Ej: Sony"
               required
             />
           </div>
@@ -94,7 +93,6 @@ export function ClientOrderForm({ onCreatedAction }: { onCreatedAction?: (orderI
               id="client-order-model"
               value={deviceModel}
               onChange={(event) => setDeviceModel(event.target.value)}
-              placeholder="Ej: PS5 Slim"
               required
             />
           </div>
@@ -104,7 +102,6 @@ export function ClientOrderForm({ onCreatedAction }: { onCreatedAction?: (orderI
               id="client-order-serial"
               value={deviceSerial}
               onChange={(event) => setDeviceSerial(event.target.value)}
-              placeholder="Ej: SN123456789"
               autoComplete="off"
             />
           </div>

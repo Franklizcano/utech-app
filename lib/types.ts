@@ -132,9 +132,21 @@ export interface TimelineEvent {
 
 export interface AppNotification {
   id: string
+  orderId?: string
+  title?: string
   message: string
+  type?: string
+  priority?: "normal" | "important"
   date: string
   read: boolean
+  readAt?: string | null
+}
+
+export interface NotificationPreferences {
+  inAppEnabled: boolean
+  orderUpdates: boolean
+  budgetUpdates: boolean
+  assignmentUpdates: boolean
 }
 
 export interface Announcement {

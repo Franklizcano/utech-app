@@ -281,11 +281,11 @@ export function OrderForm({ onCreatedAction }: { onCreatedAction?: (orderId: str
           </div>
           <div className="space-y-2">
             <Label htmlFor="brand">Marca</Label>
-            <Input id="brand" value={deviceBrand} onChange={(e) => setDeviceBrand(e.target.value)} placeholder="Ej: Sony" />
+            <Input id="brand" value={deviceBrand} onChange={(e) => setDeviceBrand(e.target.value)} />
           </div>
           <div className="space-y-2">
             <Label htmlFor="model">Modelo</Label>
-            <Input id="model" value={deviceModel} onChange={(e) => setDeviceModel(e.target.value)} placeholder="Ej: PS5 Slim" />
+            <Input id="model" value={deviceModel} onChange={(e) => setDeviceModel(e.target.value)} />
           </div>
           <div className="space-y-2">
             <Label htmlFor="serial">Serial</Label>
@@ -293,7 +293,6 @@ export function OrderForm({ onCreatedAction }: { onCreatedAction?: (orderId: str
               id="serial"
               value={deviceSerial}
               onChange={(e) => setDeviceSerial(e.target.value)}
-              placeholder="Ej: SN123456789"
               autoComplete="off"
             />
           </div>

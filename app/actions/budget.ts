@@ -102,14 +102,14 @@ export async function submitOrderForBudgetAction(orderId: string): Promise<boole
     .eq("id", orderId)
     .eq("assigned_to", session.name)
     .eq("status", "recibido")
-    .select("id")
+    .select("id, client_id")
     .maybeSingle()
   if (error || !data) return false
 
   const now = new Date().toISOString()
   await Promise.all([
     supabase.from("timeline_events").insert({ order_id: orderId, status: "pendiente_presupuesto", note: "El equipo fue enviado a revisión de presupuesto.", event_date: now }),
-    supabase.from("notifications").insert({ order_id: orderId, message: "Tu equipo fue enviado a revisión de presupuesto.", notification_date: now, read: false }),
+    supabase.from("notifications").insert({ order_id: orderId, recipient_user_id: (data.client_id as string | null) ?? null, notification_type: "budget_requested", title: "Presupuesto solicitado", message: "Tu equipo fue enviado a revisión de presupuesto.", notification_date: now, read: false }),
   ])
   return true
 }
@@ -134,12 +134,12 @@ export async function sendBudgetToClientAction(orderId: string): Promise<boolean
     .in("status", ["pendiente_presupuesto", "presupuesto_rechazado"])
   if (session.role === "presupuestador") query = query.eq("budget_assigned_to", session.id)
   const { data, error } = await query
-    .select("id")
+    .select("id, client_id")
     .maybeSingle()
   if (error || !data) return false
   await Promise.all([
     supabase.from("timeline_events").insert({ order_id: orderId, status: "presupuesto_enviado", note: "Presupuesto finalizado y enviado al cliente.", event_date: now }),
-    supabase.from("notifications").insert({ order_id: orderId, message: "Tu presupuesto está disponible para revisar y responder.", notification_date: now, read: false }),
+    supabase.from("notifications").insert({ order_id: orderId, recipient_user_id: (data.client_id as string | null) ?? null, notification_type: "budget_sent", title: "Presupuesto disponible", message: "Tu presupuesto está disponible para revisar y responder.", notification_date: now, read: false }),
   ])
   return true
 }
@@ -152,6 +152,15 @@ export async function decideBudgetAction(orderId: string, decision: "aprobado" |
   const supabase = getSupabaseServerClient()
   const now = new Date().toISOString()
   const status = decision === "aprobado" ? "presupuesto_aprobado" : "presupuesto_rechazado"
+  const { data: currentOrder, error: currentOrderError } = await supabase
+    .from("orders")
+    .select("id, budget_assigned_to")
+    .eq("id", orderId)
+    .eq("client_id", session.id)
+    .eq("status", "presupuesto_enviado")
+    .maybeSingle()
+  if (currentOrderError || !currentOrder) return false
+
   const { data, error } = await supabase
     .from("orders")
     .update({ status, budget_decision: decision, budget_decision_note: normalizedNote || null, budget_decided_at: now, assigned_to: null, budget_assigned_to: null, updated_at: now })
@@ -163,7 +172,10 @@ export async function decideBudgetAction(orderId: string, decision: "aprobado" |
   if (error || !data) return false
   await Promise.all([
     supabase.from("timeline_events").insert({ order_id: orderId, status, note: normalizedNote || (decision === "aprobado" ? "El cliente aceptó el presupuesto." : "El cliente rechazó el presupuesto."), event_date: now }),
-    supabase.from("notifications").insert({ order_id: orderId, message: decision === "aprobado" ? "El cliente aprobó el presupuesto. La orden está lista para ser tomada." : `El cliente rechazó el presupuesto.${normalizedNote ? ` Motivo: ${normalizedNote}` : ""}`, notification_date: now, read: false }),
+    supabase.from("notifications").insert({ order_id: orderId, recipient_user_id: session.id, notification_type: decision === "aprobado" ? "budget_approved_confirmation" : "budget_rejected_confirmation", title: decision === "aprobado" ? "Presupuesto aceptado" : "Presupuesto rechazado", message: decision === "aprobado" ? "Registramos tu aceptación del presupuesto." : "Registramos el rechazo del presupuesto.", notification_date: now, read: false }),
+    currentOrder.budget_assigned_to
+      ? supabase.from("notifications").insert({ order_id: orderId, recipient_user_id: currentOrder.budget_assigned_to, notification_type: decision === "aprobado" ? "budget_approved" : "budget_rejected", title: decision === "aprobado" ? "Presupuesto aceptado por el cliente" : "Presupuesto rechazado por el cliente", message: decision === "aprobado" ? "El cliente aprobó el presupuesto. La orden está lista para ser tomada." : `El cliente rechazó el presupuesto.${normalizedNote ? ` Motivo: ${normalizedNote}` : ""}`, notification_date: now, read: false })
+      : Promise.resolve({ error: null }),
   ])
   return true
 }

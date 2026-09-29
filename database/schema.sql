@@ -206,14 +206,24 @@ CREATE INDEX IF NOT EXISTS idx_timeline_events_status ON timeline_events(status)
 CREATE TABLE IF NOT EXISTS notifications (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   order_id UUID NOT NULL REFERENCES orders(id) ON DELETE CASCADE,
+  recipient_user_id UUID REFERENCES users(id) ON DELETE CASCADE,
+  notification_type VARCHAR(80) NOT NULL DEFAULT 'order_update',
+  title VARCHAR(255) NOT NULL DEFAULT 'Actualización de orden',
   message TEXT NOT NULL,
+  priority VARCHAR(20) NOT NULL DEFAULT 'normal' CHECK (priority IN ('normal', 'important')),
+  metadata JSONB NOT NULL DEFAULT '{}'::jsonb,
   read BOOLEAN DEFAULT false,
+  read_at TIMESTAMP WITH TIME ZONE,
+  dedupe_key TEXT,
   notification_date TIMESTAMP WITH TIME ZONE NOT NULL,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 
 CREATE INDEX IF NOT EXISTS idx_notifications_order_id ON notifications(order_id);
 CREATE INDEX IF NOT EXISTS idx_notifications_read ON notifications(read);
+CREATE INDEX IF NOT EXISTS idx_notifications_recipient_date ON notifications(recipient_user_id, notification_date DESC);
+CREATE INDEX IF NOT EXISTS idx_notifications_recipient_unread ON notifications(recipient_user_id, read, notification_date DESC);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_notifications_dedupe_key ON notifications(dedupe_key) WHERE dedupe_key IS NOT NULL;
 
 -- ============================================
 -- Tabla: general_announcements (Avisos generales)
@@ -239,6 +249,22 @@ CREATE TABLE IF NOT EXISTS general_announcement_reads (
   read_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (announcement_id, user_id)
 );
+
+-- ============================================
+-- Tabla: notification_preferences (Preferencias in-app)
+-- ============================================
+CREATE TABLE IF NOT EXISTS notification_preferences (
+  user_id UUID PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+  in_app_enabled BOOLEAN NOT NULL DEFAULT true,
+  order_updates BOOLEAN NOT NULL DEFAULT true,
+  budget_updates BOOLEAN NOT NULL DEFAULT true,
+  assignment_updates BOOLEAN NOT NULL DEFAULT true,
+  created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_notification_preferences_updated_at
+  ON notification_preferences(updated_at DESC);
 
 CREATE INDEX IF NOT EXISTS idx_general_announcement_reads_user ON general_announcement_reads(user_id);
 

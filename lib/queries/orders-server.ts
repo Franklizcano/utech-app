@@ -1,5 +1,6 @@
 import { getSupabaseServerClient } from "@/lib/supabase"
 import { FINAL_ORDER_STATUS, type AppNotification, type BudgetItem, type OccasionalTicketDetail, type OccasionalTicketStatus, type Order, type OrderCreationInput, type OrderStatus, type TimelineEvent, type Role } from "@/lib/types"
+import { fetchNotificationPreferencesForUser, isNotificationEnabled } from "@/lib/notification-preferences"
 
 function rowToBudgetItem(row: Record<string, unknown>): BudgetItem {
   return {
@@ -23,9 +24,14 @@ function rowToTimelineEvent(row: Record<string, unknown>): TimelineEvent {
 function rowToNotification(row: Record<string, unknown>): AppNotification {
   return {
     id: row.id as string,
+    orderId: (row.order_id as string | null) ?? undefined,
+    title: (row.title as string | null) ?? undefined,
     message: row.message as string,
+    type: (row.notification_type as string | null) ?? undefined,
+    priority: row.priority === "important" ? "important" : "normal",
     date: row.notification_date as string,
     read: row.read as boolean,
+    readAt: (row.read_at as string | null) ?? null,
   }
 }
 
@@ -73,18 +79,22 @@ async function hydrateOrders(
   supabase: ReturnType<typeof getSupabaseServerClient>,
   includeBudget = true,
   viewerRole?: Role,
+  viewerId?: string,
 ): Promise<Order[]> {
   if (!ordersData.length) return []
 
   const orderIds = ordersData.map((row) => row.id as string)
+  let notificationsQuery = supabase
+    .from("notifications")
+    .select("*")
+    .in("order_id", orderIds)
+    .order("notification_date", { ascending: true })
+  if (viewerId) notificationsQuery = notificationsQuery.eq("recipient_user_id", viewerId)
+
   const [budgetResult, timelineResult, notificationsResult] = await Promise.all([
     includeBudget ? supabase.from("budget_items").select("*").in("order_id", orderIds) : Promise.resolve({ data: [], error: null }),
     supabase.from("timeline_events").select("*").in("order_id", orderIds).order("event_date", { ascending: true }),
-    supabase
-      .from("notifications")
-      .select("*")
-      .in("order_id", orderIds)
-      .order("notification_date", { ascending: true }),
+    notificationsQuery,
   ])
 
   if (budgetResult.error || timelineResult.error || notificationsResult.error) {
@@ -99,6 +109,7 @@ async function hydrateOrders(
   const budgets = new Map<string, BudgetItem[]>()
   const timelines = new Map<string, TimelineEvent[]>()
   const notifications = new Map<string, AppNotification[]>()
+  const notificationPreferences = viewerId ? await fetchNotificationPreferencesForUser(viewerId) : null
 
   for (const row of budgetResult.data ?? []) {
     const orderId = row.order_id as string
@@ -115,6 +126,7 @@ async function hydrateOrders(
   }
 
   for (const row of notificationsResult.data ?? []) {
+    if (notificationPreferences && !isNotificationEnabled(notificationPreferences, row.notification_type as string | null)) continue
     const orderId = row.order_id as string
     const items = notifications.get(orderId) ?? []
     items.push(rowToNotification(row))
@@ -168,6 +180,9 @@ export async function insertOrderServer(input: OrderCreationInput): Promise<Orde
     }),
     supabase.from("notifications").insert({
       order_id: orderId,
+      recipient_user_id: input.clientId,
+      notification_type: "order_created",
+      title: "Orden recibida",
       message: `Recibimos tu equipo (${input.deviceBrand} ${input.deviceModel}). Te mantendremos al tanto.`,
       notification_date: now,
       read: false,
@@ -196,7 +211,7 @@ export async function insertOrderServer(input: OrderCreationInput): Promise<Orde
  * Asigna una orden disponible al colaborador actual sin permitir que dos colaboradores
  * tomen la misma orden simultáneamente.
  */
-export async function claimOrderServer(orderId: string, assignee: string): Promise<boolean> {
+export async function claimOrderServer(orderId: string, assignee: string, recipientUserId?: string): Promise<boolean> {
   if (!orderId || !assignee.trim()) return false
 
   const supabase = getSupabaseServerClient()
@@ -208,7 +223,7 @@ export async function claimOrderServer(orderId: string, assignee: string): Promi
     .in("status", ["recibido", "presupuesto_aprobado"])
     .is("assigned_to", null)
     .not("client_id", "is", null)
-    .select("id")
+    .select("id, code, client_id")
     .maybeSingle()
 
   if (error || !order) {
@@ -216,21 +231,32 @@ export async function claimOrderServer(orderId: string, assignee: string): Promi
     return false
   }
 
-  const { error: notificationError } = await supabase.from("notifications").insert({
+  const notifications = [supabase.from("notifications").insert({
     order_id: order.id,
+    recipient_user_id: (order.client_id as string | null) ?? null,
+    notification_type: "order_assigned",
+    title: "Orden asignada",
     message: `Tu orden fue tomada por ${assignee.trim()}.`,
     notification_date: now,
     read: false,
-  })
-
-  if (notificationError) {
-    console.error("Error al notificar la asignación de la orden:", notificationError.message)
-  }
+  })]
+  if (recipientUserId) notifications.push(supabase.from("notifications").insert({
+    order_id: order.id,
+    recipient_user_id: recipientUserId,
+    notification_type: "order_assigned_to_you",
+    title: "Nueva orden asignada",
+    message: `La orden ${order.code as string} fue asignada a tu gestión.`,
+    notification_date: now,
+    read: false,
+  }))
+  const notificationResults = await Promise.all(notifications)
+  const notificationError = notificationResults.find((result) => result.error)?.error
+  if (notificationError) console.error("Error al notificar la asignación de la orden:", notificationError.message)
 
   return true
 }
 
-export async function fetchAvailableOrdersForCollaborator(role: Role): Promise<Order[]> {
+export async function fetchAvailableOrdersForCollaborator(userId: string, role: Role): Promise<Order[]> {
   const supabase = getSupabaseServerClient()
   const { data, error } = await supabase
     .from("orders")
@@ -245,7 +271,7 @@ export async function fetchAvailableOrdersForCollaborator(role: Role): Promise<O
     throw new Error("No se pudieron cargar las órdenes disponibles.")
   }
 
-  return hydrateOrders((data ?? []) as Array<Record<string, unknown>>, supabase, false, role)
+  return hydrateOrders((data ?? []) as Array<Record<string, unknown>>, supabase, false, role, userId)
 }
 
 export async function fetchAvailableOrdersCount(): Promise<number> {
@@ -464,7 +490,7 @@ export async function fetchOrderDetailForUser(
   if (!data) return null
 
   const canSeeBudget = role === "admin" || role === "presupuestador" || (role === "cliente" && ["presupuesto_enviado", "presupuesto_aprobado", "presupuesto_rechazado"].includes(data.status))
-  const [order] = await hydrateOrders([data as Record<string, unknown>], supabase, canSeeBudget, role)
+  const [order] = await hydrateOrders([data as Record<string, unknown>], supabase, canSeeBudget, role, userId)
   return order ?? null
 }
 
@@ -517,7 +543,7 @@ export async function fetchCompletedOrdersForUser(userId: string, role: Role, as
     throw new Error("No se pudieron cargar las órdenes finalizadas.")
   }
 
-  return hydrateOrders((ordersData ?? []) as Array<Record<string, unknown>>, supabase, role === "admin", role)
+  return hydrateOrders((ordersData ?? []) as Array<Record<string, unknown>>, supabase, role === "admin", role, userId)
 }
 
 export async function fetchBudgetOrdersForUser(userId: string, role: Role): Promise<Order[]> {
@@ -527,7 +553,7 @@ export async function fetchBudgetOrdersForUser(userId: string, role: Role): Prom
   if (role === "presupuestador") query = query.or(`budget_assigned_to.is.null,budget_assigned_to.eq.${userId}`)
   const { data, error } = await query
   if (error) throw new Error("No se pudieron cargar las órdenes pendientes de presupuesto.")
-  return hydrateOrders((data ?? []) as Array<Record<string, unknown>>, supabase, true, role)
+  return hydrateOrders((data ?? []) as Array<Record<string, unknown>>, supabase, true, role, userId)
 }
 
 export async function claimBudgetOrderServer(orderId: string, userId: string): Promise<boolean> {

@@ -204,6 +204,18 @@ export function ClientPortal() {
     return () => window.clearTimeout(timeoutId)
   }, [searchQuery, searchOrders])
 
+  useEffect(() => {
+    function handleNotificationOrder(event: Event) {
+      const orderId = (event as CustomEvent<{ orderId?: string }>).detail?.orderId
+      if (!orderId) return
+      setSelectedOrderId(orderId)
+      markNotificationsRead(orderId)
+    }
+
+    window.addEventListener("utech:select-order", handleNotificationOrder)
+    return () => window.removeEventListener("utech:select-order", handleNotificationOrder)
+  }, [markNotificationsRead])
+
   const selectedOrder = orders.find((order) => order.id === selectedOrderId) ?? orders[0] ?? null
 
   useEffect(() => {
@@ -255,16 +267,11 @@ export function ClientPortal() {
               </div>
             </div>
           </div>
-          <div className="grid grid-cols-2 gap-3 sm:min-w-56">
+          <div className="grid gap-3 sm:min-w-28">
             <div className="rounded-lg border border-border bg-card p-3 text-center">
               <Users className="mx-auto size-4 text-primary" />
               <p className="mt-1 text-xl font-semibold text-foreground">{referralStats?.totalReferredUsers ?? 0}</p>
               <p className="text-xs text-muted-foreground">Referidos</p>
-            </div>
-            <div className="rounded-lg border border-border bg-card p-3 text-center">
-              <Receipt className="mx-auto size-4 text-primary" />
-              <p className="mt-1 text-xl font-semibold text-foreground">{referralStats?.totalOrders ?? 0}</p>
-              <p className="text-xs text-muted-foreground">Órdenes de referidos</p>
             </div>
           </div>
         </CardContent>

@@ -1,5 +1,16 @@
 # CHANGELOG
 
+### [0.2.2] - 2026-09-15
+- Refined the budget workflow from technical analysis through client decision, including server-side validation for submission, finalization, acceptance, and rejection.
+- Added budget timeline events and in-app notifications when an order enters budget review, when a finalized budget is sent, and when the client accepts or rejects it.
+- Made finalized budgets read-only after being sent to the client, while preserving editing for new or rejected budgets and enforcing the rule in server actions.
+- Enabled clients, including corporate clients, to view finalized budgets and accept or reject them with an optional comment; the portal refreshes immediately after the decision.
+- Returned rejected budgets to the budget queue and allowed them to be claimed again for revision and resubmission.
+- Added recipient-aware in-app notifications with notification types, titles, priorities, read timestamps, metadata, and deduplication support for future delivery channels.
+- Added a global notification bell with unread counts, individual read state, and direct navigation to the related ticket for clients and internal users.
+- Added targeted notifications for clients, collaborators, and budgeters while preserving the existing public flow for occasional tickets.
+- Added per-user in-app notification preferences from the profile menu, with separate controls for order updates, budgets, and assignments.
+
 ### [0.2.1] - 2026-09-14
 - Added signed HS256 JWT sessions stored in secure, HTTP-only cookies, with server-side validation of session claims without querying the database on each request.
 - Added scalable corporate roles with `member` and `manager`, including a single manager per company enforced by the server.

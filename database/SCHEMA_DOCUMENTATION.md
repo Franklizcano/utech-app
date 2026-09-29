@@ -211,16 +211,41 @@ Orden CP-240701-0001:
 
 ---
 
-### 7. **notifications** - Notificaciones
+### 8. **notification_preferences** - Preferencias de notificaciones
 
-Almacena notificaciones enviadas a clientes sobre sus órdenes.
+Guarda la configuración individual de los avisos in-app. Las preferencias se aplican al mostrar la campanita, al contar avisos no leídos y al hidratar las notificaciones de una orden. No elimina registros históricos y deja preparado el modelo para sumar preferencias por canales externos en el futuro.
+
+```sql
+user_id (FK → users.id, PK)       -- Usuario propietario
+in_app_enabled (BOOLEAN)          -- Habilita/deshabilita la campanita
+order_updates (BOOLEAN)           -- Cambios y novedades de órdenes
+budget_updates (BOOLEAN)          -- Eventos de presupuestos
+assignment_updates (BOOLEAN)      -- Asignaciones y reasignaciones
+created_at (TIMESTAMP)
+updated_at (TIMESTAMP)
+```
+
+Todos los controles están habilitados por defecto. La configuración se administra desde el menú del perfil y solo puede ser modificada por el usuario autenticado para sí mismo.
+
+---
+
+### 7. **notifications** - Notificaciones in-app
+
+Almacena notificaciones dirigidas a usuarios registrados sobre sus órdenes. Los tickets ocasionales pueden conservar `recipient_user_id = NULL` y continúan utilizando la consulta pública restringida.
 
 ```sql
 -- Campos
 id (UUID, PK)              -- Identificador único
 order_id (FK → orders.id)  -- Referencia a la orden
+recipient_user_id (FK → users.id) -- Usuario destinatario
+notification_type (VARCHAR) -- Tipo de evento de comunicación
+title (VARCHAR)            -- Título visible en la campanita
 message (TEXT)             -- Contenido de la notificación
+priority (VARCHAR)         -- 'normal' o 'important'
+metadata (JSONB)           -- Datos estructurados para futuras entregas
 read (BOOLEAN)             -- ¿Fue leída?
+read_at (TIMESTAMP)        -- Fecha de lectura
+dedupe_key (TEXT)          -- Clave opcional para evitar duplicados
 
 notification_date (TIMESTAMP)  -- Fecha de envío
 created_at (TIMESTAMP)         -- Fecha de creación en BD
@@ -229,6 +254,8 @@ created_at (TIMESTAMP)         -- Fecha de creación en BD
 **Índices:**
 - `order_id` - Notificaciones de una orden
 - `read` - Notificaciones leídas/no leídas
+- `recipient_user_id, notification_date` - Bandeja de cada usuario
+- `recipient_user_id, read, notification_date` - Contador de no leídas
 
 **Ejemplo:**
 ```
