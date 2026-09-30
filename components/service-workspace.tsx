@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect, useRef, useMemo } from "react"
-import { Check, Clipboard, ExternalLink, Plus, Inbox, Loader2, Search, X } from "lucide-react"
+import { Building2, Check, Clipboard, ExternalLink, Plus, Inbox, Loader2, Search, X } from "lucide-react"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
@@ -52,12 +52,13 @@ export function ServiceWorkspace() {
   const { role, orders, orderExpirationDays, ordersLoading, ordersLoadingMore, ordersHasMore, loadMoreOrders, searchOrders, loadOrderDetail } = useStore()
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [selectedDetail, setSelectedDetail] = useState<Order | null>(null)
-  const [dialogOpen, setDialogOpen] = useState(false)
+  const [orderDialogMode, setOrderDialogMode] = useState<"standard" | "corporate" | null>(null)
   const [searchQuery, setSearchQuery] = useState("")
   const [orderSort, setOrderSort] = useState<OrderSort>("expiration")
   const [now, setNow] = useState(() => Date.now())
   const [copiedCode, setCopiedCode] = useState(false)
   const initialSearchEffect = useRef(true)
+  const canCreateCorporateOrder = role === "admin" || role === "colaborador"
 
   function openInternalTicket(order: Order) {
     setSelectedId(order.id)
@@ -186,13 +187,19 @@ export function ServiceWorkspace() {
     <div className="animate-utech-enter space-y-5">
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-xl font-semibold tracking-tight text-foreground">Pedidos</h2>
+          <h2 className="text-xl font-semibold tracking-tight text-foreground">Órdenes</h2>
           <p className="text-sm text-muted-foreground">{orders.length} órdenes cargadas</p>
         </div>
-        <Button className="gap-2" onClick={() => setDialogOpen(true)} disabled={ordersLoading}>
-          <Plus className="size-4" />
-          Nuevo pedido
-        </Button>
+        <div className="flex flex-wrap justify-end gap-2">
+          <Button className="gap-2" onClick={() => setOrderDialogMode("standard")} disabled={ordersLoading}>
+            <Plus className="size-4" />
+            Nueva orden
+          </Button>
+          {canCreateCorporateOrder && <Button type="button" variant="outline" className="gap-2" onClick={() => setOrderDialogMode("corporate")} disabled={ordersLoading}>
+            <Building2 className="size-4" />
+            Nueva orden corporativa
+          </Button>}
+        </div>
       </div>
 
       <div className="flex flex-wrap items-center gap-2">
@@ -347,23 +354,25 @@ export function ServiceWorkspace() {
             ) : (
               <div className="flex flex-col items-center justify-center gap-3 py-16 text-center">
                 <Inbox className="size-10 text-muted-foreground" />
-                <p className="text-sm text-muted-foreground">Seleccioná un pedido para ver el detalle.</p>
+                <p className="text-sm text-muted-foreground">Seleccioná una orden para ver el detalle.</p>
               </div>
             )}
           </CardContent>
         </Card>}
       </div>
 
-      <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+      <Dialog open={orderDialogMode !== null} onOpenChange={(open) => { if (!open) setOrderDialogMode(null) }}>
         <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-2xl">
           <DialogHeader>
-            <DialogTitle>Nuevo pedido</DialogTitle>
-            <DialogDescription>Cargá los datos del cliente, el equipo y la falla reportada.</DialogDescription>
+            <DialogTitle>{orderDialogMode === "corporate" ? "Nueva orden corporativa" : "Nueva orden"}</DialogTitle>
+            <DialogDescription>{orderDialogMode === "corporate" ? "Seleccioná un cliente corporativo y cargá los datos del equipo y la falla reportada." : "Cargá los datos del cliente, el equipo y la falla reportada."}</DialogDescription>
           </DialogHeader>
           <OrderForm
+            key={orderDialogMode ?? "closed"}
+            corporateOnly={orderDialogMode === "corporate"}
             onCreatedAction={(id: string) => {
               setSelectedId(id)
-              setDialogOpen(false)
+              setOrderDialogMode(null)
             }}
           />
         </DialogContent>

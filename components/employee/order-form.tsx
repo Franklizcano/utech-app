@@ -27,12 +27,17 @@ function normalizeSearchText(value: string) {
     .trim()
 }
 
-export function OrderForm({ onCreatedAction }: { onCreatedAction?: (orderId: string) => void }) {
+interface OrderFormProps {
+  onCreatedAction?: (orderId: string) => void
+  corporateOnly?: boolean
+}
+
+export function OrderForm({ onCreatedAction, corporateOnly = false }: OrderFormProps) {
   const { addOrder, currentUser, employees, users } = useStore()
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const activeEmployees = employees.filter((e) => e.active)
-  const clients = users.filter((u) => u.role === "cliente")
+  const clients = users.filter((u) => u.role === "cliente" && (!corporateOnly || Boolean(u.companyId)))
 
   const [clientType, setClientType] = useState<"registered" | "occasional">("registered")
   const [clientId, setClientId] = useState(clients[0]?.id ?? "")
@@ -58,7 +63,7 @@ export function OrderForm({ onCreatedAction }: { onCreatedAction?: (orderId: str
       normalizeSearchText(value).includes(normalizedClientSearch),
     )
   })
-  const isUsingOccasional = clientType === "occasional"
+  const isUsingOccasional = !corporateOnly && clientType === "occasional"
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
@@ -78,6 +83,10 @@ export function OrderForm({ onCreatedAction }: { onCreatedAction?: (orderId: str
     } else {
       if (!clientId || !fault) return
       if (!selectedClient) return
+      if (corporateOnly && !selectedClient.companyId) {
+        setError("Seleccioná un cliente corporativo.")
+        return
+      }
       clientName = selectedClient.name
       clientPhone = selectedClient.phone
       clientEmail = selectedClient.email
@@ -124,7 +133,7 @@ export function OrderForm({ onCreatedAction }: { onCreatedAction?: (orderId: str
           Cliente
         </div>
         <div className="space-y-4">
-          <div className="flex gap-3">
+          {!corporateOnly && <div className="flex gap-3">
             <Label className="flex items-center gap-2 cursor-pointer">
               <input
                 type="radio"
@@ -143,13 +152,15 @@ export function OrderForm({ onCreatedAction }: { onCreatedAction?: (orderId: str
               />
               <span>Cliente ocasional</span>
             </Label>
-          </div>
+          </div>}
 
-          {clientType === "registered" ? (
+          {!isUsingOccasional ? (
             <div className="space-y-2">
               {clients.length === 0 ? (
                 <div className="rounded-lg border border-dashed border-border bg-secondary/30 p-4 text-center text-sm text-muted-foreground">
-                  No hay clientes registrados. Crea uno en la gestión de usuarios o selecciona &quot;Cliente ocasional&quot;.
+                  {corporateOnly
+                    ? "No hay clientes corporativos registrados. Creá uno en la gestión de usuarios."
+                    : "No hay clientes registrados. Creá uno en la gestión de usuarios o seleccioná «Cliente ocasional»."}
                 </div>
               ) : (
                 <>
@@ -349,7 +360,7 @@ export function OrderForm({ onCreatedAction }: { onCreatedAction?: (orderId: str
       <div className="flex justify-end">
         <Button type="submit" className="gap-2" disabled={saving}>
           <ClipboardPlus className="size-4" />
-          {saving ? "Cargando pedido…" : "Cargar pedido"}
+          {saving ? "Creando orden…" : "Crear orden"}
         </Button>
       </div>
     </form>

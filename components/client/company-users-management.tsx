@@ -15,7 +15,7 @@ import { useStore } from "@/lib/store"
 export function CompanyUsersManagement() {
   const { currentUser } = useStore()
   const [users, setUsers] = useState<User[]>([])
-  const [loading, setLoading] = useState(false)
+  const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [open, setOpen] = useState(false)
@@ -30,7 +30,22 @@ export function CompanyUsersManagement() {
 
   useEffect(() => {
     if (!isManager) return
-    void fetchCompanyUsersAction().then(setUsers).catch(() => setError("No se pudieron cargar los integrantes de la empresa.")).finally(() => setLoading(false))
+
+    let cancelled = false
+    void fetchCompanyUsersAction()
+      .then((nextUsers) => {
+        if (!cancelled) setUsers(nextUsers)
+      })
+      .catch(() => {
+        if (!cancelled) setError("No se pudieron cargar los integrantes de la empresa.")
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false)
+      })
+
+    return () => {
+      cancelled = true
+    }
   }, [isManager])
 
   if (!isManager) return null
