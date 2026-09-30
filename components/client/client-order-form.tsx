@@ -20,35 +20,45 @@ const DEVICE_TYPES: DeviceType[] = ["PC", "Notebook", "PlayStation", "Xbox", "Ni
 
 export function ClientOrderForm({ onCreatedAction }: { onCreatedAction?: (orderId: string) => void }) {
   const { currentUser, addOrder } = useStore()
+  const [saving, setSaving] = useState(false)
+  const [error, setError] = useState<string | null>(null)
   const [deviceType, setDeviceType] = useState<DeviceType>("PC")
   const [deviceBrand, setDeviceBrand] = useState("")
   const [deviceModel, setDeviceModel] = useState("")
   const [deviceSerial, setDeviceSerial] = useState("")
   const [fault, setFault] = useState("")
 
-  function handleSubmit(event: React.FormEvent) {
+  async function handleSubmit(event: React.FormEvent) {
     event.preventDefault()
     if (!currentUser || !deviceBrand.trim() || !deviceModel.trim() || !fault.trim()) return
 
-    const order = addOrder({
-      clientId: currentUser.id,
-      clientName: currentUser.name,
-      clientPhone: currentUser.phone,
-      clientEmail: currentUser.email,
-      deviceType,
-      deviceBrand: deviceBrand.trim(),
-      deviceModel: deviceModel.trim(),
-      deviceSerial: deviceSerial.trim() || null,
-      fault: fault.trim(),
-      assignedTo: null,
-    })
+    setSaving(true)
+    setError(null)
+    try {
+      const order = await addOrder({
+        clientId: currentUser.id,
+        clientName: currentUser.name,
+        clientPhone: currentUser.phone,
+        clientEmail: currentUser.email,
+        deviceType,
+        deviceBrand: deviceBrand.trim(),
+        deviceModel: deviceModel.trim(),
+        deviceSerial: deviceSerial.trim() || null,
+        fault: fault.trim(),
+        assignedTo: null,
+      })
 
-    setDeviceType("PC")
-    setDeviceBrand("")
-    setDeviceModel("")
-    setDeviceSerial("")
-    setFault("")
-    onCreatedAction?.(order.id)
+      setDeviceType("PC")
+      setDeviceBrand("")
+      setDeviceModel("")
+      setDeviceSerial("")
+      setFault("")
+      onCreatedAction?.(order.id)
+    } catch (submitError: unknown) {
+      setError(submitError instanceof Error ? submitError.message : "No se pudo crear la orden.")
+    } finally {
+      setSaving(false)
+    }
   }
 
   return (
@@ -56,6 +66,7 @@ export function ClientOrderForm({ onCreatedAction }: { onCreatedAction?: (orderI
       <div className="rounded-lg border border-primary/20 bg-primary/5 p-3 text-sm text-muted-foreground">
         La orden quedará pendiente hasta que un colaborador la tome. Vas a poder seguir su estado desde tu panel.
       </div>
+      {error && <p role="alert" className="rounded-lg border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive">{error}</p>}
 
       <section className="space-y-4">
         <div className="flex items-center gap-2 text-sm font-semibold text-foreground">
@@ -127,9 +138,9 @@ export function ClientOrderForm({ onCreatedAction }: { onCreatedAction?: (orderI
       </section>
 
       <div className="flex justify-end">
-        <Button type="submit" className="gap-2" disabled={!currentUser}>
+        <Button type="submit" className="gap-2" disabled={!currentUser || saving}>
           <ClipboardPlus className="size-4" />
-          Crear orden
+          {saving ? "Creando orden…" : "Crear orden"}
         </Button>
       </div>
     </form>

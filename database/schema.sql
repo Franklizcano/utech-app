@@ -200,6 +200,36 @@ CREATE INDEX IF NOT EXISTS idx_timeline_events_order_id ON timeline_events(order
 CREATE INDEX IF NOT EXISTS idx_timeline_events_status ON timeline_events(status);
 
 -- ============================================
+-- Tabla: order_history_events (Auditoría interna de órdenes)
+-- ============================================
+CREATE TABLE IF NOT EXISTS order_history_events (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  order_id UUID NOT NULL REFERENCES orders(id) ON DELETE CASCADE,
+  actor_user_id UUID REFERENCES users(id) ON DELETE SET NULL,
+  actor_name VARCHAR(255),
+  actor_role VARCHAR(40),
+  event_type VARCHAR(80) NOT NULL CHECK (event_type IN (
+    'order_created', 'status_changed', 'assignee_changed',
+    'budget_assignee_changed', 'order_details_changed',
+    'budget_item_added', 'budget_item_updated', 'budget_item_deleted',
+    'budget_submitted', 'budget_sent', 'budget_decided'
+  )),
+  summary TEXT NOT NULL,
+  field_name VARCHAR(100),
+  old_value JSONB,
+  new_value JSONB,
+  metadata JSONB NOT NULL DEFAULT '{}'::jsonb,
+  event_date TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_order_history_events_order_date
+  ON order_history_events(order_id, event_date DESC, created_at DESC);
+
+CREATE INDEX IF NOT EXISTS idx_order_history_events_actor
+  ON order_history_events(actor_user_id, event_date DESC);
+
+-- ============================================
 -- Tabla: notifications (Notificaciones)
 -- Descripción: Notificaciones enviadas a clientes sobre sus órdenes
 -- ============================================
@@ -359,6 +389,7 @@ ALTER TABLE users ENABLE ROW LEVEL SECURITY;
 ALTER TABLE orders ENABLE ROW LEVEL SECURITY;
 ALTER TABLE budget_items ENABLE ROW LEVEL SECURITY;
 ALTER TABLE timeline_events ENABLE ROW LEVEL SECURITY;
+ALTER TABLE order_history_events ENABLE ROW LEVEL SECURITY;
 ALTER TABLE notifications ENABLE ROW LEVEL SECURITY;
 ALTER TABLE general_announcements ENABLE ROW LEVEL SECURITY;
 ALTER TABLE general_announcement_reads ENABLE ROW LEVEL SECURITY;
@@ -491,6 +522,23 @@ INSERT INTO timeline_events (order_id, status, note, event_date)
 SELECT id, 'esperando_repuestos', 'Se encarga módulo HDMI original.', NOW() - INTERVAL '3 days'
 FROM orders WHERE code = 'CP-240701-0001'
 ON CONFLICT DO NOTHING;
+
+INSERT INTO order_history_events (order_id, actor_name, actor_role, event_type, summary, new_value, metadata, event_date)
+SELECT
+  te.order_id,
+  'Historial previo',
+  'system',
+  'status_changed',
+  'Estado registrado en el historial anterior.',
+  jsonb_build_object('status', te.status),
+  jsonb_build_object('source', 'timeline_backfill', 'timeline_event_id', te.id),
+  te.event_date
+FROM timeline_events AS te
+WHERE NOT EXISTS (
+  SELECT 1 FROM order_history_events AS he
+  WHERE he.metadata ->> 'source' = 'timeline_backfill'
+    AND he.metadata ->> 'timeline_event_id' = te.id::text
+);
 
 -- Insertar notificaciones
 INSERT INTO notifications (order_id, message, read, notification_date)

@@ -3,6 +3,7 @@
 import { getSessionAction } from "@/app/actions/auth"
 import { getSupabaseServerClient } from "@/lib/supabase"
 import { fetchBudgetOrdersCountForUser, fetchBudgetOrdersForUser, claimBudgetOrderServer, updateBudgetItemDiscountServer } from "@/lib/queries/orders-server"
+import { appendOrderHistoryEventServer } from "@/lib/queries/order-history-server"
 import type { BudgetItem, Order } from "@/lib/types"
 
 const EDITABLE_BUDGET_STATUSES = ["recibido", "pendiente_presupuesto", "presupuesto_rechazado"]
@@ -41,7 +42,7 @@ export async function fetchBudgetQueueCountAction(): Promise<number> {
 export async function claimBudgetOrderAction(orderId: string): Promise<boolean> {
   const session = await getSessionAction()
   if (!session || !session.active || !["admin", "presupuestador"].includes(session.role)) return false
-  return claimBudgetOrderServer(orderId, session.id)
+  return claimBudgetOrderServer(orderId, session.id, { userId: session.id, name: session.name, role: session.role })
 }
 
 export async function updateBudgetItemDiscountAction(
@@ -56,7 +57,7 @@ export async function updateBudgetItemDiscountAction(
   if (typeof discountValue !== "number" || !Number.isFinite(discountValue) || discountValue < 0) return false
   if (discountType === "percentage" && discountValue > 100) return false
 
-  return updateBudgetItemDiscountServer(itemId, session.id, session.role, discountType, discountValue)
+  return updateBudgetItemDiscountServer(itemId, session.id, session.role, discountType, discountValue, { userId: session.id, name: session.name, role: session.role })
 }
 
 export async function addBudgetItemAction(orderId: string, description: string, amount: number): Promise<BudgetItem | null> {
@@ -73,7 +74,16 @@ export async function addBudgetItemAction(orderId: string, description: string, 
     .insert({ order_id: orderId, description: normalizedDescription, amount })
     .select("id, description, amount, discount_type, discount_value")
     .single()
-  return error || !data ? null : mapBudgetItem(data as Record<string, unknown>)
+  if (error || !data) return null
+
+  await appendOrderHistoryEventServer({
+    orderId,
+    eventType: "budget_item_added",
+    summary: "Ítem agregado al presupuesto.",
+    actor: { userId: session.id, name: session.name, role: session.role },
+    newValue: { description: normalizedDescription, amount },
+  })
+  return mapBudgetItem(data as Record<string, unknown>)
 }
 
 export async function deleteBudgetItemAction(itemId: string): Promise<boolean> {
@@ -83,13 +93,27 @@ export async function deleteBudgetItemAction(itemId: string): Promise<boolean> {
   const supabase = getSupabaseServerClient()
   const { data: item, error: itemError } = await supabase
     .from("budget_items")
-    .select("id, order_id")
+    .select("id, order_id, description, amount, discount_type, discount_value")
     .eq("id", itemId)
     .maybeSingle()
   if (itemError || !item || !await canEditBudgetOrder(item.order_id as string, session.id, session.role)) return false
 
   const { error } = await supabase.from("budget_items").delete().eq("id", itemId)
-  return !error
+  if (error) return false
+
+  await appendOrderHistoryEventServer({
+    orderId: item.order_id as string,
+    eventType: "budget_item_deleted",
+    summary: "Ítem eliminado del presupuesto.",
+    actor: { userId: session.id, name: session.name, role: session.role },
+    oldValue: {
+      description: item.description,
+      amount: Number(item.amount),
+      discountType: item.discount_type,
+      discountValue: item.discount_value === null ? null : Number(item.discount_value),
+    },
+  })
+  return true
 }
 
 export async function submitOrderForBudgetAction(orderId: string): Promise<boolean> {
@@ -110,6 +134,16 @@ export async function submitOrderForBudgetAction(orderId: string): Promise<boole
   await Promise.all([
     supabase.from("timeline_events").insert({ order_id: orderId, status: "pendiente_presupuesto", note: "El equipo fue enviado a revisión de presupuesto.", event_date: now }),
     supabase.from("notifications").insert({ order_id: orderId, recipient_user_id: (data.client_id as string | null) ?? null, notification_type: "budget_requested", title: "Presupuesto solicitado", message: "Tu equipo fue enviado a revisión de presupuesto.", notification_date: now, read: false }),
+    appendOrderHistoryEventServer({
+      orderId,
+      eventType: "budget_submitted",
+      summary: "La orden fue enviada a revisión de presupuesto.",
+      actor: { userId: session.id, name: session.name, role: session.role },
+      fieldName: "status",
+      oldValue: "recibido",
+      newValue: "pendiente_presupuesto",
+      date: now,
+    }),
   ])
   return true
 }
@@ -119,6 +153,8 @@ export async function sendBudgetToClientAction(orderId: string): Promise<boolean
   if (!session || !session.active || !["admin", "presupuestador"].includes(session.role)) return false
   const supabase = getSupabaseServerClient()
   const now = new Date().toISOString()
+  const { data: currentOrder, error: currentOrderError } = await supabase.from("orders").select("status").eq("id", orderId).maybeSingle()
+  if (currentOrderError || !currentOrder) return false
   const { data: budgetItems, error: budgetError } = await supabase.from("budget_items").select("amount, discount_type, discount_value").eq("order_id", orderId)
   if (budgetError || !budgetItems?.length) return false
   const total = budgetItems.reduce((sum, item) => {
@@ -140,6 +176,17 @@ export async function sendBudgetToClientAction(orderId: string): Promise<boolean
   await Promise.all([
     supabase.from("timeline_events").insert({ order_id: orderId, status: "presupuesto_enviado", note: "Presupuesto finalizado y enviado al cliente.", event_date: now }),
     supabase.from("notifications").insert({ order_id: orderId, recipient_user_id: (data.client_id as string | null) ?? null, notification_type: "budget_sent", title: "Presupuesto disponible", message: "Tu presupuesto está disponible para revisar y responder.", notification_date: now, read: false }),
+    appendOrderHistoryEventServer({
+      orderId,
+      eventType: "budget_sent",
+      summary: "Presupuesto enviado al cliente.",
+      actor: { userId: session.id, name: session.name, role: session.role },
+      fieldName: "status",
+      oldValue: currentOrder.status,
+      newValue: "presupuesto_enviado",
+      metadata: { total },
+      date: now,
+    }),
   ])
   return true
 }
@@ -176,6 +223,17 @@ export async function decideBudgetAction(orderId: string, decision: "aprobado" |
     currentOrder.budget_assigned_to
       ? supabase.from("notifications").insert({ order_id: orderId, recipient_user_id: currentOrder.budget_assigned_to, notification_type: decision === "aprobado" ? "budget_approved" : "budget_rejected", title: decision === "aprobado" ? "Presupuesto aceptado por el cliente" : "Presupuesto rechazado por el cliente", message: decision === "aprobado" ? "El cliente aprobó el presupuesto. La orden está lista para ser tomada." : `El cliente rechazó el presupuesto.${normalizedNote ? ` Motivo: ${normalizedNote}` : ""}`, notification_date: now, read: false })
       : Promise.resolve({ error: null }),
+    appendOrderHistoryEventServer({
+      orderId,
+      eventType: "budget_decided",
+      summary: decision === "aprobado" ? "El cliente aprobó el presupuesto." : "El cliente rechazó el presupuesto.",
+      actor: { userId: session.id, name: session.name, role: session.role },
+      fieldName: "budget_decision",
+      oldValue: null,
+      newValue: decision,
+      metadata: { note: normalizedNote || null, status },
+      date: now,
+    }),
   ])
   return true
 }

@@ -29,6 +29,8 @@ function normalizeSearchText(value: string) {
 
 export function OrderForm({ onCreatedAction }: { onCreatedAction?: (orderId: string) => void }) {
   const { addOrder, currentUser, employees, users } = useStore()
+  const [saving, setSaving] = useState(false)
+  const [error, setError] = useState<string | null>(null)
   const activeEmployees = employees.filter((e) => e.active)
   const clients = users.filter((u) => u.role === "cliente")
 
@@ -58,8 +60,9 @@ export function OrderForm({ onCreatedAction }: { onCreatedAction?: (orderId: str
   })
   const isUsingOccasional = clientType === "occasional"
 
-  function handleSubmit(e: React.FormEvent) {
+  async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
+    setError(null)
     
     let clientName: string
     let clientPhone: string
@@ -81,29 +84,36 @@ export function OrderForm({ onCreatedAction }: { onCreatedAction?: (orderId: str
       useClientId = clientId
     }
     
-    const order = addOrder({
-      clientId: useClientId,
-      clientName,
-      clientPhone,
-      clientEmail,
-      deviceType,
-      deviceBrand,
-      deviceModel,
-      deviceSerial: deviceSerial.trim() || null,
-      fault,
-      assignedTo: assignedTo || defaultAssignee,
-    })
-    
-    // Reset form
-    setDeviceType("PC")
-    setDeviceBrand("")
-    setDeviceModel("")
-    setDeviceSerial("")
-    setFault("")
-    setOccasionalName("")
-    setOccasionalPhone("")
-    setOccasionalEmail("")
-    onCreatedAction?.(order.id)
+    setSaving(true)
+    try {
+      const order = await addOrder({
+        clientId: useClientId,
+        clientName,
+        clientPhone,
+        clientEmail,
+        deviceType,
+        deviceBrand,
+        deviceModel,
+        deviceSerial: deviceSerial.trim() || null,
+        fault,
+        assignedTo: assignedTo || defaultAssignee,
+      })
+
+      // Reset form
+      setDeviceType("PC")
+      setDeviceBrand("")
+      setDeviceModel("")
+      setDeviceSerial("")
+      setFault("")
+      setOccasionalName("")
+      setOccasionalPhone("")
+      setOccasionalEmail("")
+      onCreatedAction?.(order.id)
+    } catch (submitError: unknown) {
+      setError(submitError instanceof Error ? submitError.message : "No se pudo crear la orden.")
+    } finally {
+      setSaving(false)
+    }
   }
 
   return (
@@ -334,10 +344,12 @@ export function OrderForm({ onCreatedAction }: { onCreatedAction?: (orderId: str
         )}
       </section>
 
+      {error && <p role="alert" className="rounded-lg border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive">{error}</p>}
+
       <div className="flex justify-end">
-        <Button type="submit" className="gap-2">
+        <Button type="submit" className="gap-2" disabled={saving}>
           <ClipboardPlus className="size-4" />
-          Cargar pedido
+          {saving ? "Cargando pedido…" : "Cargar pedido"}
         </Button>
       </div>
     </form>

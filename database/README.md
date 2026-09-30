@@ -73,7 +73,7 @@ database/
 
 ## 🎯 PRINCIPALES CARACTERÍSTICAS
 
-### ✅ 7 Tablas Principales
+### ✅ 8 Tablas Principales
 ```
 roles          → Tipos de usuario (admin, empleado, cliente)
 users          → Usuarios del sistema
@@ -81,6 +81,7 @@ orders         → Órdenes de reparación
 order_states   → Estados del flujo
 budget_items   → Items de presupuesto
 timeline_events → Historial de cambios
+order_history_events → Auditoría interna de cambios por usuario
 notifications  → Notificaciones in-app dirigidas a usuarios
 notification_preferences → Preferencias in-app por usuario
 ```
@@ -198,8 +199,8 @@ WHERE order_id = (SELECT id FROM orders WHERE code = 'CP-240701-0001');
 
 ### Historial
 - Tabla `timeline_events` registra cada cambio
-- Inmutable (solo se inserta, no se modifica)
-- Permite auditoría completa de la orden
+- `order_history_events` registra actor, acción y valores anteriores/nuevos
+- El historial interno no se expone a clientes ni a la consulta pública
 
 ---
 

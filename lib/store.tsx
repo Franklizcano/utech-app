@@ -2,6 +2,7 @@
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react"
 import { createOrderAction, fetchOrderDetailAction, fetchOrdersAction, markNotificationsReadAction } from "@/app/actions/orders"
+import { reassignOrderAction, updateOrderDetailsAction, updateOrderStatusAction } from "@/app/actions/order-history"
 import { fetchOrderExpirationDaysAction } from "@/app/actions/order-settings"
 import { addBudgetItemAction, deleteBudgetItemAction, updateBudgetItemDiscountAction } from "@/app/actions/budget"
 import { fetchUsersAction } from "@/app/actions/users"
@@ -37,12 +38,7 @@ import {
   toggleUserActiveRemote,
   deleteUserRemote,
 } from "@/lib/queries/users"
-import {
-  updateOrderStatusRemote,
-  updateOrderAssigneeRemote,
-  updateOrderDetailsRemote,
-  insertNotificationRemote,
-} from "@/lib/queries/orders"
+import { insertNotificationRemote } from "@/lib/queries/orders"
 import {
   clearOrdersCache,
   getOrdersCache,
@@ -110,7 +106,7 @@ interface StoreValue {
   searchOrders: (query: string) => Promise<void>
   loadOrderDetail: (orderId: string, force?: boolean) => Promise<Order | null>
   // acciones
-  addOrder: (input: NewOrderInput) => Order
+  addOrder: (input: NewOrderInput) => Promise<Order>
   advanceStatus: (orderId: string, status: OrderStatus, note?: string) => void
   reassignOrder: (orderId: string, newAssignee: string) => void
   updateOrderDetails: (orderId: string, input: OrderDetailsInput) => void
@@ -166,7 +162,7 @@ export function StoreProvider({
   useEffect(() => {
     ordersRef.current = orders
   }, [orders])
-  const ordersCacheKey = currentUser && isLoggedIn ? getOrdersCacheKey(currentUser.id, currentUser.role) : null
+  const ordersCacheKey = currentUser && isLoggedIn ? getOrdersCacheKey(currentUser.id, currentUser.role, "", currentUser.companyId) : null
   const loadOrderDetail = useCallback(async (orderId: string, force = false): Promise<Order | null> => {
     const cachedDetail = ordersRef.current.find((order) => order.id === orderId)
     if (!force && cachedDetail?.fault) return cachedDetail
@@ -179,7 +175,7 @@ export function StoreProvider({
   }, [])
   const searchOrders = useCallback(async (query: string): Promise<void> => {
     if (!currentUser || !isLoggedIn) return
-    const cacheKey = getOrdersCacheKey(currentUser.id, currentUser.role, query)
+    const cacheKey = getOrdersCacheKey(currentUser.id, currentUser.role, query, currentUser.companyId)
     const cachedOrders = getOrdersCache(cacheKey)
     if (cachedOrders && !isOrdersCacheStale(cacheKey, ORDERS_CACHE_TTL_MS)) {
       setOrdersState(cachedOrders)
@@ -353,7 +349,7 @@ export function StoreProvider({
       setOrdersState([])
     }
 
-    function addOrder(input: NewOrderInput): Order {
+    function addOrder(input: NewOrderInput): Promise<Order> {
       const tempId = uid("o")
       const tempCode = `TEMP-${tempId}`
       const canSeeClientData = role === "admin" || role === "cliente"
@@ -378,6 +374,7 @@ export function StoreProvider({
         budgetDecidedAt: null,
         budget: [],
         timeline: [{ id: uid("ev"), status: "recibido", note: "Equipo ingresado en el sistema.", date: now() }],
+        history: [],
         notifications: [
           { id: uid("nt"), message: `Recibimos tu equipo (${input.deviceBrand} ${input.deviceModel}). Te mantendremos al tanto.`, date: now(), read: false },
         ],
@@ -387,22 +384,22 @@ export function StoreProvider({
       setOrders((prev) => [tempOrder, ...prev])
 
       // Persistir en la base de datos
-      createOrderAction(input).then((result) => {
+      return createOrderAction(input).then((result) => {
         if (!result.success || !result.order) {
-          // Revertir si falló la persistencia
-          setOrders((prev) => prev.filter((o) => o.id !== tempId))
-          console.error(result.error ?? "No se pudo crear la orden en la base de datos.")
-        } else {
-          // Reemplazar la orden temporal con la real (UUID de la DB)
-          setOrders((prev) => prev.map((o) => (o.id === tempId ? result.order! : o)))
-          if (currentUser) invalidateOperationsCache(currentUser.id)
+          throw new Error(result.error ?? "No se pudo crear la orden en la base de datos.")
         }
-      }).catch((error: unknown) => {
-        setOrders((prev) => prev.filter((o) => o.id !== tempId))
-        console.error("No se pudo crear la orden en la base de datos:", error)
-      })
 
-      return tempOrder
+        // Reemplazar la orden temporal con la real (UUID de la DB)
+        setOrders((prev) => prev.map((o) => (o.id === tempId ? result.order! : o)))
+        if (currentUser) invalidateOperationsCache(currentUser.id)
+        return result.order
+      }).catch((error: unknown) => {
+        // Revertir si falló la persistencia
+        setOrders((prev) => prev.filter((o) => o.id !== tempId))
+        const message = error instanceof Error ? error.message : "No se pudo crear la orden en la base de datos."
+        console.error("No se pudo crear la orden en la base de datos:", message)
+        throw new Error(message)
+      })
     }
 
     function advanceStatus(orderId: string, status: OrderStatus, note?: string) {
@@ -427,13 +424,14 @@ export function StoreProvider({
       )
 
       // Persistir en la base de datos
-      updateOrderStatusRemote(orderId, status, statusLabel, note).then((ok) => {
+      updateOrderStatusAction(orderId, status, note).then((ok) => {
         if (!ok) {
           // Revertir si falló
           setOrders(previousOrders)
           console.error(`No se pudo actualizar el estado de la orden "${orderId}" en la base de datos.`)
         } else {
           if (currentUser) invalidateOperationsCache(currentUser.id)
+          void loadOrderDetail(orderId, true)
         }
       })
     }
@@ -457,13 +455,14 @@ export function StoreProvider({
       )
 
       // Persistir en la base de datos
-      updateOrderAssigneeRemote(orderId, newAssignee).then((ok) => {
+      reassignOrderAction(orderId, newAssignee).then((ok) => {
         if (!ok) {
           // Revertir si falló
           setOrders(previousOrders)
           console.error(`No se pudo reasignar la orden "${orderId}" en la base de datos.`)
         } else {
           if (currentUser) invalidateOperationsCache(currentUser.id)
+          void loadOrderDetail(orderId, true)
         }
       })
     }
@@ -475,11 +474,13 @@ export function StoreProvider({
       setOrders((prev) => prev.map((o) => (o.id === orderId ? { ...o, ...input } : o)))
 
       // Persistir en la base de datos
-      updateOrderDetailsRemote(orderId, input).then((ok) => {
+      updateOrderDetailsAction(orderId, input).then((ok) => {
         if (!ok) {
           // Revertir si falló
           setOrders(previousOrders)
           console.error(`No se pudieron actualizar los datos de reparación de la orden "${orderId}" en la base de datos.`)
+        } else {
+          void loadOrderDetail(orderId, true)
         }
       })
     }
@@ -499,6 +500,7 @@ export function StoreProvider({
         } else {
           // Reemplazar el item temporal con el real (UUID de la DB)
           setOrders((prev) => prev.map((o) => (o.id === orderId ? { ...o, budget: o.budget.map((b) => b.id === tempItem.id ? saved : b) } : o)))
+          void loadOrderDetail(orderId, true)
         }
       })
     }
@@ -522,6 +524,7 @@ export function StoreProvider({
           return
         }
         if (currentUser) invalidateOperationsCache(currentUser.id)
+        void loadOrderDetail(orderId, true)
       })
     }
 
@@ -539,6 +542,8 @@ export function StoreProvider({
           // Revertir si falló
           setOrders(previousOrders)
           console.error(`No se pudo eliminar el item de presupuesto "${itemId}" en la base de datos.`)
+        } else {
+          void loadOrderDetail(orderId, true)
         }
       })
     }

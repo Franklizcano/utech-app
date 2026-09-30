@@ -211,6 +211,30 @@ Orden CP-240701-0001:
 
 ---
 
+### 7. **order_history_events** - Historial interno de cambios
+
+Registra quién cambió una orden, qué operación realizó y los valores anteriores y nuevos cuando están disponibles. Es de uso interno para administradores, colaboradores y presupuestadores autorizados; no forma parte del historial público del cliente.
+
+```sql
+id (UUID, PK)
+order_id (FK → orders.id)
+actor_user_id (FK → users.id, nullable)
+actor_name (VARCHAR)       -- Snapshot para conservar el nombre histórico
+actor_role (VARCHAR)
+event_type (VARCHAR)
+summary (TEXT)
+field_name (VARCHAR)
+old_value (JSONB)
+new_value (JSONB)
+metadata (JSONB)
+event_date (TIMESTAMP)
+created_at (TIMESTAMP)
+```
+
+Incluye creación, estados, asignaciones, cambios técnicos, operaciones de presupuesto y decisiones del cliente. Los eventos anteriores a la migración se cargan desde `timeline_events` sin actor conocido.
+
+---
+
 ### 8. **notification_preferences** - Preferencias de notificaciones
 
 Guarda la configuración individual de los avisos in-app. Las preferencias se aplican al mostrar la campanita, al contar avisos no leídos y al hidratar las notificaciones de una orden. No elimina registros históricos y deja preparado el modelo para sumar preferencias por canales externos en el futuro.
@@ -229,7 +253,7 @@ Todos los controles están habilitados por defecto. La configuración se adminis
 
 ---
 
-### 7. **notifications** - Notificaciones in-app
+### 9. **notifications** - Notificaciones in-app
 
 Almacena notificaciones dirigidas a usuarios registrados sobre sus órdenes. Los tickets ocasionales pueden conservar `recipient_user_id = NULL` y continúan utilizando la consulta pública restringida.
 

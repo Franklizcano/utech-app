@@ -22,6 +22,7 @@ import {
 } from "@/components/ui/dropdown-menu"
 import { StatusBadge } from "@/components/status-badge"
 import { RepairTimeline } from "@/components/repair-timeline"
+import { OrderHistoryTable } from "@/components/order-history-table"
 import { ReassignDialog } from "@/components/employee/reassign-dialog"
 import { sendBudgetToClientAction, submitOrderForBudgetAction } from "@/app/actions/budget"
 import { useStore, formatCurrency } from "@/lib/store"
@@ -32,7 +33,7 @@ import Image from "next/image"
 const DEVICE_TYPES: DeviceType[] = ["PC", "Notebook", "PlayStation", "Xbox", "Nintendo", "Otro"]
 
 export function OrderDetail({ order, showCode = true }: { order: Order; showCode?: boolean }) {
-  const { role, currentUser, addBudgetItem, updateBudgetItemDiscount, removeBudgetItem, advanceStatus, updateOrderDetails, states, users, refreshOrders } = useStore()
+  const { role, currentUser, addBudgetItem, updateBudgetItemDiscount, removeBudgetItem, advanceStatus, updateOrderDetails, states, users, refreshOrders, loadOrderDetail } = useStore()
   const [desc, setDesc] = useState("")
   const [amount, setAmount] = useState("")
   const [nextStatus, setNextStatus] = useState<OrderStatus>(order.status)
@@ -418,7 +419,7 @@ export function OrderDetail({ order, showCode = true }: { order: Order; showCode
             variant="outline"
             className="w-full gap-2"
             disabled={order.budget.length === 0 || !["pendiente_presupuesto", "presupuesto_rechazado"].includes(order.status)}
-            onClick={async () => { if (await sendBudgetToClientAction(order.id)) { if (currentUser) invalidateOperationsCache(currentUser.id); await refreshOrders() } }}
+            onClick={async () => { if (await sendBudgetToClientAction(order.id)) { if (currentUser) invalidateOperationsCache(currentUser.id); await refreshOrders(); await loadOrderDetail(order.id, true) } }}
           >
             <Send className="size-4" />
             Notificar presupuesto al cliente
@@ -426,7 +427,7 @@ export function OrderDetail({ order, showCode = true }: { order: Order; showCode
         </div> : <div className="space-y-4 rounded-lg border border-dashed border-border p-4">
           <h4 className="text-sm font-semibold text-foreground">Análisis técnico</h4>
           <p className="text-sm text-muted-foreground">El presupuesto es gestionado por el responsable de presupuestos y no está visible para colaboradores.</p>
-          <Button type="button" className="w-full" disabled={submittingBudget || order.status !== "recibido"} onClick={async () => { setSubmittingBudget(true); try { if (await submitOrderForBudgetAction(order.id)) { if (currentUser) invalidateOperationsCache(currentUser.id); await refreshOrders() } } finally { setSubmittingBudget(false) } }}>
+          <Button type="button" className="w-full" disabled={submittingBudget || order.status !== "recibido"} onClick={async () => { setSubmittingBudget(true); try { if (await submitOrderForBudgetAction(order.id)) { if (currentUser) invalidateOperationsCache(currentUser.id); await refreshOrders(); await loadOrderDetail(order.id, true) } } finally { setSubmittingBudget(false) } }}>
             {submittingBudget ? "Enviando…" : "Finalizar análisis y enviar a presupuesto"}
           </Button>
         </div>}
@@ -473,6 +474,12 @@ export function OrderDetail({ order, showCode = true }: { order: Order; showCode
           <div>
             <h4 className="mb-4 text-sm font-semibold text-foreground">Historial</h4>
             <RepairTimeline order={order} />
+          </div>
+
+          <div className="border-t border-border pt-4">
+            <h4 className="mb-3 text-sm font-semibold text-foreground">Historial de cambios</h4>
+            <p className="mb-3 text-xs text-muted-foreground">Registro interno de estados, asignaciones, presupuesto y datos técnicos.</p>
+            <OrderHistoryTable order={order} />
           </div>
         </div>
       </div>

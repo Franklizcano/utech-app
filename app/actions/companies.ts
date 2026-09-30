@@ -2,6 +2,7 @@
 
 import { getSessionAction } from "@/app/actions/auth"
 import { getSupabaseServerClient } from "@/lib/supabase"
+import { fetchCompanyCapacityServer } from "@/lib/queries/companies-server"
 import type { Company } from "@/lib/types"
 
 function isAdmin(session: Awaited<ReturnType<typeof getSessionAction>>) {
@@ -59,8 +60,8 @@ export async function updateCompanyAction(id: string, input: { name: string; use
   const name = input.name.trim()
   if (!name || !Number.isInteger(input.userLimit) || input.userLimit < 0) return { success: false, error: "Revisá el nombre y el límite de usuarios." }
   const supabase = getSupabaseServerClient()
-  const { count } = await supabase.from("users").select("id", { count: "exact", head: true }).eq("company_id", id)
-  if ((count ?? 0) > input.userLimit) return { success: false, error: `El límite no puede ser menor a los ${count ?? 0} usuarios corporativos actuales.` }
+  const currentCapacity = await fetchCompanyCapacityServer(id)
+  if (!currentCapacity) return { success: false, error: "La empresa seleccionada no existe." }
   const { error } = await supabase.from("companies").update({ name, user_limit: input.userLimit, logo: input.logo || null, updated_at: new Date().toISOString() }).eq("id", id)
   if (error) return { success: false, error: error.code === "23505" ? "Ya existe una empresa con ese nombre." : "No se pudo actualizar la empresa." }
   return { success: true }

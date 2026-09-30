@@ -1,5 +1,17 @@
 # CHANGELOG
 
+### [0.3.0] - 2026-09-30
+- Restricted corporate clients to tickets belonging to their company across authenticated order lists and ticket details, with server-side scope validation.
+- Added company capacity enforcement: administrators can lower a company's member limit, and companies exceeding that limit cannot generate new tickets until their membership is regularized.
+- Added explicit capacity warnings for administrators and corporate clients, while preserving regular-client and occasional-ticket creation.
+- Preserved manager removal controls so removed members become regular clients without deleting their accounts.
+- Added an internal, actor-aware order history that records creation, status changes, assignments, technical edits, budget operations, and client budget decisions without exposing audit data to clients.
+- Added a backfill for historical timeline events and separated the internal audit trail from the client-facing repair timeline.
+- Routed internal order mutations through authorized server actions with role and assignment validation, while preserving optimistic UI updates and refreshes.
+- Added fixed-amount and percentage discounts to budget items with server-side limits, recalculated totals, and client-visible discount details.
+- Added globally unique `CP`, `CC`, and `CO` order codes with a transaction-safe counter, date-based formatting, and normalized code searches.
+- Improved notification navigation so clients and internal users can load the related ticket detail on demand even when it is not already in the current list.
+
 ### [0.2.2] - 2026-09-15
 - Refined the budget workflow from technical analysis through client decision, including server-side validation for submission, finalization, acceptance, and rejection.
 - Added budget timeline events and in-app notifications when an order enters budget review, when a finalized budget is sent, and when the client accepts or rejects it.

@@ -111,30 +111,41 @@ export function ServiceWorkspace() {
 
       const matchedOrder = orders.find((order) => normalizeOrderCode(order.code) === normalizeOrderCode(code))
       if (matchedOrder) {
+        if (selectedId === matchedOrder.id) return
         setSelectedId(matchedOrder.id)
-        setSelectedDetail((current) => current?.id === matchedOrder.id ? current : null)
+        setSelectedDetail(null)
       }
     }
 
     syncTicketFromUrl()
     window.addEventListener("popstate", syncTicketFromUrl)
     return () => window.removeEventListener("popstate", syncTicketFromUrl)
-  }, [orders])
+  }, [orders, selectedId])
 
   useEffect(() => {
     function openNotificationOrder(event: Event) {
       const orderId = (event as CustomEvent<{ orderId?: string }>).detail?.orderId
       const order = orderId ? orders.find((candidate) => candidate.id === orderId) : null
-      if (!order) return
-      setSelectedId(order.id)
-      setSelectedDetail(order.fault ? order : null)
-      const path = `/gestion/ticket/${encodeURIComponent(order.code)}`
-      if (window.location.pathname !== path) window.history.pushState({ ticketCode: order.code }, "", path)
+      if (order) {
+        openInternalTicket(order)
+        return
+      }
+      if (!orderId) return
+
+      void loadOrderDetail(orderId, true).then((detail) => {
+        if (!detail) return
+        setSelectedId(detail.id)
+        setSelectedDetail(detail)
+        const path = `/gestion/ticket/${encodeURIComponent(detail.code)}`
+        if (window.location.pathname !== path) window.history.pushState({ ticketCode: detail.code }, "", path)
+      }).catch((error: unknown) => {
+        console.error("No se pudo cargar la orden de la notificación:", error)
+      })
     }
 
     window.addEventListener("utech:select-order", openNotificationOrder)
     return () => window.removeEventListener("utech:select-order", openNotificationOrder)
-  }, [orders])
+  }, [loadOrderDetail, orders])
 
   const selected = orders.find((o) => o.id === selectedId) ?? (selectedDetail?.id === selectedId ? selectedDetail : null)
   const sortedOrders = useMemo(() => [...orders].sort((left, right) => {

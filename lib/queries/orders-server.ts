@@ -1,6 +1,7 @@
 import { getSupabaseServerClient } from "@/lib/supabase"
 import { FINAL_ORDER_STATUS, type AppNotification, type BudgetItem, type OccasionalTicketDetail, type OccasionalTicketStatus, type Order, type OrderCreationInput, type OrderStatus, type TimelineEvent, type Role } from "@/lib/types"
 import { fetchNotificationPreferencesForUser, isNotificationEnabled } from "@/lib/notification-preferences"
+import { appendOrderHistoryEventServer, fetchOrderHistoryServer, type OrderHistoryActor } from "@/lib/queries/order-history-server"
 
 function rowToBudgetItem(row: Record<string, unknown>): BudgetItem {
   return {
@@ -57,12 +58,51 @@ function rowToOrder(row: Record<string, unknown>): Order {
     budgetDecidedAt: (row.budget_decided_at as string | null) ?? null,
     budget: [],
     timeline: [],
+    history: [],
     notifications: [],
     createdAt: row.created_at as string,
   }
 }
 
+async function resolveClientOrderIds(
+  supabase: ReturnType<typeof getSupabaseServerClient>,
+  userId: string,
+  expectedCompanyId?: string,
+): Promise<string[]> {
+  const { data: viewer, error: viewerError } = await supabase
+    .from("users")
+    .select("company_id")
+    .eq("id", userId)
+    .eq("role", "cliente")
+    .maybeSingle()
+
+  if (viewerError) {
+    console.error("Error al validar la empresa del cliente:", viewerError.message)
+    throw new Error("No se pudo validar el alcance de las órdenes.")
+  }
+
+  if (!viewer) return []
+
+  const currentCompanyId = (viewer.company_id as string | null) ?? null
+  if (expectedCompanyId && expectedCompanyId !== currentCompanyId) return []
+  if (!currentCompanyId) return [userId]
+
+  const { data: companyUsers, error: companyUsersError } = await supabase
+    .from("users")
+    .select("id")
+    .eq("company_id", currentCompanyId)
+    .eq("role", "cliente")
+
+  if (companyUsersError) {
+    console.error("Error al cargar los clientes de la empresa:", companyUsersError.message)
+    throw new Error("No se pudo validar el alcance de las órdenes.")
+  }
+
+  return (companyUsers ?? []).map((user) => user.id as string)
+}
+
 export function redactOrderClientData(order: Order, role: Role): Order {
+  if (role === "cliente") return { ...order, history: [] }
   if (role !== "colaborador" && role !== "presupuestador") return order
 
   return {
@@ -91,9 +131,10 @@ async function hydrateOrders(
     .order("notification_date", { ascending: true })
   if (viewerId) notificationsQuery = notificationsQuery.eq("recipient_user_id", viewerId)
 
-  const [budgetResult, timelineResult, notificationsResult] = await Promise.all([
+  const [budgetResult, timelineResult, historyResult, notificationsResult] = await Promise.all([
     includeBudget ? supabase.from("budget_items").select("*").in("order_id", orderIds) : Promise.resolve({ data: [], error: null }),
     supabase.from("timeline_events").select("*").in("order_id", orderIds).order("event_date", { ascending: true }),
+    fetchOrderHistoryServer(orderIds),
     notificationsQuery,
   ])
 
@@ -137,6 +178,7 @@ async function hydrateOrders(
     const order = redactOrderClientData(rowToOrder(row), viewerRole ?? "admin")
         order.budget = includeBudget ? budgets.get(order.id) ?? [] : []
     order.timeline = timelines.get(order.id) ?? []
+    order.history = viewerRole === "cliente" ? [] : historyResult.get(order.id) ?? []
     order.notifications = notifications.get(order.id) ?? []
     return order
   })
@@ -146,7 +188,7 @@ async function hydrateOrders(
  * Crea una orden usando el cliente server-side y devuelve sus datos iniciales.
  * La identidad del cliente debe ser fijada por la Server Action que llama a esta función.
  */
-export async function insertOrderServer(input: OrderCreationInput): Promise<Order | null> {
+export async function insertOrderServer(input: OrderCreationInput, actor?: OrderHistoryActor): Promise<Order | null> {
   const supabase = getSupabaseServerClient()
   const { data: createdOrders, error: orderError } = await supabase.rpc("create_order_with_code", {
     p_client_id: input.clientId,
@@ -189,6 +231,22 @@ export async function insertOrderServer(input: OrderCreationInput): Promise<Orde
     }),
   ])
 
+  if (actor) {
+    await appendOrderHistoryEventServer({
+      orderId,
+      eventType: "order_created",
+      summary: "Orden creada.",
+      actor,
+      newValue: {
+        status: "recibido",
+        deviceType: input.deviceType,
+        deviceBrand: input.deviceBrand,
+        deviceModel: input.deviceModel,
+      },
+      date: now,
+    })
+  }
+
   if (timelineResult.error || notificationResult.error) {
     console.error("Error al crear los detalles iniciales de la orden:", {
       timeline: timelineResult.error?.message,
@@ -196,13 +254,27 @@ export async function insertOrderServer(input: OrderCreationInput): Promise<Orde
     })
   }
 
-  const [timeline, notifications] = await Promise.all([
+  const [timeline, history, notifications] = await Promise.all([
     supabase.from("timeline_events").select("*").eq("order_id", orderId).order("event_date", { ascending: true }),
+    supabase.from("order_history_events").select("*").eq("order_id", orderId).order("event_date", { ascending: true }),
     supabase.from("notifications").select("*").eq("order_id", orderId).order("notification_date", { ascending: true }),
   ])
 
   const order = rowToOrder(orderData)
   order.timeline = (timeline.data ?? []).map(rowToTimelineEvent)
+  order.history = (history.data ?? []).map((row) => ({
+    id: row.id as string,
+    eventType: row.event_type as Order["history"][number]["eventType"],
+    actorUserId: (row.actor_user_id as string | null) ?? null,
+    actorName: (row.actor_name as string | null) ?? null,
+    actorRole: (row.actor_role as Role | null) ?? null,
+    summary: row.summary as string,
+    fieldName: (row.field_name as string | null) ?? null,
+    oldValue: row.old_value ?? null,
+    newValue: row.new_value ?? null,
+    metadata: (row.metadata as Record<string, unknown> | null) ?? {},
+    date: row.event_date as string,
+  }))
   order.notifications = (notifications.data ?? []).map(rowToNotification)
   return order
 }
@@ -211,7 +283,7 @@ export async function insertOrderServer(input: OrderCreationInput): Promise<Orde
  * Asigna una orden disponible al colaborador actual sin permitir que dos colaboradores
  * tomen la misma orden simultáneamente.
  */
-export async function claimOrderServer(orderId: string, assignee: string, recipientUserId?: string): Promise<boolean> {
+export async function claimOrderServer(orderId: string, assignee: string, recipientUserId?: string, actor?: OrderHistoryActor): Promise<boolean> {
   if (!orderId || !assignee.trim()) return false
 
   const supabase = getSupabaseServerClient()
@@ -252,6 +324,20 @@ export async function claimOrderServer(orderId: string, assignee: string, recipi
   const notificationResults = await Promise.all(notifications)
   const notificationError = notificationResults.find((result) => result.error)?.error
   if (notificationError) console.error("Error al notificar la asignación de la orden:", notificationError.message)
+
+  if (actor) {
+    await appendOrderHistoryEventServer({
+      orderId: order.id as string,
+      eventType: "assignee_changed",
+      summary: "Colaborador asignado a la orden.",
+      actor,
+      fieldName: "assigned_to",
+      oldValue: null,
+      newValue: assignee.trim(),
+      metadata: { recipientUserId: recipientUserId ?? null },
+      date: now,
+    })
+  }
 
   return true
 }
@@ -402,7 +488,7 @@ export async function fetchOccasionalTicketDetail(code: string): Promise<Occasio
  * Obtiene únicamente las órdenes permitidas para la sesión autenticada.
  * Esta función solo debe importarse desde Server Actions o código server-side.
  */
-export async function fetchOrdersForUser(userId: string, role: Role, assignedTo?: string, offset = 0, limit = 50, search = ""): Promise<Order[]> {
+export async function fetchOrdersForUser(userId: string, role: Role, assignedTo?: string, offset = 0, limit = 50, search = "", companyId?: string): Promise<Order[]> {
   if (!userId || !["admin", "colaborador", "presupuestador", "cliente"].includes(role)) {
     return []
   }
@@ -414,7 +500,9 @@ export async function fetchOrdersForUser(userId: string, role: Role, assignedTo?
     .order("created_at", { ascending: false })
 
   if (role === "cliente") {
-    ordersQuery = ordersQuery.eq("client_id", userId)
+    const clientIds = await resolveClientOrderIds(supabase, userId, companyId)
+    if (clientIds.length === 0) return []
+    ordersQuery = ordersQuery.in("client_id", clientIds)
   } else if (role === "admin") {
     ordersQuery = ordersQuery.not("assigned_to", "is", null).neq("status", FINAL_ORDER_STATUS)
   } else if (role === "colaborador") {
@@ -470,7 +558,9 @@ export async function fetchOrderDetailForUser(
   let orderQuery = supabase.from("orders").select("*").eq("id", orderId)
 
   if (role === "cliente") {
-    orderQuery = orderQuery.eq("client_id", userId)
+    const clientIds = await resolveClientOrderIds(supabase, userId, companyId)
+    if (clientIds.length === 0) return null
+    orderQuery = orderQuery.in("client_id", clientIds)
   } else if (role === "admin") {
     orderQuery = orderQuery.not("assigned_to", "is", null).neq("status", FINAL_ORDER_STATUS)
   } else if (role === "colaborador") {
@@ -508,7 +598,7 @@ export async function fetchOrderDetailByCodeForUser(
   const normalizedCode = code.trim().replace(/[-\s]/g, "").toUpperCase()
   if (!normalizedCode) return null
 
-  const candidates = await fetchOrdersForUser(userId, role, assignedTo, 0, 50, code.trim())
+  const candidates = await fetchOrdersForUser(userId, role, assignedTo, 0, 50, code.trim(), companyId)
   const candidate = candidates.find((order) => order.code.replace(/[-\s]/g, "").toUpperCase() === normalizedCode)
   if (candidate) {
     return fetchOrderDetailForUser(candidate.id, userId, role, assignedTo, companyId)
@@ -556,7 +646,7 @@ export async function fetchBudgetOrdersForUser(userId: string, role: Role): Prom
   return hydrateOrders((data ?? []) as Array<Record<string, unknown>>, supabase, true, role, userId)
 }
 
-export async function claimBudgetOrderServer(orderId: string, userId: string): Promise<boolean> {
+export async function claimBudgetOrderServer(orderId: string, userId: string, actor?: OrderHistoryActor): Promise<boolean> {
   const supabase = getSupabaseServerClient()
   const { data, error } = await supabase
     .from("orders")
@@ -564,9 +654,23 @@ export async function claimBudgetOrderServer(orderId: string, userId: string): P
     .eq("id", orderId)
     .in("status", ["pendiente_presupuesto", "presupuesto_rechazado"])
     .is("budget_assigned_to", null)
-    .select("id")
+    .select("id, budget_assigned_to")
     .maybeSingle()
-  return !error && Boolean(data)
+  if (error || !data) return false
+
+  if (actor) {
+    await appendOrderHistoryEventServer({
+      orderId,
+      eventType: "budget_assignee_changed",
+      summary: "Responsable de presupuesto asignado.",
+      actor,
+      fieldName: "budget_assigned_to",
+      oldValue: null,
+      newValue: userId,
+    })
+  }
+
+  return true
 }
 
 export async function updateBudgetItemDiscountServer(
@@ -575,13 +679,14 @@ export async function updateBudgetItemDiscountServer(
   role: Role,
   discountType: "fixed" | "percentage" | null,
   discountValue: number | null,
+  actor?: OrderHistoryActor,
 ): Promise<boolean> {
   if (!itemId || !userId || !["admin", "presupuestador"].includes(role)) return false
 
   const supabase = getSupabaseServerClient()
   const { data: item, error: itemError } = await supabase
     .from("budget_items")
-    .select("id, amount, order_id")
+    .select("id, amount, order_id, discount_type, discount_value, description")
     .eq("id", itemId)
     .maybeSingle()
   if (itemError || !item) return false
@@ -596,6 +701,17 @@ export async function updateBudgetItemDiscountServer(
     .from("budget_items")
     .update({ discount_type: discountType, discount_value: discountValue })
     .eq("id", itemId)
+  if (!error && actor) {
+    await appendOrderHistoryEventServer({
+      orderId: item.order_id as string,
+      eventType: "budget_item_updated",
+      summary: "Descuento del presupuesto actualizado.",
+      actor,
+      fieldName: "discount",
+      oldValue: { type: item.discount_type, value: item.discount_value === null ? null : Number(item.discount_value) },
+      newValue: { type: discountType, value: discountValue },
+      metadata: { itemId, description: item.description },
+    })
+  }
   return !error
 }
-

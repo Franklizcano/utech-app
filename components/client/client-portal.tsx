@@ -177,6 +177,7 @@ export function ClientPortal() {
   const [dialogOpen, setDialogOpen] = useState(false)
   const [referralStats, setReferralStats] = useState<Awaited<ReturnType<typeof fetchReferralStatsAction>>>(null)
   const [copied, setCopied] = useState(false)
+  const [notificationOrderLoading, setNotificationOrderLoading] = useState(false)
   const initialSearchEffect = useRef(true)
 
   useEffect(() => {
@@ -209,17 +210,29 @@ export function ClientPortal() {
       const orderId = (event as CustomEvent<{ orderId?: string }>).detail?.orderId
       if (!orderId) return
       setSelectedOrderId(orderId)
+      setSelectedOrderDetail(null)
+      const orderIsLoaded = orders.some((order) => order.id === orderId)
+      setNotificationOrderLoading(!orderIsLoaded)
+      if (!orderIsLoaded) {
+        void loadOrderDetail(orderId, true).then((detail) => {
+          if (detail) setSelectedOrderDetail(detail)
+        }).catch((error: unknown) => {
+          console.error("No se pudo cargar la orden de la notificación:", error)
+        }).finally(() => setNotificationOrderLoading(false))
+      }
       markNotificationsRead(orderId)
     }
 
     window.addEventListener("utech:select-order", handleNotificationOrder)
     return () => window.removeEventListener("utech:select-order", handleNotificationOrder)
-  }, [markNotificationsRead])
+  }, [loadOrderDetail, markNotificationsRead, orders])
 
-  const selectedOrder = orders.find((order) => order.id === selectedOrderId) ?? orders[0] ?? null
+  const selectedOrder = selectedOrderId
+    ? orders.find((order) => order.id === selectedOrderId) ?? (selectedOrderDetail?.id === selectedOrderId ? selectedOrderDetail : null)
+    : orders[0] ?? null
 
   useEffect(() => {
-    if (!selectedOrder?.id) {
+    if (!selectedOrder?.id || selectedOrderDetail?.id === selectedOrder.id) {
       return
     }
 
@@ -236,12 +249,14 @@ export function ClientPortal() {
     return () => {
       cancelled = true
     }
-  }, [selectedOrder?.id, loadOrderDetail])
+  }, [selectedOrder?.id, selectedOrderDetail?.id, loadOrderDetail])
 
-  const detailLoading = Boolean(selectedOrder?.id && selectedOrderDetail?.id !== selectedOrder.id)
+  const detailLoading = notificationOrderLoading || Boolean(selectedOrder?.id && selectedOrderDetail?.id !== selectedOrder.id)
 
   function handleSelectOrder(orderId: string) {
     setSelectedOrderId(orderId)
+    setSelectedOrderDetail(null)
+    setNotificationOrderLoading(false)
     markNotificationsRead(orderId)
   }
 
