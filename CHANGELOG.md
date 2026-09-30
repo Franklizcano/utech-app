@@ -11,6 +11,8 @@
 - Added fixed-amount and percentage discounts to budget items with server-side limits, recalculated totals, and client-visible discount details.
 - Added globally unique `CP`, `CC`, and `CO` order codes with a transaction-safe counter, date-based formatting, and normalized code searches.
 - Improved notification navigation so clients and internal users can load the related ticket detail on demand even when it is not already in the current list.
+- Added a dedicated `Nueva orden corporativa` action for administrators and collaborators, restricted to registered corporate clients.
+- Renamed the internal `Nuevo pedido` actions and order-creation labels to `Nueva orden` for consistent terminology.
 
 ### [0.2.2] - 2026-09-15
 - Refined the budget workflow from technical analysis through client decision, including server-side validation for submission, finalization, acceptance, and rejection.
