@@ -197,6 +197,14 @@ export async function decideBudgetAction(orderId: string, decision: "aprobado" |
   if (decision !== "aprobado" && decision !== "rechazado") return false
   const normalizedNote = typeof note === "string" ? note.trim().slice(0, 500) : ""
   const supabase = getSupabaseServerClient()
+  const { data: viewer, error: viewerError } = await supabase
+    .from("users")
+    .select("company_id")
+    .eq("id", session.id)
+    .eq("role", "cliente")
+    .maybeSingle()
+  if (viewerError || !viewer || viewer.company_id) return false
+
   const now = new Date().toISOString()
   const status = decision === "aprobado" ? "presupuesto_aprobado" : "presupuesto_rechazado"
   const { data: currentOrder, error: currentOrderError } = await supabase

@@ -374,7 +374,7 @@ export function ClientPortal() {
                 Cargando detalle…
               </div>
             ) : selectedOrderDetail ? (
-              <ClientOrderDetail key={selectedOrderDetail.id} order={selectedOrderDetail} showBudget={true} onDecisionAction={async () => {
+              <ClientOrderDetail key={selectedOrderDetail.id} order={selectedOrderDetail} showBudget={!currentUser?.companyId} onDecisionAction={async () => {
                 await refreshOrders()
                 if (selectedOrderId) setSelectedOrderDetail(await loadOrderDetail(selectedOrderId, true))
               }} />

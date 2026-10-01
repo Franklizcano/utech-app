@@ -579,7 +579,19 @@ export async function fetchOrderDetailForUser(
   }
   if (!data) return null
 
-  const canSeeBudget = role === "admin" || role === "presupuestador" || (role === "cliente" && ["presupuesto_enviado", "presupuesto_aprobado", "presupuesto_rechazado"].includes(data.status))
+  let isCorporateClient = false
+  if (role === "cliente") {
+    const { data: viewer, error: viewerError } = await supabase
+      .from("users")
+      .select("company_id")
+      .eq("id", userId)
+      .eq("role", "cliente")
+      .maybeSingle()
+    if (viewerError || !viewer) return null
+    isCorporateClient = Boolean(viewer.company_id)
+  }
+
+  const canSeeBudget = role === "admin" || role === "presupuestador" || (role === "cliente" && !isCorporateClient && ["presupuesto_enviado", "presupuesto_aprobado", "presupuesto_rechazado"].includes(data.status))
   const [order] = await hydrateOrders([data as Record<string, unknown>], supabase, canSeeBudget, role, userId)
   return order ?? null
 }
