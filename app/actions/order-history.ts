@@ -4,6 +4,7 @@ import { getSessionAction } from "@/app/actions/auth"
 import { getSupabaseServerClient } from "@/lib/supabase"
 import { appendOrderHistoryEventServer } from "@/lib/queries/order-history-server"
 import { FINAL_ORDER_STATUS, type DeviceType, type OrderDetailsInput, type OrderStatus, type Role } from "@/lib/types"
+import { addMonthsClamped, ORDER_REMINDER_INTERVALS, type OrderReminderInterval } from "@/lib/order-reminders"
 
 const INTERNAL_ROLES: Role[] = ["admin", "colaborador", "presupuestador"]
 const DEVICE_TYPES: DeviceType[] = ["PC", "Notebook", "PlayStation", "Xbox", "Nintendo", "Otro"]
@@ -16,7 +17,7 @@ async function getMutableOrder(orderId: string, session: InternalSession) {
   const supabase = getSupabaseServerClient()
   let query = supabase
     .from("orders")
-    .select("id, status, assigned_to, budget_assigned_to, device_type, device_brand, device_model, device_serial, fault")
+    .select("id, status, assigned_to, budget_assigned_to, client_id, device_type, device_brand, device_model, device_serial, fault")
     .eq("id", orderId)
     .neq("status", FINAL_ORDER_STATUS)
 
@@ -63,6 +64,24 @@ export async function updateOrderStatusAction(orderId: string, statusInput: stri
     .maybeSingle()
   if (error || !updated) return false
 
+  if (status === FINAL_ORDER_STATUS) {
+    const { data: reminder, error: reminderError } = await supabase
+      .from("order_reminders")
+      .select("id, interval_months, active, recipient_user_id")
+      .eq("order_id", orderId)
+      .maybeSingle()
+    if (reminderError) console.error("Error al buscar el recordatorio de la orden:", reminderError.message)
+    if (reminder?.active && updated.client_id) {
+      const nextReminderAt = addMonthsClamped(new Date(now), Number(reminder.interval_months)).toISOString()
+      const { error: scheduleError } = await supabase.from("order_reminders").update({
+        recipient_user_id: updated.client_id,
+        next_reminder_at: nextReminderAt,
+        updated_at: now,
+      }).eq("id", reminder.id)
+      if (scheduleError) console.error("Error al programar el recordatorio de la orden:", scheduleError.message)
+    }
+  }
+
   const statusLabel = state.label as string
   const message = `Estado actualizado: ${statusLabel}.${note ? ` ${note}` : ""}`
   await Promise.all([
@@ -89,6 +108,59 @@ export async function updateOrderStatusAction(orderId: string, statusInput: stri
     }),
   ])
 
+  return true
+}
+
+export async function saveOrderReminderAction(orderId: string, intervalInput: number | null, messageInput: string): Promise<boolean> {
+  const session = await getSessionAction()
+  if (!session || !session.active || !["admin", "colaborador"].includes(session.role)) return false
+  if (typeof orderId !== "string" || !orderId.trim()) return false
+  if (intervalInput !== null && !ORDER_REMINDER_INTERVALS.includes(intervalInput as OrderReminderInterval)) return false
+  const message = typeof messageInput === "string" ? messageInput.trim().slice(0, 1000) : ""
+  if (intervalInput !== null && !message) return false
+
+  const currentOrder = await getMutableOrder(orderId, session)
+  if (!currentOrder || !currentOrder.client_id) return false
+
+  const supabase = getSupabaseServerClient()
+  const now = new Date().toISOString()
+  if (intervalInput === null) {
+    const { error } = await supabase.from("order_reminders").update({ active: false, next_reminder_at: null, updated_at: now }).eq("order_id", orderId)
+    if (error) return false
+    await appendOrderHistoryEventServer({
+      orderId,
+      eventType: "order_reminder_updated",
+      summary: "Recordatorio de orden desactivado.",
+      actor: actorFromSession(session),
+      fieldName: "order_reminder",
+      newValue: { active: false },
+      date: now,
+    })
+    return true
+  }
+
+  const { error } = await supabase.from("order_reminders").upsert({
+    order_id: orderId,
+    interval_months: intervalInput,
+    message,
+    active: true,
+    created_by: session.id,
+    updated_at: now,
+  }, { onConflict: "order_id" })
+  if (error) {
+    console.error("Error al guardar el recordatorio de la orden:", error.message)
+    return false
+  }
+
+  await appendOrderHistoryEventServer({
+    orderId,
+    eventType: "order_reminder_updated",
+    summary: `Recordatorio configurado cada ${intervalInput} meses.`,
+    actor: actorFromSession(session),
+    fieldName: "order_reminder",
+    newValue: { intervalMonths: intervalInput, message, active: true },
+    date: now,
+  })
   return true
 }
 

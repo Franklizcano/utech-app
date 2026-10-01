@@ -14,6 +14,18 @@ Abre Supabase SQL Editor y ejecuta:
 
 **Tiempo estimado:** 2-3 minutos
 
+Si la base ya está inicializada, aplicar `database/migrations/020_order_reminders.sql` desde Supabase SQL Editor. Configurar `CRON_SECRET` en el entorno de producción. El endpoint es independiente del proveedor y acepta `GET` con `Authorization: Bearer <CRON_SECRET>`. Vercel lo ejecuta diariamente mediante `vercel.json`; al migrar a Hostinger, crear en hPanel el cron diario que invoque el mismo endpoint.
+
+Ejemplo de comando para un cron del hosting (reemplazar dominio y secreto; no guardar el secreto en Git):
+
+```sh
+curl --fail --silent --show-error \
+  -H "Authorization: Bearer TU_CRON_SECRET" \
+  "https://tu-dominio.com/api/cron/order-reminders"
+```
+
+En Hostinger hPanel, se puede crear como cron de tipo **Custom**, con frecuencia diaria. Hostinger programa los cron jobs en UTC; este ejemplo de horario equivale a las 09:00 de Argentina (`0 12 * * *`). Revisar la salida del cron para detectar errores.
+
 ---
 
 ### 2️⃣ VERIFICAR QUE FUNCIONÓ
@@ -32,6 +44,7 @@ ORDER BY table_name;
 -- roles
 -- timeline_events
 -- users
+-- order_reminders (migración 020)
 ```
 
 ---

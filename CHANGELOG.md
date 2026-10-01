@@ -1,5 +1,10 @@
 # CHANGELOG
 
+### [Unreleased]
+- Added order-level recurring reminders with collaborator/admin-authored messages and 6-, 12-, or 24-month intervals (12 months by default); delivery begins when the order is marked as delivered and repeats for registered clients.
+- Added authenticated daily reminder processing with deduplication and per-channel delivery tracking, leaving the email-provider integration point available for later.
+- Moved recurring reminder controls and internal change history into the order actions menu to reduce visual clutter.
+
 ### [0.3.0] - 2026-09-30
 - Moved corporate clients out of the general user list and added a search by name, email, or phone in company management.
 - Restricted corporate clients to tickets belonging to their company across authenticated order lists and ticket details, with server-side scope validation.

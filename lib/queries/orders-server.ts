@@ -1,5 +1,5 @@
 import { getSupabaseServerClient } from "@/lib/supabase"
-import { FINAL_ORDER_STATUS, type AppNotification, type BudgetItem, type OccasionalTicketDetail, type OccasionalTicketStatus, type Order, type OrderCreationInput, type OrderStatus, type TimelineEvent, type Role } from "@/lib/types"
+import { FINAL_ORDER_STATUS, type AppNotification, type BudgetItem, type OrderReminder, type OccasionalTicketDetail, type OccasionalTicketStatus, type Order, type OrderCreationInput, type OrderStatus, type TimelineEvent, type Role } from "@/lib/types"
 import { fetchNotificationPreferencesForUser, isNotificationEnabled } from "@/lib/notification-preferences"
 import { appendOrderHistoryEventServer, fetchOrderHistoryServer, type OrderHistoryActor } from "@/lib/queries/order-history-server"
 
@@ -138,11 +138,16 @@ async function hydrateOrders(
     notificationsQuery,
   ])
 
-  if (budgetResult.error || timelineResult.error || notificationsResult.error) {
+  const remindersResult = viewerRole === "cliente"
+    ? { data: [], error: null }
+    : await supabase.from("order_reminders").select("order_id, interval_months, message, active, next_reminder_at, last_sent_at").in("order_id", orderIds)
+
+  if (budgetResult.error || timelineResult.error || notificationsResult.error || remindersResult.error) {
     console.error("Error al traer relaciones de órdenes autorizadas:", {
       budget: budgetResult.error?.message,
       timeline: timelineResult.error?.message,
       notifications: notificationsResult.error?.message,
+      orderReminders: remindersResult.error?.message,
     })
     throw new Error("No se pudieron cargar los detalles de las órdenes.")
   }
@@ -150,6 +155,7 @@ async function hydrateOrders(
   const budgets = new Map<string, BudgetItem[]>()
   const timelines = new Map<string, TimelineEvent[]>()
   const notifications = new Map<string, AppNotification[]>()
+  const orderReminders = new Map<string, OrderReminder>()
   const notificationPreferences = viewerId ? await fetchNotificationPreferencesForUser(viewerId) : null
 
   for (const row of budgetResult.data ?? []) {
@@ -174,12 +180,25 @@ async function hydrateOrders(
     notifications.set(orderId, items)
   }
 
+  for (const row of remindersResult.data ?? []) {
+    const interval = Number(row.interval_months)
+    if (interval !== 6 && interval !== 12 && interval !== 24) continue
+    orderReminders.set(row.order_id as string, {
+      intervalMonths: interval,
+      message: row.message as string,
+      active: Boolean(row.active),
+      nextReminderAt: (row.next_reminder_at as string | null) ?? null,
+      lastSentAt: (row.last_sent_at as string | null) ?? null,
+    })
+  }
+
   return ordersData.map((row) => {
     const order = redactOrderClientData(rowToOrder(row), viewerRole ?? "admin")
         order.budget = includeBudget ? budgets.get(order.id) ?? [] : []
     order.timeline = timelines.get(order.id) ?? []
     order.history = viewerRole === "cliente" ? [] : historyResult.get(order.id) ?? []
     order.notifications = notifications.get(order.id) ?? []
+    if (viewerRole !== "cliente") order.orderReminder = orderReminders.get(order.id) ?? null
     return order
   })
 }

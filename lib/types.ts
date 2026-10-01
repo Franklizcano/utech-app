@@ -142,6 +142,7 @@ export type OrderHistoryEventType =
   | "budget_submitted"
   | "budget_sent"
   | "budget_decided"
+  | "order_reminder_updated"
 
 export interface OrderHistoryEvent {
   id: string
@@ -167,6 +168,14 @@ export interface AppNotification {
   date: string
   read: boolean
   readAt?: string | null
+}
+
+export interface OrderReminder {
+  intervalMonths: 6 | 12 | 24
+  message: string
+  active: boolean
+  nextReminderAt: string | null
+  lastSentAt: string | null
 }
 
 export interface NotificationPreferences {
@@ -214,6 +223,7 @@ export interface Order {
   timeline: TimelineEvent[]
   history: OrderHistoryEvent[]
   notifications: AppNotification[]
+  orderReminder?: OrderReminder | null
   createdAt: string
 }
 

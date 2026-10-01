@@ -137,6 +137,7 @@ updated_at (TIMESTAMP)     -- Fecha de actualización
 
 **Ejemplo:**
 ```
+
 Código: CP-2407010001
 Cliente: Juan Pérez (juan.perez@mail.com)
 Equipo: Sony PS5 Slim
@@ -288,6 +289,10 @@ Orden CP-240701-0001:
   [LEÍDA] "Presupuesto cargado. Total: $56.000"
   [NO LEÍDA] "Estamos esperando el repuesto (módulo HDMI)"
 ```
+
+### Recordatorios configurables por orden
+
+La tabla `order_reminders` guarda un mensaje configurable por orden y una frecuencia de 6, 12 o 24 meses. El valor inicial propone mantenimiento anual, pero el colaborador o admin puede escribir cualquier recordatorio. El ciclo empieza al entregar la orden. El proceso programado crea una notificación in-app para el cliente registrado y avanza la fecha; los tickets ocasionales no reciben estos avisos. `notification_deliveries` registra el estado de entrega por canal y permite incorporar un proveedor de email en el futuro.
 
 ---
 

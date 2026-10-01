@@ -1,7 +1,7 @@
 "use client"
 
 import { useState } from "react"
-import { Plus, Trash2, Send, ArrowRight, Phone, Mail, UserRound, MoreVertical, Pencil, X, Check } from "lucide-react"
+import { Plus, Trash2, Send, ArrowRight, Phone, Mail, UserRound, MoreVertical, Pencil, X, Check, BellRing, History } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -24,6 +24,8 @@ import { StatusBadge } from "@/components/status-badge"
 import { RepairTimeline } from "@/components/repair-timeline"
 import { OrderHistoryTable } from "@/components/order-history-table"
 import { ReassignDialog } from "@/components/employee/reassign-dialog"
+import { OrderReminderDialog } from "@/components/employee/order-reminder-dialog"
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { sendBudgetToClientAction, submitOrderForBudgetAction } from "@/app/actions/budget"
 import { useStore, formatCurrency } from "@/lib/store"
 import { invalidateOperationsCache } from "@/lib/operations-cache"
@@ -47,9 +49,12 @@ export function OrderDetail({ order, showCode = true }: { order: Order; showCode
   const [draftFault, setDraftFault] = useState(order.fault)
   const [submittingBudget, setSubmittingBudget] = useState(false)
   const [discountDrafts, setDiscountDrafts] = useState<Record<string, string>>({})
+  const [reminderOpen, setReminderOpen] = useState(false)
+  const [historyOpen, setHistoryOpen] = useState(false)
 
   const total = budgetTotal(order)
   const canManageBudget = role === "admin" || role === "presupuestador"
+  const canConfigureOrderReminder = role === "admin" || role === "colaborador"
   const canEditBudget = canManageBudget && ["recibido", "pendiente_presupuesto", "presupuesto_rechazado"].includes(order.status)
   const canSeeClientData = role !== "colaborador" && role !== "presupuestador"
   const statusFlow = getStatusFlow(states).filter((status) => canManageBudget || !status.startsWith("presupuesto") && status !== "pendiente_presupuesto")
@@ -241,6 +246,18 @@ export function OrderDetail({ order, showCode = true }: { order: Order; showCode
                 <ArrowRight className="mr-2 h-4 w-4" />
                 <span>Reasignar técnico</span>
               </DropdownMenuItem>
+              {canConfigureOrderReminder && (
+                <DropdownMenuItem onClick={() => setReminderOpen(true)}>
+                  <BellRing className="mr-2 h-4 w-4" />
+                  <span>Avisos recurrentes</span>
+                </DropdownMenuItem>
+              )}
+              {role !== "cliente" && (
+                <DropdownMenuItem onClick={() => setHistoryOpen(true)}>
+                  <History className="mr-2 h-4 w-4" />
+                  <span>Historial de cambios</span>
+                </DropdownMenuItem>
+              )}
             </DropdownMenuContent>
           </DropdownMenu>
         </div>
@@ -279,6 +296,16 @@ export function OrderDetail({ order, showCode = true }: { order: Order; showCode
       </div>
 
       <ReassignDialog order={order} open={reassignOpen} onOpenChange={setReassignOpen} />
+      {canConfigureOrderReminder && reminderOpen && <OrderReminderDialog key={order.id} order={order} open onOpenChange={setReminderOpen} />}
+      <Dialog open={historyOpen} onOpenChange={setHistoryOpen}>
+        <DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-2xl">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2"><History className="size-4" />Historial de cambios</DialogTitle>
+            <DialogDescription>Registro interno de estados, asignaciones, presupuesto y datos técnicos.</DialogDescription>
+          </DialogHeader>
+          <OrderHistoryTable order={order} />
+        </DialogContent>
+      </Dialog>
 
       <div className="grid gap-6 lg:grid-cols-2">
         {/* Presupuesto */}
@@ -476,11 +503,6 @@ export function OrderDetail({ order, showCode = true }: { order: Order; showCode
             <RepairTimeline order={order} />
           </div>
 
-          <div className="border-t border-border pt-4">
-            <h4 className="mb-3 text-sm font-semibold text-foreground">Historial de cambios</h4>
-            <p className="mb-3 text-xs text-muted-foreground">Registro interno de estados, asignaciones, presupuesto y datos técnicos.</p>
-            <OrderHistoryTable order={order} />
-          </div>
         </div>
       </div>
     </div>

@@ -16,6 +16,7 @@ const EVENT_LABELS: Record<OrderHistoryEvent["eventType"], string> = {
   budget_submitted: "Enviada a revisión de presupuesto",
   budget_sent: "Presupuesto enviado al cliente",
   budget_decided: "Decisión del cliente sobre el presupuesto",
+  order_reminder_updated: "Recordatorio de orden actualizado",
 }
 
 function formatDate(iso: string) {

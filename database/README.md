@@ -84,6 +84,8 @@ timeline_events → Historial de cambios
 order_history_events → Auditoría interna de cambios por usuario
 notifications  → Notificaciones in-app dirigidas a usuarios
 notification_preferences → Preferencias in-app por usuario
+order_reminders → Recordatorios recurrentes con mensaje configurable por orden
+notification_deliveries → Estado de entrega por canal (in-app/email)
 ```
 
 ### ✅ 2 Vistas SQL
