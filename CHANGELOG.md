@@ -1,6 +1,7 @@
 # CHANGELOG
 
 ### [0.3.0] - 2026-09-30
+- Moved corporate clients out of the general user list and added a search by name, email, or phone in company management.
 - Restricted corporate clients to tickets belonging to their company across authenticated order lists and ticket details, with server-side scope validation.
 - Added company capacity enforcement: administrators can lower a company's member limit, and companies exceeding that limit cannot generate new tickets until their membership is regularized.
 - Added explicit capacity warnings for administrators and corporate clients, while preserving regular-client and occasional-ticket creation.
