@@ -2,6 +2,7 @@
 
 import { getSessionAction } from "@/app/actions/auth"
 import { getSupabaseServerClient } from "@/lib/supabase"
+import { fetchCompanyCapacityForUserServer, getCompanyOverLimitMessage } from "@/lib/queries/companies-server"
 import {
   claimOrderServer,
   fetchAvailableOrdersForCollaborator,
@@ -92,7 +93,15 @@ export async function createOrderAction(input: OrderCreationInput): Promise<Crea
       return { success: false, error: "No tenés permisos para crear órdenes." }
     }
 
-    const order = await insertOrderServer(orderInput)
+    const companyCapacity = orderInput.clientId ? await fetchCompanyCapacityForUserServer(orderInput.clientId) : null
+    const companyLimitError = companyCapacity ? getCompanyOverLimitMessage(companyCapacity) : null
+    if (companyLimitError) return { success: false, error: companyLimitError }
+
+    const order = await insertOrderServer(orderInput, {
+      userId: session.id,
+      name: session.name,
+      role: session.role,
+    })
     return order ? { success: true, order: redactOrderClientData(order, session.role) } : { success: false, error: "No se pudo crear la orden." }
   } catch (error) {
     console.error("Error al crear la orden:", error)
@@ -103,7 +112,7 @@ export async function createOrderAction(input: OrderCreationInput): Promise<Crea
 export async function fetchAvailableOrdersAction(): Promise<Order[]> {
   const session = await getSessionAction()
   if (!session || !session.active || !["admin", "colaborador", "presupuestador"].includes(session.role)) return []
-  return fetchAvailableOrdersForCollaborator(session.role)
+  return fetchAvailableOrdersForCollaborator(session.id, session.role)
 }
 
 export async function fetchAvailableOrdersCountAction(): Promise<number> {
@@ -115,7 +124,7 @@ export async function fetchAvailableOrdersCountAction(): Promise<number> {
 export async function claimOrderAction(orderId: string): Promise<boolean> {
   const session = await getSessionAction()
   if (!session || !session.active || !["admin", "colaborador", "presupuestador"].includes(session.role)) return false
-  return claimOrderServer(orderId, session.name)
+  return claimOrderServer(orderId, session.name, session.id, { userId: session.id, name: session.name, role: session.role })
 }
 
 export async function assignOrderAction(orderId: string, collaboratorId: string): Promise<boolean> {
@@ -136,7 +145,7 @@ export async function assignOrderAction(orderId: string, collaboratorId: string)
     return false
   }
 
-  return claimOrderServer(orderId, collaborator.name as string)
+  return claimOrderServer(orderId, collaborator.name as string, collaboratorId, { userId: session.id, name: session.name, role: session.role })
 }
 
 export async function fetchOrdersAction(offset = 0, limit = 50, search = "") {
@@ -145,7 +154,7 @@ export async function fetchOrdersAction(offset = 0, limit = 50, search = "") {
     return []
   }
 
-  return fetchOrdersForUser(session.id, session.role, session.name, offset, limit, search)
+  return fetchOrdersForUser(session.id, session.role, session.name, offset, limit, search, session.companyId)
 }
 
 export async function fetchOrderDetailAction(orderId: string): Promise<Order | null> {
@@ -202,8 +211,9 @@ export async function markNotificationsReadAction(orderId: string): Promise<bool
 
   const { error } = await supabase
     .from("notifications")
-    .update({ read: true })
+    .update({ read: true, read_at: new Date().toISOString() })
     .eq("order_id", order.id)
+    .eq("recipient_user_id", session.id)
     .eq("read", false)
 
   if (error) {
@@ -213,4 +223,3 @@ export async function markNotificationsReadAction(orderId: string): Promise<bool
 
   return true
 }
-

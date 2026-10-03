@@ -41,7 +41,7 @@ export function CompletedOrdersInbox({ onSelectOrderAction }: { onSelectOrderAct
     setLoading(true)
     setError("")
     try {
-      if (currentUser) setCompletedOrders(await loadCachedCompletedOrders(currentUser.id, fetchCompletedOrdersAction))
+      if (currentUser) setCompletedOrders(await loadCachedCompletedOrders(currentUser.id, currentUser.role, fetchCompletedOrdersAction))
     } catch (refreshError) {
       console.error("No se pudieron cargar las órdenes finalizadas:", refreshError)
       setError("No se pudo actualizar el buzón.")
@@ -133,6 +133,7 @@ export function CompletedOrdersInbox({ onSelectOrderAction }: { onSelectOrderAct
     </Dialog>
   )
 }
+
 
 
 

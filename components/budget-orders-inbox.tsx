@@ -29,7 +29,7 @@ export function BudgetOrdersInbox() {
     const key = `${currentUser.id}:${currentUser.role}`
     if (countCheckKey.current === key) return
     countCheckKey.current = key
-    void loadCachedBudgetOrdersCount(currentUser.id, fetchBudgetQueueCountAction)
+    void loadCachedBudgetOrdersCount(currentUser.id, currentUser.role, fetchBudgetQueueCountAction)
       .then((count) => setOrdersCount(count))
       .catch((error: unknown) => console.error("No se pudo contar el buzón de presupuestos:", error))
   }, [currentUser])
@@ -39,7 +39,7 @@ export function BudgetOrdersInbox() {
     setLoading(true)
     try {
       if (currentUser) {
-        const nextOrders = await loadCachedBudgetOrders(currentUser.id, fetchBudgetQueueAction)
+        const nextOrders = await loadCachedBudgetOrders(currentUser.id, currentUser.role, fetchBudgetQueueAction)
         setOrders(nextOrders)
         setOrdersCount(nextOrders.length)
       }

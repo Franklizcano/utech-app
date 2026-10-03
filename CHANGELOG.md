@@ -1,5 +1,36 @@
 # CHANGELOG
 
+### [Unreleased]
+- Added order-level recurring reminders with collaborator/admin-authored messages and 6-, 12-, or 24-month intervals (12 months by default); delivery begins when the order is marked as delivered and repeats for registered clients.
+- Added authenticated daily reminder processing with deduplication and per-channel delivery tracking, leaving the email-provider integration point available for later.
+- Moved recurring reminder controls and internal change history into the order actions menu to reduce visual clutter.
+
+### [0.3.0] - 2026-09-30
+- Moved corporate clients out of the general user list and added a search by name, email, or phone in company management.
+- Restricted corporate clients to tickets belonging to their company across authenticated order lists and ticket details, with server-side scope validation.
+- Added company capacity enforcement: administrators can lower a company's member limit, and companies exceeding that limit cannot generate new tickets until their membership is regularized.
+- Added explicit capacity warnings for administrators and corporate clients, while preserving regular-client and occasional-ticket creation.
+- Preserved manager removal controls so removed members become regular clients without deleting their accounts.
+- Added an internal, actor-aware order history that records creation, status changes, assignments, technical edits, budget operations, and client budget decisions without exposing audit data to clients.
+- Added a backfill for historical timeline events and separated the internal audit trail from the client-facing repair timeline.
+- Routed internal order mutations through authorized server actions with role and assignment validation, while preserving optimistic UI updates and refreshes.
+- Added fixed-amount and percentage discounts to budget items with server-side limits, recalculated totals, and client-visible discount details.
+- Added globally unique `CP`, `CC`, and `CO` order codes with a transaction-safe counter, date-based formatting, and normalized code searches.
+- Improved notification navigation so clients and internal users can load the related ticket detail on demand even when it is not already in the current list.
+- Added a dedicated `Nueva orden corporativa` action for administrators and collaborators, restricted to registered corporate clients.
+- Renamed the internal `Nuevo pedido` actions and order-creation labels to `Nueva orden` for consistent terminology.
+
+### [0.2.2] - 2026-09-15
+- Refined the budget workflow from technical analysis through client decision, including server-side validation for submission, finalization, acceptance, and rejection.
+- Added budget timeline events and in-app notifications when an order enters budget review, when a finalized budget is sent, and when the client accepts or rejects it.
+- Made finalized budgets read-only after being sent to the client, while preserving editing for new or rejected budgets and enforcing the rule in server actions.
+- Enabled clients, including corporate clients, to view finalized budgets and accept or reject them with an optional comment; the portal refreshes immediately after the decision.
+- Returned rejected budgets to the budget queue and allowed them to be claimed again for revision and resubmission.
+- Added recipient-aware in-app notifications with notification types, titles, priorities, read timestamps, metadata, and deduplication support for future delivery channels.
+- Added a global notification bell with unread counts, individual read state, and direct navigation to the related ticket for clients and internal users.
+- Added targeted notifications for clients, collaborators, and budgeters while preserving the existing public flow for occasional tickets.
+- Added per-user in-app notification preferences from the profile menu, with separate controls for order updates, budgets, and assignments.
+
 ### [0.2.1] - 2026-09-14
 - Added signed HS256 JWT sessions stored in secure, HTTP-only cookies, with server-side validation of session claims without querying the database on each request.
 - Added scalable corporate roles with `member` and `manager`, including a single manager per company enforced by the server.

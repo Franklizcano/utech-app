@@ -10,8 +10,8 @@ interface CacheEntry<T> {
 
 const operationsCache = new Map<string, CacheEntry<unknown>>()
 
-function key(userId: string, resource: string): string {
-  return `${userId}:${resource}`
+function key(userId: string, role: string, resource: string): string {
+  return `${userId}:${role}:${resource}`
 }
 
 function loadCached<T>(cacheKey: string, loader: () => Promise<T>, force = false): Promise<T> {
@@ -35,24 +35,24 @@ function loadCached<T>(cacheKey: string, loader: () => Promise<T>, force = false
   return request
 }
 
-export function loadCachedAvailableOrdersCount(userId: string, loader: () => Promise<number>): Promise<number> {
-  return loadCached(key(userId, "available-count"), loader)
+export function loadCachedAvailableOrdersCount(userId: string, role: string, loader: () => Promise<number>): Promise<number> {
+  return loadCached(key(userId, role, "available-count"), loader)
 }
 
-export function loadCachedAvailableOrders(userId: string, loader: () => Promise<Order[]>, force = false): Promise<Order[]> {
-  return loadCached(key(userId, "available-orders"), loader, force)
+export function loadCachedAvailableOrders(userId: string, role: string, loader: () => Promise<Order[]>, force = false): Promise<Order[]> {
+  return loadCached(key(userId, role, "available-orders"), loader, force)
 }
 
-export function loadCachedBudgetOrders(userId: string, loader: () => Promise<Order[]>, force = false): Promise<Order[]> {
-  return loadCached(key(userId, "budget-orders"), loader, force)
+export function loadCachedBudgetOrders(userId: string, role: string, loader: () => Promise<Order[]>, force = false): Promise<Order[]> {
+  return loadCached(key(userId, role, "budget-orders"), loader, force)
 }
 
-export function loadCachedBudgetOrdersCount(userId: string, loader: () => Promise<number>): Promise<number> {
-  return loadCached(key(userId, "budget-count"), loader)
+export function loadCachedBudgetOrdersCount(userId: string, role: string, loader: () => Promise<number>): Promise<number> {
+  return loadCached(key(userId, role, "budget-count"), loader)
 }
 
-export function loadCachedCompletedOrders(userId: string, loader: () => Promise<Order[]>, force = false): Promise<Order[]> {
-  return loadCached(key(userId, "completed-orders"), loader, force)
+export function loadCachedCompletedOrders(userId: string, role: string, loader: () => Promise<Order[]>, force = false): Promise<Order[]> {
+  return loadCached(key(userId, role, "completed-orders"), loader, force)
 }
 
 export function invalidateOperationsCache(userId: string): void {

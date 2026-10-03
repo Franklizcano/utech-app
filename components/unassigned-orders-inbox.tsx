@@ -62,7 +62,7 @@ export function UnassignedOrdersInbox() {
     if (countCheckKey.current === key) return
     countCheckKey.current = key
 
-    void loadCachedAvailableOrdersCount(currentUser.id, fetchAvailableOrdersCountAction)
+    void loadCachedAvailableOrdersCount(currentUser.id, currentUser.role, fetchAvailableOrdersCountAction)
       .then((count: number) => setAvailableOrdersCount(count))
       .catch((countError: unknown) => {
         console.error("No se pudo contar el buzón de órdenes:", countError)
@@ -73,7 +73,7 @@ export function UnassignedOrdersInbox() {
     if (!currentUser) return
     setLoading(true)
     try {
-      const nextOrders = await loadCachedAvailableOrders(currentUser.id, fetchAvailableOrdersAction, force)
+      const nextOrders = await loadCachedAvailableOrders(currentUser.id, currentUser.role, fetchAvailableOrdersAction, force)
       setAvailableOrders(nextOrders)
       setAvailableOrdersCount(nextOrders.length)
     } catch (refreshError) {

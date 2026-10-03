@@ -27,10 +27,17 @@ function normalizeSearchText(value: string) {
     .trim()
 }
 
-export function OrderForm({ onCreatedAction }: { onCreatedAction?: (orderId: string) => void }) {
+interface OrderFormProps {
+  onCreatedAction?: (orderId: string) => void
+  corporateOnly?: boolean
+}
+
+export function OrderForm({ onCreatedAction, corporateOnly = false }: OrderFormProps) {
   const { addOrder, currentUser, employees, users } = useStore()
+  const [saving, setSaving] = useState(false)
+  const [error, setError] = useState<string | null>(null)
   const activeEmployees = employees.filter((e) => e.active)
-  const clients = users.filter((u) => u.role === "cliente")
+  const clients = users.filter((u) => u.role === "cliente" && (!corporateOnly || Boolean(u.companyId)))
 
   const [clientType, setClientType] = useState<"registered" | "occasional">("registered")
   const [clientId, setClientId] = useState(clients[0]?.id ?? "")
@@ -56,10 +63,11 @@ export function OrderForm({ onCreatedAction }: { onCreatedAction?: (orderId: str
       normalizeSearchText(value).includes(normalizedClientSearch),
     )
   })
-  const isUsingOccasional = clientType === "occasional"
+  const isUsingOccasional = !corporateOnly && clientType === "occasional"
 
-  function handleSubmit(e: React.FormEvent) {
+  async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
+    setError(null)
     
     let clientName: string
     let clientPhone: string
@@ -75,35 +83,46 @@ export function OrderForm({ onCreatedAction }: { onCreatedAction?: (orderId: str
     } else {
       if (!clientId || !fault) return
       if (!selectedClient) return
+      if (corporateOnly && !selectedClient.companyId) {
+        setError("Seleccioná un cliente corporativo.")
+        return
+      }
       clientName = selectedClient.name
       clientPhone = selectedClient.phone
       clientEmail = selectedClient.email
       useClientId = clientId
     }
     
-    const order = addOrder({
-      clientId: useClientId,
-      clientName,
-      clientPhone,
-      clientEmail,
-      deviceType,
-      deviceBrand,
-      deviceModel,
-      deviceSerial: deviceSerial.trim() || null,
-      fault,
-      assignedTo: assignedTo || defaultAssignee,
-    })
-    
-    // Reset form
-    setDeviceType("PC")
-    setDeviceBrand("")
-    setDeviceModel("")
-    setDeviceSerial("")
-    setFault("")
-    setOccasionalName("")
-    setOccasionalPhone("")
-    setOccasionalEmail("")
-    onCreatedAction?.(order.id)
+    setSaving(true)
+    try {
+      const order = await addOrder({
+        clientId: useClientId,
+        clientName,
+        clientPhone,
+        clientEmail,
+        deviceType,
+        deviceBrand,
+        deviceModel,
+        deviceSerial: deviceSerial.trim() || null,
+        fault,
+        assignedTo: assignedTo || defaultAssignee,
+      })
+
+      // Reset form
+      setDeviceType("PC")
+      setDeviceBrand("")
+      setDeviceModel("")
+      setDeviceSerial("")
+      setFault("")
+      setOccasionalName("")
+      setOccasionalPhone("")
+      setOccasionalEmail("")
+      onCreatedAction?.(order.id)
+    } catch (submitError: unknown) {
+      setError(submitError instanceof Error ? submitError.message : "No se pudo crear la orden.")
+    } finally {
+      setSaving(false)
+    }
   }
 
   return (
@@ -114,7 +133,7 @@ export function OrderForm({ onCreatedAction }: { onCreatedAction?: (orderId: str
           Cliente
         </div>
         <div className="space-y-4">
-          <div className="flex gap-3">
+          {!corporateOnly && <div className="flex gap-3">
             <Label className="flex items-center gap-2 cursor-pointer">
               <input
                 type="radio"
@@ -133,13 +152,15 @@ export function OrderForm({ onCreatedAction }: { onCreatedAction?: (orderId: str
               />
               <span>Cliente ocasional</span>
             </Label>
-          </div>
+          </div>}
 
-          {clientType === "registered" ? (
+          {!isUsingOccasional ? (
             <div className="space-y-2">
               {clients.length === 0 ? (
                 <div className="rounded-lg border border-dashed border-border bg-secondary/30 p-4 text-center text-sm text-muted-foreground">
-                  No hay clientes registrados. Crea uno en la gestión de usuarios o selecciona &quot;Cliente ocasional&quot;.
+                  {corporateOnly
+                    ? "No hay clientes corporativos registrados. Creá uno en la gestión de usuarios."
+                    : "No hay clientes registrados. Creá uno en la gestión de usuarios o seleccioná «Cliente ocasional»."}
                 </div>
               ) : (
                 <>
@@ -281,11 +302,11 @@ export function OrderForm({ onCreatedAction }: { onCreatedAction?: (orderId: str
           </div>
           <div className="space-y-2">
             <Label htmlFor="brand">Marca</Label>
-            <Input id="brand" value={deviceBrand} onChange={(e) => setDeviceBrand(e.target.value)} placeholder="Ej: Sony" />
+            <Input id="brand" value={deviceBrand} onChange={(e) => setDeviceBrand(e.target.value)} />
           </div>
           <div className="space-y-2">
             <Label htmlFor="model">Modelo</Label>
-            <Input id="model" value={deviceModel} onChange={(e) => setDeviceModel(e.target.value)} placeholder="Ej: PS5 Slim" />
+            <Input id="model" value={deviceModel} onChange={(e) => setDeviceModel(e.target.value)} />
           </div>
           <div className="space-y-2">
             <Label htmlFor="serial">Serial</Label>
@@ -293,7 +314,6 @@ export function OrderForm({ onCreatedAction }: { onCreatedAction?: (orderId: str
               id="serial"
               value={deviceSerial}
               onChange={(e) => setDeviceSerial(e.target.value)}
-              placeholder="Ej: SN123456789"
               autoComplete="off"
             />
           </div>
@@ -335,10 +355,12 @@ export function OrderForm({ onCreatedAction }: { onCreatedAction?: (orderId: str
         )}
       </section>
 
+      {error && <p role="alert" className="rounded-lg border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive">{error}</p>}
+
       <div className="flex justify-end">
-        <Button type="submit" className="gap-2">
+        <Button type="submit" className="gap-2" disabled={saving}>
           <ClipboardPlus className="size-4" />
-          Cargar pedido
+          {saving ? "Creando orden…" : "Crear orden"}
         </Button>
       </div>
     </form>

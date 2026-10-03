@@ -200,20 +200,99 @@ CREATE INDEX IF NOT EXISTS idx_timeline_events_order_id ON timeline_events(order
 CREATE INDEX IF NOT EXISTS idx_timeline_events_status ON timeline_events(status);
 
 -- ============================================
+-- Tabla: order_history_events (Auditoría interna de órdenes)
+-- ============================================
+CREATE TABLE IF NOT EXISTS order_history_events (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  order_id UUID NOT NULL REFERENCES orders(id) ON DELETE CASCADE,
+  actor_user_id UUID REFERENCES users(id) ON DELETE SET NULL,
+  actor_name VARCHAR(255),
+  actor_role VARCHAR(40),
+  event_type VARCHAR(80) NOT NULL CHECK (event_type IN (
+    'order_created', 'status_changed', 'assignee_changed',
+    'budget_assignee_changed', 'order_details_changed',
+    'budget_item_added', 'budget_item_updated', 'budget_item_deleted',
+    'budget_submitted', 'budget_sent', 'budget_decided', 'order_reminder_updated'
+  )),
+  summary TEXT NOT NULL,
+  field_name VARCHAR(100),
+  old_value JSONB,
+  new_value JSONB,
+  metadata JSONB NOT NULL DEFAULT '{}'::jsonb,
+  event_date TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_order_history_events_order_date
+  ON order_history_events(order_id, event_date DESC, created_at DESC);
+
+CREATE INDEX IF NOT EXISTS idx_order_history_events_actor
+  ON order_history_events(actor_user_id, event_date DESC);
+
+-- ============================================
 -- Tabla: notifications (Notificaciones)
 -- Descripción: Notificaciones enviadas a clientes sobre sus órdenes
 -- ============================================
 CREATE TABLE IF NOT EXISTS notifications (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   order_id UUID NOT NULL REFERENCES orders(id) ON DELETE CASCADE,
+  recipient_user_id UUID REFERENCES users(id) ON DELETE CASCADE,
+  notification_type VARCHAR(80) NOT NULL DEFAULT 'order_update',
+  title VARCHAR(255) NOT NULL DEFAULT 'Actualización de orden',
   message TEXT NOT NULL,
+  priority VARCHAR(20) NOT NULL DEFAULT 'normal' CHECK (priority IN ('normal', 'important')),
+  metadata JSONB NOT NULL DEFAULT '{}'::jsonb,
   read BOOLEAN DEFAULT false,
+  read_at TIMESTAMP WITH TIME ZONE,
+  dedupe_key TEXT,
   notification_date TIMESTAMP WITH TIME ZONE NOT NULL,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 
 CREATE INDEX IF NOT EXISTS idx_notifications_order_id ON notifications(order_id);
 CREATE INDEX IF NOT EXISTS idx_notifications_read ON notifications(read);
+CREATE INDEX IF NOT EXISTS idx_notifications_recipient_date ON notifications(recipient_user_id, notification_date DESC);
+CREATE INDEX IF NOT EXISTS idx_notifications_recipient_unread ON notifications(recipient_user_id, read, notification_date DESC);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_notifications_dedupe_key ON notifications(dedupe_key) WHERE dedupe_key IS NOT NULL;
+
+-- Recordatorios recurrentes configurables por orden (migración 020).
+CREATE TABLE IF NOT EXISTS order_reminders (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  order_id UUID NOT NULL UNIQUE REFERENCES orders(id) ON DELETE CASCADE,
+  recipient_user_id UUID REFERENCES users(id) ON DELETE SET NULL,
+  interval_months SMALLINT NOT NULL DEFAULT 12 CHECK (interval_months IN (6, 12, 24)),
+  message TEXT NOT NULL DEFAULT 'Te recordamos que es momento de realizar el mantenimiento de tu equipo.',
+  active BOOLEAN NOT NULL DEFAULT true,
+  next_reminder_at TIMESTAMP WITH TIME ZONE,
+  last_sent_at TIMESTAMP WITH TIME ZONE,
+  created_by UUID REFERENCES users(id) ON DELETE SET NULL,
+  created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+CREATE INDEX IF NOT EXISTS idx_order_reminders_due
+  ON order_reminders(next_reminder_at)
+  WHERE active = true AND next_reminder_at IS NOT NULL;
+ALTER TABLE order_reminders ENABLE ROW LEVEL SECURITY;
+
+-- Registro genérico de entregas, listo para futuros canales externos.
+CREATE TABLE IF NOT EXISTS notification_deliveries (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  notification_id UUID NOT NULL REFERENCES notifications(id) ON DELETE CASCADE,
+  channel VARCHAR(30) NOT NULL CHECK (channel IN ('in_app', 'email')),
+  status VARCHAR(20) NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'sent', 'failed', 'skipped')),
+  provider VARCHAR(80),
+  provider_message_id TEXT,
+  attempt_count INTEGER NOT NULL DEFAULT 0 CHECK (attempt_count >= 0),
+  last_error TEXT,
+  sent_at TIMESTAMP WITH TIME ZONE,
+  created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE (notification_id, channel)
+);
+CREATE INDEX IF NOT EXISTS idx_notification_deliveries_pending
+  ON notification_deliveries(status, created_at)
+  WHERE status = 'pending';
+ALTER TABLE notification_deliveries ENABLE ROW LEVEL SECURITY;
 
 -- ============================================
 -- Tabla: general_announcements (Avisos generales)
@@ -239,6 +318,22 @@ CREATE TABLE IF NOT EXISTS general_announcement_reads (
   read_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (announcement_id, user_id)
 );
+
+-- ============================================
+-- Tabla: notification_preferences (Preferencias in-app)
+-- ============================================
+CREATE TABLE IF NOT EXISTS notification_preferences (
+  user_id UUID PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+  in_app_enabled BOOLEAN NOT NULL DEFAULT true,
+  order_updates BOOLEAN NOT NULL DEFAULT true,
+  budget_updates BOOLEAN NOT NULL DEFAULT true,
+  assignment_updates BOOLEAN NOT NULL DEFAULT true,
+  created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_notification_preferences_updated_at
+  ON notification_preferences(updated_at DESC);
 
 CREATE INDEX IF NOT EXISTS idx_general_announcement_reads_user ON general_announcement_reads(user_id);
 
@@ -333,6 +428,7 @@ ALTER TABLE users ENABLE ROW LEVEL SECURITY;
 ALTER TABLE orders ENABLE ROW LEVEL SECURITY;
 ALTER TABLE budget_items ENABLE ROW LEVEL SECURITY;
 ALTER TABLE timeline_events ENABLE ROW LEVEL SECURITY;
+ALTER TABLE order_history_events ENABLE ROW LEVEL SECURITY;
 ALTER TABLE notifications ENABLE ROW LEVEL SECURITY;
 ALTER TABLE general_announcements ENABLE ROW LEVEL SECURITY;
 ALTER TABLE general_announcement_reads ENABLE ROW LEVEL SECURITY;
@@ -465,6 +561,23 @@ INSERT INTO timeline_events (order_id, status, note, event_date)
 SELECT id, 'esperando_repuestos', 'Se encarga módulo HDMI original.', NOW() - INTERVAL '3 days'
 FROM orders WHERE code = 'CP-240701-0001'
 ON CONFLICT DO NOTHING;
+
+INSERT INTO order_history_events (order_id, actor_name, actor_role, event_type, summary, new_value, metadata, event_date)
+SELECT
+  te.order_id,
+  'Historial previo',
+  'system',
+  'status_changed',
+  'Estado registrado en el historial anterior.',
+  jsonb_build_object('status', te.status),
+  jsonb_build_object('source', 'timeline_backfill', 'timeline_event_id', te.id),
+  te.event_date
+FROM timeline_events AS te
+WHERE NOT EXISTS (
+  SELECT 1 FROM order_history_events AS he
+  WHERE he.metadata ->> 'source' = 'timeline_backfill'
+    AND he.metadata ->> 'timeline_event_id' = te.id::text
+);
 
 -- Insertar notificaciones
 INSERT INTO notifications (order_id, message, read, notification_date)

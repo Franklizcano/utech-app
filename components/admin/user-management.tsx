@@ -102,7 +102,8 @@ export function UserManagement() {
     return () => window.clearTimeout(timeoutId)
   }, [debouncedSearch, loadUsersPage])
 
-  const managedUsers = users
+  // Corporate clients are managed from the Companies section.
+  const managedUsers = users.filter((user) => !user.companyId)
   const normalizedSearch = normalizeSearchText(debouncedSearch)
   const visibleUsers = managedUsers.filter((user) => {
     const matchesRole = roleFilter === "all" || user.role === roleFilter

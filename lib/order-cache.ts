@@ -8,8 +8,8 @@ interface OrdersCacheEntry {
 
 const ordersCache = new Map<string, OrdersCacheEntry>()
 
-export function getOrdersCacheKey(userId: string, role: string, search = ""): string {
-  return `${role === "cliente" ? "client" : "staff"}:${userId}:${search.trim().toLowerCase()}`
+export function getOrdersCacheKey(userId: string, role: string, search = "", companyId?: string): string {
+  return `${role}:${userId}:${companyId ?? "independent"}:${search.trim().toLowerCase()}`
 }
 
 export function getOrdersCache(key: string): Order[] | undefined {
@@ -67,5 +67,4 @@ export function revalidateOrdersCache(key: string, loader: () => Promise<Order[]
 export function clearOrdersCache(key: string): void {
   ordersCache.delete(key)
 }
-
 

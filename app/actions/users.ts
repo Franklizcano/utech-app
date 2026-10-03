@@ -36,22 +36,28 @@ export async function fetchUsersAction(page = 0, pageSize = USERS_PAGE_SIZE, sea
     throw new Error("No se pudieron cargar los usuarios.")
   }
 
-  const users = (data ?? []).slice(0, pageSize).map((row) => ({
-    id: row.id as string,
-    name: row.name as string,
-    email: row.email as string,
-    phone: row.phone as string,
-    role: row.role as Role,
-    active: row.active as boolean,
-    companyId: (row.company_id as string) ?? undefined,
-    companyRole: (row.company_role === "manager" ? "manager" : "member") as CompanyRole,
-    company: Array.isArray(row.company) && row.company[0]
-      ? { name: row.company[0].name as string, logo: (row.company[0].logo as string | null) ?? undefined }
-      : undefined,
-    referralCode: row.referral_code as string,
-    referredBy: (row.referred_by as string | null) ?? undefined,
-    createdAt: row.created_at as string,
-  }))
+  const users = (data ?? []).slice(0, pageSize).map((row) => {
+    const company = Array.isArray(row.company)
+      ? row.company[0]
+      : row.company as { name?: string; logo?: string | null } | undefined
+
+    return {
+      id: row.id as string,
+      name: row.name as string,
+      email: row.email as string,
+      phone: row.phone as string,
+      role: row.role as Role,
+      active: row.active as boolean,
+      companyId: (row.company_id as string) ?? undefined,
+      companyRole: (row.company_role === "manager" ? "manager" : "member") as CompanyRole,
+      company: company?.name
+        ? { name: company.name, logo: company.logo ?? undefined }
+        : undefined,
+      referralCode: row.referral_code as string,
+      referredBy: (row.referred_by as string | null) ?? undefined,
+      createdAt: row.created_at as string,
+    }
+  })
 
   return { users, hasMore: (data?.length ?? 0) > pageSize }
 }

@@ -2,13 +2,15 @@
 
 import { useCallback, useEffect, useRef, useState } from "react"
 import { useRouter } from "next/navigation"
-import { Bell, Building2, ChevronDown, CircleHelp, Cpu, Calculator, KeyRound, LogOut, Megaphone, Moon, Settings, Settings2, ShieldCheck, SlidersHorizontal, Sun, UserRound, Wrench } from "lucide-react"
+import { Building2, ChevronDown, CircleHelp, Cpu, Calculator, KeyRound, LogOut, Megaphone, Moon, Settings, Settings2, ShieldCheck, SlidersHorizontal, Sun, UserRound, Wrench } from "lucide-react"
 import { useStore } from "@/lib/store"
 import { ServiceWorkspace } from "@/components/service-workspace"
 import { ClientPortal } from "@/components/client/client-portal"
 import { AdminView, type AdminSection } from "@/components/admin/admin-view"
 import { LoginScreen } from "@/components/login-screen"
 import { ChangePasswordDialog } from "@/components/change-password-dialog"
+import { NotificationBell } from "@/components/notifications/notification-bell"
+import { NotificationPreferences } from "@/components/notifications/notification-preferences"
 import { AnnouncementInbox } from "@/components/announcements/announcement-inbox"
 import {
   DropdownMenu,
@@ -106,6 +108,7 @@ export function AppShell() {
           </div>
 
           <div className="flex items-center gap-3">
+            <NotificationBell />
             <DropdownMenu>
               <DropdownMenuTrigger
                 render={
@@ -137,8 +140,8 @@ export function AppShell() {
                   Mi perfil
                 </DropdownMenuItem>
                 <DropdownMenuItem disabled={unreadAnnouncements === 0} onClick={() => setAnnouncementDialogOpen(true)}>
-                  <Bell />
-                  <span className="flex-1">Notificaciones</span>
+                  <Megaphone />
+                  <span className="flex-1">Avisos generales</span>
                   {unreadAnnouncements > 0 && <span className="rounded-full bg-primary/15 px-1.5 text-[10px] font-semibold text-primary">{unreadAnnouncements}</span>}
                 </DropdownMenuItem>
                 {role === "cliente" && currentUser?.companyId && (
@@ -238,9 +241,13 @@ export function AppShell() {
               <DialogContent className="sm:max-w-md">
                 <DialogHeader>
                   <DialogTitle>Preferencias</DialogTitle>
-                  <DialogDescription>Personalizá la apariencia de UTech en este dispositivo.</DialogDescription>
+                  <DialogDescription>Personalizá la apariencia y las notificaciones que querés recibir.</DialogDescription>
                 </DialogHeader>
-                <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-6">
+                  <NotificationPreferences />
+                  <div className="space-y-3 border-t border-border pt-4">
+                    <p className="text-sm font-medium text-foreground">Apariencia</p>
+                    <div className="grid grid-cols-2 gap-3">
                   <Button type="button" variant={theme === "dark" ? "default" : "outline"} className="h-auto justify-start gap-2 p-3" onClick={() => changeTheme("dark")}>
                     <Moon className="size-4" />
                     <span className="text-left"><span className="block font-medium">Oscuro</span><span className="block text-xs opacity-75">Predeterminado</span></span>
@@ -249,6 +256,8 @@ export function AppShell() {
                     <Sun className="size-4" />
                     <span className="text-left"><span className="block font-medium">Claro</span><span className="block text-xs opacity-75">Mayor luminosidad</span></span>
                   </Button>
+                    </div>
+                  </div>
                 </div>
               </DialogContent>
             </Dialog>

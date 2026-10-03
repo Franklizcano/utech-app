@@ -1,7 +1,7 @@
 "use client"
 
 import { useState } from "react"
-import { Plus, Trash2, Send, ArrowRight, Phone, Mail, UserRound, MoreVertical, Pencil, X, Check } from "lucide-react"
+import { Plus, Trash2, Send, ArrowRight, Phone, Mail, UserRound, MoreVertical, Pencil, X, Check, BellRing, History } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -22,7 +22,10 @@ import {
 } from "@/components/ui/dropdown-menu"
 import { StatusBadge } from "@/components/status-badge"
 import { RepairTimeline } from "@/components/repair-timeline"
+import { OrderHistoryTable } from "@/components/order-history-table"
 import { ReassignDialog } from "@/components/employee/reassign-dialog"
+import { OrderReminderDialog } from "@/components/employee/order-reminder-dialog"
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { sendBudgetToClientAction, submitOrderForBudgetAction } from "@/app/actions/budget"
 import { useStore, formatCurrency } from "@/lib/store"
 import { invalidateOperationsCache } from "@/lib/operations-cache"
@@ -31,8 +34,8 @@ import Image from "next/image"
 
 const DEVICE_TYPES: DeviceType[] = ["PC", "Notebook", "PlayStation", "Xbox", "Nintendo", "Otro"]
 
-export function OrderDetail({ order }: { order: Order }) {
-  const { role, currentUser, addBudgetItem, updateBudgetItemDiscount, removeBudgetItem, advanceStatus, updateOrderDetails, states, users, refreshOrders } = useStore()
+export function OrderDetail({ order, showCode = true }: { order: Order; showCode?: boolean }) {
+  const { role, currentUser, addBudgetItem, updateBudgetItemDiscount, removeBudgetItem, advanceStatus, updateOrderDetails, states, users, refreshOrders, loadOrderDetail } = useStore()
   const [desc, setDesc] = useState("")
   const [amount, setAmount] = useState("")
   const [nextStatus, setNextStatus] = useState<OrderStatus>(order.status)
@@ -46,9 +49,13 @@ export function OrderDetail({ order }: { order: Order }) {
   const [draftFault, setDraftFault] = useState(order.fault)
   const [submittingBudget, setSubmittingBudget] = useState(false)
   const [discountDrafts, setDiscountDrafts] = useState<Record<string, string>>({})
+  const [reminderOpen, setReminderOpen] = useState(false)
+  const [historyOpen, setHistoryOpen] = useState(false)
 
   const total = budgetTotal(order)
   const canManageBudget = role === "admin" || role === "presupuestador"
+  const canConfigureOrderReminder = role === "admin" || role === "colaborador"
+  const canEditBudget = canManageBudget && ["recibido", "pendiente_presupuesto", "presupuesto_rechazado"].includes(order.status)
   const canSeeClientData = role !== "colaborador" && role !== "presupuestador"
   const statusFlow = getStatusFlow(states).filter((status) => canManageBudget || !status.startsWith("presupuesto") && status !== "pendiente_presupuesto")
   const client = canSeeClientData ? users.find((u) => u.id === order.clientId) : undefined
@@ -118,9 +125,11 @@ export function OrderDetail({ order }: { order: Order }) {
             <div>
               <div className="flex items-center gap-2">
                 {canSeeClientData && order.clientName && <h3 className="text-lg font-semibold text-foreground">{order.clientName}</h3>}
-                <span className="rounded-md bg-secondary px-2 py-0.5 font-mono text-xs text-secondary-foreground">
-                  {order.code}
-                </span>
+                {showCode && (
+                  <span className="rounded-md bg-secondary px-2 py-0.5 font-mono text-xs text-secondary-foreground">
+                    {order.code}
+                  </span>
+                )}
               </div>
               {client?.companyId && client.company?.name && (
                 <p className="mt-0.5 text-sm text-muted-foreground">{client.company.name}</p>
@@ -237,6 +246,18 @@ export function OrderDetail({ order }: { order: Order }) {
                 <ArrowRight className="mr-2 h-4 w-4" />
                 <span>Reasignar técnico</span>
               </DropdownMenuItem>
+              {canConfigureOrderReminder && (
+                <DropdownMenuItem onClick={() => setReminderOpen(true)}>
+                  <BellRing className="mr-2 h-4 w-4" />
+                  <span>Avisos recurrentes</span>
+                </DropdownMenuItem>
+              )}
+              {role !== "cliente" && (
+                <DropdownMenuItem onClick={() => setHistoryOpen(true)}>
+                  <History className="mr-2 h-4 w-4" />
+                  <span>Historial de cambios</span>
+                </DropdownMenuItem>
+              )}
             </DropdownMenuContent>
           </DropdownMenu>
         </div>
@@ -275,6 +296,16 @@ export function OrderDetail({ order }: { order: Order }) {
       </div>
 
       <ReassignDialog order={order} open={reassignOpen} onOpenChange={setReassignOpen} />
+      {canConfigureOrderReminder && reminderOpen && <OrderReminderDialog key={order.id} order={order} open onOpenChange={setReminderOpen} />}
+      <Dialog open={historyOpen} onOpenChange={setHistoryOpen}>
+        <DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-2xl">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2"><History className="size-4" />Historial de cambios</DialogTitle>
+            <DialogDescription>Registro interno de estados, asignaciones, presupuesto y datos técnicos.</DialogDescription>
+          </DialogHeader>
+          <OrderHistoryTable order={order} />
+        </DialogContent>
+      </Dialog>
 
       <div className="grid gap-6 lg:grid-cols-2">
         {/* Presupuesto */}
@@ -298,6 +329,7 @@ export function OrderDetail({ order }: { order: Order }) {
                     <Label className="text-[11px] text-muted-foreground">Descuento</Label>
                     <Select
                       value={item.discountType ?? "none"}
+                      disabled={!canEditBudget}
                       onValueChange={(value) => {
                         const nextType = value === "none" ? null : value as "fixed" | "percentage"
                         const nextValue = nextType === null ? null : item.discountType === nextType ? item.discountValue ?? 0 : 0
@@ -323,6 +355,7 @@ export function OrderDetail({ order }: { order: Order }) {
                         max={item.discountType === "percentage" ? "100" : String(item.amount)}
                         step="0.01"
                         value={discountDrafts[item.id] ?? String(item.discountValue ?? "")}
+                        disabled={!canEditBudget}
                         onChange={(event) => setDiscountDrafts((current) => ({ ...current, [item.id]: event.target.value }))}
                         onBlur={() => {
                           const value = Number.parseFloat(discountDrafts[item.id] ?? "")
@@ -339,6 +372,7 @@ export function OrderDetail({ order }: { order: Order }) {
                     size="icon"
                     variant="ghost"
                     className="size-7 text-muted-foreground hover:text-destructive"
+                    disabled={!canEditBudget}
                     onClick={() => removeBudgetItem(order.id, item.id)}
                     aria-label="Eliminar ítem"
                   >
@@ -380,6 +414,7 @@ export function OrderDetail({ order }: { order: Order }) {
               <Input
                 id="bi-desc"
                 value={desc}
+                disabled={!canEditBudget}
                 onChange={(e) => setDesc(e.target.value)}
                 placeholder="Ej: Cambio de módulo HDMI de PS5"
               />
@@ -394,11 +429,12 @@ export function OrderDetail({ order }: { order: Order }) {
                   type="number"
                   min="0"
                   value={amount}
+                  disabled={!canEditBudget}
                   onChange={(e) => setAmount(e.target.value)}
                   placeholder="0"
                 />
               </div>
-              <Button type="submit" variant="secondary" className="gap-1">
+              <Button type="submit" variant="secondary" className="gap-1" disabled={!canEditBudget}>
                 <Plus className="size-4" />
                 Agregar
               </Button>
@@ -409,8 +445,8 @@ export function OrderDetail({ order }: { order: Order }) {
             type="button"
             variant="outline"
             className="w-full gap-2"
-            disabled={order.budget.length === 0}
-            onClick={async () => { if (await sendBudgetToClientAction(order.id)) { if (currentUser) invalidateOperationsCache(currentUser.id); await refreshOrders() } }}
+            disabled={order.budget.length === 0 || !["pendiente_presupuesto", "presupuesto_rechazado"].includes(order.status)}
+            onClick={async () => { if (await sendBudgetToClientAction(order.id)) { if (currentUser) invalidateOperationsCache(currentUser.id); await refreshOrders(); await loadOrderDetail(order.id, true) } }}
           >
             <Send className="size-4" />
             Notificar presupuesto al cliente
@@ -418,7 +454,7 @@ export function OrderDetail({ order }: { order: Order }) {
         </div> : <div className="space-y-4 rounded-lg border border-dashed border-border p-4">
           <h4 className="text-sm font-semibold text-foreground">Análisis técnico</h4>
           <p className="text-sm text-muted-foreground">El presupuesto es gestionado por el responsable de presupuestos y no está visible para colaboradores.</p>
-          <Button type="button" className="w-full" disabled={submittingBudget || order.status !== "recibido"} onClick={async () => { setSubmittingBudget(true); try { if (await submitOrderForBudgetAction(order.id)) { if (currentUser) invalidateOperationsCache(currentUser.id); await refreshOrders() } } finally { setSubmittingBudget(false) } }}>
+          <Button type="button" className="w-full" disabled={submittingBudget || order.status !== "recibido"} onClick={async () => { setSubmittingBudget(true); try { if (await submitOrderForBudgetAction(order.id)) { if (currentUser) invalidateOperationsCache(currentUser.id); await refreshOrders(); await loadOrderDetail(order.id, true) } } finally { setSubmittingBudget(false) } }}>
             {submittingBudget ? "Enviando…" : "Finalizar análisis y enviar a presupuesto"}
           </Button>
         </div>}
@@ -466,6 +502,7 @@ export function OrderDetail({ order }: { order: Order }) {
             <h4 className="mb-4 text-sm font-semibold text-foreground">Historial</h4>
             <RepairTimeline order={order} />
           </div>
+
         </div>
       </div>
     </div>

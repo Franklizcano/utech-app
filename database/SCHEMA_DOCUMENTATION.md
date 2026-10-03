@@ -137,6 +137,7 @@ updated_at (TIMESTAMP)     -- Fecha de actualización
 
 **Ejemplo:**
 ```
+
 Código: CP-2407010001
 Cliente: Juan Pérez (juan.perez@mail.com)
 Equipo: Sony PS5 Slim
@@ -211,16 +212,65 @@ Orden CP-240701-0001:
 
 ---
 
-### 7. **notifications** - Notificaciones
+### 7. **order_history_events** - Historial interno de cambios
 
-Almacena notificaciones enviadas a clientes sobre sus órdenes.
+Registra quién cambió una orden, qué operación realizó y los valores anteriores y nuevos cuando están disponibles. Es de uso interno para administradores, colaboradores y presupuestadores autorizados; no forma parte del historial público del cliente.
+
+```sql
+id (UUID, PK)
+order_id (FK → orders.id)
+actor_user_id (FK → users.id, nullable)
+actor_name (VARCHAR)       -- Snapshot para conservar el nombre histórico
+actor_role (VARCHAR)
+event_type (VARCHAR)
+summary (TEXT)
+field_name (VARCHAR)
+old_value (JSONB)
+new_value (JSONB)
+metadata (JSONB)
+event_date (TIMESTAMP)
+created_at (TIMESTAMP)
+```
+
+Incluye creación, estados, asignaciones, cambios técnicos, operaciones de presupuesto y decisiones del cliente. Los eventos anteriores a la migración se cargan desde `timeline_events` sin actor conocido.
+
+---
+
+### 8. **notification_preferences** - Preferencias de notificaciones
+
+Guarda la configuración individual de los avisos in-app. Las preferencias se aplican al mostrar la campanita, al contar avisos no leídos y al hidratar las notificaciones de una orden. No elimina registros históricos y deja preparado el modelo para sumar preferencias por canales externos en el futuro.
+
+```sql
+user_id (FK → users.id, PK)       -- Usuario propietario
+in_app_enabled (BOOLEAN)          -- Habilita/deshabilita la campanita
+order_updates (BOOLEAN)           -- Cambios y novedades de órdenes
+budget_updates (BOOLEAN)          -- Eventos de presupuestos
+assignment_updates (BOOLEAN)      -- Asignaciones y reasignaciones
+created_at (TIMESTAMP)
+updated_at (TIMESTAMP)
+```
+
+Todos los controles están habilitados por defecto. La configuración se administra desde el menú del perfil y solo puede ser modificada por el usuario autenticado para sí mismo.
+
+---
+
+### 9. **notifications** - Notificaciones in-app
+
+Almacena notificaciones dirigidas a usuarios registrados sobre sus órdenes. Los tickets ocasionales pueden conservar `recipient_user_id = NULL` y continúan utilizando la consulta pública restringida.
 
 ```sql
 -- Campos
 id (UUID, PK)              -- Identificador único
 order_id (FK → orders.id)  -- Referencia a la orden
+recipient_user_id (FK → users.id) -- Usuario destinatario
+notification_type (VARCHAR) -- Tipo de evento de comunicación
+title (VARCHAR)            -- Título visible en la campanita
 message (TEXT)             -- Contenido de la notificación
+priority (VARCHAR)         -- 'normal' o 'important'
+metadata (JSONB)           -- Datos estructurados para futuras entregas
 read (BOOLEAN)             -- ¿Fue leída?
+read_at (TIMESTAMP)        -- Fecha de lectura
+dedupe_key (TEXT)          -- Clave opcional para evitar duplicados
 
 notification_date (TIMESTAMP)  -- Fecha de envío
 created_at (TIMESTAMP)         -- Fecha de creación en BD
@@ -229,6 +279,8 @@ created_at (TIMESTAMP)         -- Fecha de creación en BD
 **Índices:**
 - `order_id` - Notificaciones de una orden
 - `read` - Notificaciones leídas/no leídas
+- `recipient_user_id, notification_date` - Bandeja de cada usuario
+- `recipient_user_id, read, notification_date` - Contador de no leídas
 
 **Ejemplo:**
 ```
@@ -237,6 +289,10 @@ Orden CP-240701-0001:
   [LEÍDA] "Presupuesto cargado. Total: $56.000"
   [NO LEÍDA] "Estamos esperando el repuesto (módulo HDMI)"
 ```
+
+### Recordatorios configurables por orden
+
+La tabla `order_reminders` guarda un mensaje configurable por orden y una frecuencia de 6, 12 o 24 meses. El valor inicial propone mantenimiento anual, pero el colaborador o admin puede escribir cualquier recordatorio. El ciclo empieza al entregar la orden. El proceso programado crea una notificación in-app para el cliente registrado y avanza la fecha; los tickets ocasionales no reciben estos avisos. `notification_deliveries` registra el estado de entrega por canal y permite incorporar un proveedor de email en el futuro.
 
 ---
 

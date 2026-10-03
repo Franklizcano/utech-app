@@ -32,9 +32,14 @@ function rowToTimelineEvent(row: any): TimelineEvent {
 function rowToNotification(row: any): AppNotification {
   return {
     id: row.id,
+    orderId: row.order_id ?? undefined,
+    title: row.title ?? undefined,
     message: row.message,
+    type: row.notification_type ?? undefined,
+    priority: row.priority === "important" ? "important" : "normal",
     date: row.notification_date,
     read: row.read,
+    readAt: row.read_at ?? null,
   }
 }
 
@@ -51,6 +56,7 @@ export async function updateOrderStatusRemote(
   const supabase = getSupabaseClient()
   try {
     const now = new Date().toISOString()
+    const { data: order } = await supabase.from("orders").select("client_id").eq("id", orderId).maybeSingle()
 
     // 1. Actualizar el status de la orden
     const { error: updateError } = await supabase
@@ -79,6 +85,9 @@ export async function updateOrderStatusRemote(
     const message = `Estado actualizado: ${statusLabel}.${note ? ` ${note}` : ""}`
     const { error: notifError } = await supabase.from("notifications").insert({
       order_id: orderId,
+      recipient_user_id: (order?.client_id as string | null) ?? null,
+      notification_type: "status_changed",
+      title: "Estado actualizado",
       message,
       notification_date: now,
       read: false,
@@ -105,6 +114,7 @@ export async function updateOrderAssigneeRemote(
   const supabase = getSupabaseClient()
   try {
     const now = new Date().toISOString()
+    const { data: order } = await supabase.from("orders").select("client_id").eq("id", orderId).maybeSingle()
 
     // 1. Actualizar el asignado
     const { error: updateError } = await supabase
@@ -120,6 +130,9 @@ export async function updateOrderAssigneeRemote(
     // 2. Crear notificación
     const { error: notifError } = await supabase.from("notifications").insert({
       order_id: orderId,
+      recipient_user_id: (order?.client_id as string | null) ?? null,
+      notification_type: "order_reassigned",
+      title: "Orden reasignada",
       message: `Tu pedido ha sido reasignado a ${newAssignee}.`,
       notification_date: now,
       read: false,
@@ -231,11 +244,15 @@ export async function insertNotificationRemote(
   const supabase = getSupabaseClient()
   try {
     const now = new Date().toISOString()
+    const { data: order } = await supabase.from("orders").select("client_id").eq("id", orderId).maybeSingle()
 
     const { data, error } = await supabase
       .from("notifications")
       .insert({
         order_id: orderId,
+        recipient_user_id: (order?.client_id as string | null) ?? null,
+        notification_type: "order_update",
+        title: "Actualización de orden",
         message,
         notification_date: now,
         read: false,

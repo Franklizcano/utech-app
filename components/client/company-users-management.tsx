@@ -15,7 +15,7 @@ import { useStore } from "@/lib/store"
 export function CompanyUsersManagement() {
   const { currentUser } = useStore()
   const [users, setUsers] = useState<User[]>([])
-  const [loading, setLoading] = useState(false)
+  const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [open, setOpen] = useState(false)
@@ -30,7 +30,22 @@ export function CompanyUsersManagement() {
 
   useEffect(() => {
     if (!isManager) return
-    void fetchCompanyUsersAction().then(setUsers).catch(() => setError("No se pudieron cargar los integrantes de la empresa.")).finally(() => setLoading(false))
+
+    let cancelled = false
+    void fetchCompanyUsersAction()
+      .then((nextUsers) => {
+        if (!cancelled) setUsers(nextUsers)
+      })
+      .catch(() => {
+        if (!cancelled) setError("No se pudieron cargar los integrantes de la empresa.")
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false)
+      })
+
+    return () => {
+      cancelled = true
+    }
   }, [isManager])
 
   if (!isManager) return null
@@ -71,7 +86,7 @@ export function CompanyUsersManagement() {
     </CardHeader>
     <CardContent>
       {error && <p className="mb-3 rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-sm text-destructive">{error}</p>}
-      {loading ? <div className="flex items-center gap-2 py-8 text-sm text-muted-foreground"><Loader2 className="size-4 animate-spin" />Cargando integrantes…</div> : users.length === 0 ? <p className="py-8 text-center text-sm text-muted-foreground">No hay integrantes para mostrar.</p> : <div className="overflow-x-auto"><table className="w-full text-sm"><thead><tr className="border-b text-left text-muted-foreground"><th className="px-2 py-2 font-medium">Nombre</th><th className="px-2 py-2 font-medium">Email</th><th className="px-2 py-2 font-medium">Teléfono</th><th className="px-2 py-2 text-right font-medium">Acciones</th></tr></thead><tbody>{users.map((user) => <tr key={user.id} className="border-b last:border-0"><td className="px-2 py-2 font-medium">{user.name}</td><td className="px-2 py-2 text-muted-foreground">{user.email}</td><td className="px-2 py-2 text-muted-foreground">{user.phone}</td><td className="px-2 py-2 text-right"><Button type="button" variant="ghost" size="sm" className="mr-1 gap-1" onClick={() => openEdit(user)}><Pencil className="size-3.5" />Editar</Button><AlertDialog><AlertDialogTrigger render={<Button type="button" variant="ghost" size="sm" className="gap-1 text-destructive hover:text-destructive" />}><UserMinus className="size-3.5" />Quitar</AlertDialogTrigger><AlertDialogContent><AlertDialogHeader><AlertDialogTitle>¿Quitar integrante?</AlertDialogTitle><AlertDialogDescription>{user.name} dejará de pertenecer a la empresa, pero su cuenta no será eliminada.</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel>Cancelar</AlertDialogCancel><AlertDialogAction className="bg-destructive text-destructive-foreground hover:bg-destructive/90" onClick={() => void remove(user.id)}>Quitar de la empresa</AlertDialogAction></AlertDialogFooter></AlertDialogContent></AlertDialog></td></tr>)}</tbody></table></div>}
+      {loading ? <div className="flex items-center gap-2 py-8 text-sm text-muted-foreground"><Loader2 className="size-4 animate-spin" />Cargando integrantes…</div> : users.length === 0 ? <p className="py-8 text-center text-sm text-muted-foreground">No hay integrantes para mostrar.</p> : <div className="overflow-x-auto"><table className="w-full text-sm"><thead><tr className="border-b text-left text-muted-foreground"><th className="px-2 py-2 font-medium">Nombre</th><th className="px-2 py-2 font-medium">Email</th><th className="px-2 py-2 font-medium">Teléfono</th><th className="px-2 py-2 text-right font-medium">Acciones</th></tr></thead><tbody>{users.map((user) => <tr key={user.id} className="border-b last:border-0"><td className="px-2 py-2 font-medium">{user.name}</td><td className="px-2 py-2 text-muted-foreground">{user.email}</td><td className="px-2 py-2 text-muted-foreground">{user.phone}</td><td className="px-2 py-2 text-right"><Button type="button" variant="ghost" size="sm" className="mr-1 gap-1" onClick={() => openEdit(user)}><Pencil className="size-3.5" />Editar</Button><AlertDialog><AlertDialogTrigger render={<Button type="button" variant="ghost" size="sm" className="gap-1 text-destructive hover:text-destructive" />}><UserMinus className="size-3.5" />Quitar</AlertDialogTrigger><AlertDialogContent><AlertDialogHeader><AlertDialogTitle>¿Quitar integrante?</AlertDialogTitle>      <AlertDialogDescription>{user.name} dejará de pertenecer a la empresa y pasará a ser un cliente común. Su cuenta no será eliminada.</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel>Cancelar</AlertDialogCancel><AlertDialogAction className="bg-destructive text-destructive-foreground hover:bg-destructive/90" onClick={() => void remove(user.id)}>Quitar de la empresa</AlertDialogAction></AlertDialogFooter></AlertDialogContent></AlertDialog></td></tr>)}</tbody></table></div>}
     </CardContent>
     <Dialog open={open} onOpenChange={setOpen}><DialogContent className="sm:max-w-md"><DialogHeader><DialogTitle>{editing ? "Editar integrante" : "Agregar integrante"}</DialogTitle><DialogDescription>{editing ? "Solo se pueden modificar los datos básicos." : "El nuevo usuario se incorporará a tu empresa como integrante."}</DialogDescription></DialogHeader><form onSubmit={save} className="space-y-4"><div className="space-y-2"><Label htmlFor="company-user-name">Nombre y apellido</Label><Input id="company-user-name" value={name} onChange={(event) => setName(event.target.value)} required /></div><div className="space-y-2"><Label htmlFor="company-user-email">Email</Label><Input id="company-user-email" type="email" value={email} onChange={(event) => setEmail(event.target.value)} required /></div><div className="space-y-2"><Label htmlFor="company-user-phone">Teléfono</Label><Input id="company-user-phone" value={phone} onChange={(event) => setPhone(event.target.value)} required /></div>{!editing && <><div className="space-y-2"><Label htmlFor="company-user-password">Contraseña inicial</Label><Input id="company-user-password" type="password" minLength={8} autoComplete="new-password" value={password} onChange={(event) => setPassword(event.target.value)} required /></div><div className="space-y-2"><Label htmlFor="company-user-confirmation">Repetir contraseña</Label><Input id="company-user-confirmation" type="password" minLength={8} autoComplete="new-password" value={confirmation} onChange={(event) => setConfirmation(event.target.value)} required /></div></>}{error && <p className="text-sm text-destructive">{error}</p>}<DialogFooter><Button type="button" variant="outline" onClick={() => setOpen(false)} disabled={saving}>Cancelar</Button><Button type="submit" disabled={saving}>{saving && <Loader2 className="size-4 animate-spin" />}{editing ? "Guardar cambios" : "Crear integrante"}</Button></DialogFooter></form></DialogContent></Dialog>
   </Card>

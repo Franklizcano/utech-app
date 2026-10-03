@@ -130,11 +130,59 @@ export interface TimelineEvent {
   date: string
 }
 
+export type OrderHistoryEventType =
+  | "order_created"
+  | "status_changed"
+  | "assignee_changed"
+  | "budget_assignee_changed"
+  | "order_details_changed"
+  | "budget_item_added"
+  | "budget_item_updated"
+  | "budget_item_deleted"
+  | "budget_submitted"
+  | "budget_sent"
+  | "budget_decided"
+  | "order_reminder_updated"
+
+export interface OrderHistoryEvent {
+  id: string
+  eventType: OrderHistoryEventType
+  actorUserId: string | null
+  actorName: string | null
+  actorRole: Role | null
+  summary: string
+  fieldName: string | null
+  oldValue: unknown
+  newValue: unknown
+  metadata: Record<string, unknown>
+  date: string
+}
+
 export interface AppNotification {
   id: string
+  orderId?: string
+  title?: string
   message: string
+  type?: string
+  priority?: "normal" | "important"
   date: string
   read: boolean
+  readAt?: string | null
+}
+
+export interface OrderReminder {
+  intervalMonths: 6 | 12 | 24
+  message: string
+  active: boolean
+  nextReminderAt: string | null
+  lastSentAt: string | null
+}
+
+export interface NotificationPreferences {
+  inAppEnabled: boolean
+  orderUpdates: boolean
+  budgetUpdates: boolean
+  assignmentUpdates: boolean
 }
 
 export interface Announcement {
@@ -173,7 +221,9 @@ export interface Order {
   budgetDecidedAt: string | null
   budget: BudgetItem[]
   timeline: TimelineEvent[]
+  history: OrderHistoryEvent[]
   notifications: AppNotification[]
+  orderReminder?: OrderReminder | null
   createdAt: string
 }
 

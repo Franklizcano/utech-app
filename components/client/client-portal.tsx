@@ -31,6 +31,22 @@ function ClientOrderDetail({ order, showBudget, onDecisionAction }: { order: Ord
   const notifications = [...order.notifications].reverse()
   const [decisionNote, setDecisionNote] = useState("")
   const [deciding, setDeciding] = useState(false)
+  const [decisionError, setDecisionError] = useState<string | null>(null)
+
+  async function handleDecision(decision: "aprobado" | "rechazado") {
+    setDeciding(true)
+    setDecisionError(null)
+    try {
+      const ok = await decideBudgetAction(order.id, decision, decisionNote)
+      if (!ok) {
+        setDecisionError("No se pudo registrar tu respuesta. Actualizá la página e intentá nuevamente.")
+        return
+      }
+      await onDecisionAction()
+    } finally {
+      setDeciding(false)
+    }
+  }
 
   return (
     <div className="animate-utech-enter space-y-6">
@@ -81,7 +97,7 @@ function ClientOrderDetail({ order, showBudget, onDecisionAction }: { order: Ord
             <CardHeader>
               <CardTitle className="flex items-center gap-2 text-base">
                 <Receipt className="size-4 text-primary" />
-                Presupuesto
+                Presupuesto finalizado
               </CardTitle>
             </CardHeader>
             <CardContent>
@@ -110,11 +126,12 @@ function ClientOrderDetail({ order, showBudget, onDecisionAction }: { order: Ord
             </CardContent>
             {showBudget && order.status === "presupuesto_enviado" && (
               <div className="mt-4 space-y-3 rounded-lg border border-primary/25 bg-primary/5 p-3">
-                <p className="text-sm font-medium text-foreground">¿Querés aprobar este presupuesto?</p>
+                <p className="text-sm font-medium text-foreground">Revisá el detalle y elegí una opción.</p>
                 <Input value={decisionNote} onChange={(event) => setDecisionNote(event.target.value)} placeholder="Comentario opcional" />
+                {decisionError && <p role="alert" className="text-sm text-destructive">{decisionError}</p>}
                 <div className="flex gap-2">
-                  <Button type="button" className="flex-1" disabled={deciding} onClick={async () => { setDeciding(true); try { if (await decideBudgetAction(order.id, "aprobado", decisionNote)) await onDecisionAction() } finally { setDeciding(false) } }}>Aprobar</Button>
-                  <Button type="button" variant="outline" className="flex-1" disabled={deciding} onClick={async () => { setDeciding(true); try { if (await decideBudgetAction(order.id, "rechazado", decisionNote)) await onDecisionAction() } finally { setDeciding(false) } }}>Rechazar</Button>
+                  <Button type="button" className="flex-1" disabled={deciding} onClick={() => void handleDecision("aprobado")}>{deciding ? "Guardando…" : "Aceptar presupuesto"}</Button>
+                  <Button type="button" variant="outline" className="flex-1" disabled={deciding} onClick={() => void handleDecision("rechazado")}>Rechazar presupuesto</Button>
                 </div>
               </div>
             )}
@@ -160,6 +177,7 @@ export function ClientPortal() {
   const [dialogOpen, setDialogOpen] = useState(false)
   const [referralStats, setReferralStats] = useState<Awaited<ReturnType<typeof fetchReferralStatsAction>>>(null)
   const [copied, setCopied] = useState(false)
+  const [notificationOrderLoading, setNotificationOrderLoading] = useState(false)
   const initialSearchEffect = useRef(true)
 
   useEffect(() => {
@@ -187,10 +205,34 @@ export function ClientPortal() {
     return () => window.clearTimeout(timeoutId)
   }, [searchQuery, searchOrders])
 
-  const selectedOrder = orders.find((order) => order.id === selectedOrderId) ?? orders[0] ?? null
+  useEffect(() => {
+    function handleNotificationOrder(event: Event) {
+      const orderId = (event as CustomEvent<{ orderId?: string }>).detail?.orderId
+      if (!orderId) return
+      setSelectedOrderId(orderId)
+      setSelectedOrderDetail(null)
+      const orderIsLoaded = orders.some((order) => order.id === orderId)
+      setNotificationOrderLoading(!orderIsLoaded)
+      if (!orderIsLoaded) {
+        void loadOrderDetail(orderId, true).then((detail) => {
+          if (detail) setSelectedOrderDetail(detail)
+        }).catch((error: unknown) => {
+          console.error("No se pudo cargar la orden de la notificación:", error)
+        }).finally(() => setNotificationOrderLoading(false))
+      }
+      markNotificationsRead(orderId)
+    }
+
+    window.addEventListener("utech:select-order", handleNotificationOrder)
+    return () => window.removeEventListener("utech:select-order", handleNotificationOrder)
+  }, [loadOrderDetail, markNotificationsRead, orders])
+
+  const selectedOrder = selectedOrderId
+    ? orders.find((order) => order.id === selectedOrderId) ?? (selectedOrderDetail?.id === selectedOrderId ? selectedOrderDetail : null)
+    : orders[0] ?? null
 
   useEffect(() => {
-    if (!selectedOrder?.id) {
+    if (!selectedOrder?.id || selectedOrderDetail?.id === selectedOrder.id) {
       return
     }
 
@@ -207,12 +249,14 @@ export function ClientPortal() {
     return () => {
       cancelled = true
     }
-  }, [selectedOrder?.id, loadOrderDetail])
+  }, [selectedOrder?.id, selectedOrderDetail?.id, loadOrderDetail])
 
-  const detailLoading = Boolean(selectedOrder?.id && selectedOrderDetail?.id !== selectedOrder.id)
+  const detailLoading = notificationOrderLoading || Boolean(selectedOrder?.id && selectedOrderDetail?.id !== selectedOrder.id)
 
   function handleSelectOrder(orderId: string) {
     setSelectedOrderId(orderId)
+    setSelectedOrderDetail(null)
+    setNotificationOrderLoading(false)
     markNotificationsRead(orderId)
   }
 
@@ -238,16 +282,11 @@ export function ClientPortal() {
               </div>
             </div>
           </div>
-          <div className="grid grid-cols-2 gap-3 sm:min-w-56">
+          <div className="grid gap-3 sm:min-w-28">
             <div className="rounded-lg border border-border bg-card p-3 text-center">
               <Users className="mx-auto size-4 text-primary" />
               <p className="mt-1 text-xl font-semibold text-foreground">{referralStats?.totalReferredUsers ?? 0}</p>
               <p className="text-xs text-muted-foreground">Referidos</p>
-            </div>
-            <div className="rounded-lg border border-border bg-card p-3 text-center">
-              <Receipt className="mx-auto size-4 text-primary" />
-              <p className="mt-1 text-xl font-semibold text-foreground">{referralStats?.totalOrders ?? 0}</p>
-              <p className="text-xs text-muted-foreground">Órdenes de referidos</p>
             </div>
           </div>
         </CardContent>
@@ -335,7 +374,10 @@ export function ClientPortal() {
                 Cargando detalle…
               </div>
             ) : selectedOrderDetail ? (
-              <ClientOrderDetail key={selectedOrderDetail.id} order={selectedOrderDetail} showBudget={!currentUser?.companyId} onDecisionAction={refreshOrders} />
+              <ClientOrderDetail key={selectedOrderDetail.id} order={selectedOrderDetail} showBudget={!currentUser?.companyId} onDecisionAction={async () => {
+                await refreshOrders()
+                if (selectedOrderId) setSelectedOrderDetail(await loadOrderDetail(selectedOrderId, true))
+              }} />
             ) : (
               <div className="flex flex-col items-center justify-center gap-3 py-16 text-center">
                 <Inbox className="size-10 text-muted-foreground" />
