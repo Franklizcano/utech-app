@@ -24,7 +24,6 @@ export default async function InternalTicketRoute({ params }: InternalTicketPage
     session.id,
     session.role,
     session.name,
-    session.companyId,
   )
 
   if (!order) notFound()

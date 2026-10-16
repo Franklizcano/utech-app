@@ -67,11 +67,10 @@ function rowToOrder(row: Record<string, unknown>): Order {
 async function resolveClientOrderIds(
   supabase: ReturnType<typeof getSupabaseServerClient>,
   userId: string,
-  expectedCompanyId?: string,
 ): Promise<string[]> {
   const { data: viewer, error: viewerError } = await supabase
     .from("users")
-    .select("company_id")
+    .select("company_id, company_role")
     .eq("id", userId)
     .eq("role", "cliente")
     .maybeSingle()
@@ -84,8 +83,7 @@ async function resolveClientOrderIds(
   if (!viewer) return []
 
   const currentCompanyId = (viewer.company_id as string | null) ?? null
-  if (expectedCompanyId && expectedCompanyId !== currentCompanyId) return []
-  if (!currentCompanyId) return [userId]
+  if (!currentCompanyId || viewer.company_role !== "manager") return [userId]
 
   const { data: companyUsers, error: companyUsersError } = await supabase
     .from("users")
@@ -507,7 +505,7 @@ export async function fetchOccasionalTicketDetail(code: string): Promise<Occasio
  * Obtiene únicamente las órdenes permitidas para la sesión autenticada.
  * Esta función solo debe importarse desde Server Actions o código server-side.
  */
-export async function fetchOrdersForUser(userId: string, role: Role, assignedTo?: string, offset = 0, limit = 50, search = "", companyId?: string): Promise<Order[]> {
+export async function fetchOrdersForUser(userId: string, role: Role, assignedTo?: string, offset = 0, limit = 50, search = ""): Promise<Order[]> {
   if (!userId || !["admin", "colaborador", "presupuestador", "cliente"].includes(role)) {
     return []
   }
@@ -519,7 +517,7 @@ export async function fetchOrdersForUser(userId: string, role: Role, assignedTo?
     .order("created_at", { ascending: false })
 
   if (role === "cliente") {
-    const clientIds = await resolveClientOrderIds(supabase, userId, companyId)
+    const clientIds = await resolveClientOrderIds(supabase, userId)
     if (clientIds.length === 0) return []
     ordersQuery = ordersQuery.in("client_id", clientIds)
   } else if (role === "admin") {
@@ -569,7 +567,6 @@ export async function fetchOrderDetailForUser(
   userId: string,
   role: Role,
   assignedTo?: string,
-  companyId?: string,
 ): Promise<Order | null> {
   if (!orderId || !userId || !["admin", "colaborador", "presupuestador", "cliente"].includes(role)) return null
 
@@ -577,7 +574,7 @@ export async function fetchOrderDetailForUser(
   let orderQuery = supabase.from("orders").select("*").eq("id", orderId)
 
   if (role === "cliente") {
-    const clientIds = await resolveClientOrderIds(supabase, userId, companyId)
+    const clientIds = await resolveClientOrderIds(supabase, userId)
     if (clientIds.length === 0) return null
     orderQuery = orderQuery.in("client_id", clientIds)
   } else if (role === "admin") {
@@ -599,18 +596,21 @@ export async function fetchOrderDetailForUser(
   if (!data) return null
 
   let isCorporateClient = false
+  let canManageCompanyBudget = false
   if (role === "cliente") {
     const { data: viewer, error: viewerError } = await supabase
       .from("users")
-      .select("company_id")
+      .select("company_id, company_role")
       .eq("id", userId)
       .eq("role", "cliente")
       .maybeSingle()
     if (viewerError || !viewer) return null
     isCorporateClient = Boolean(viewer.company_id)
+    canManageCompanyBudget = Boolean(viewer.company_id) && viewer.company_role === "manager"
   }
 
-  const canSeeBudget = role === "admin" || role === "presupuestador" || (role === "cliente" && !isCorporateClient && ["presupuesto_enviado", "presupuesto_aprobado", "presupuesto_rechazado"].includes(data.status))
+  const budgetVisibleStatuses = ["presupuesto_enviado", "presupuesto_aprobado", "presupuesto_rechazado"]
+  const canSeeBudget = role === "admin" || role === "presupuestador" || (role === "cliente" && (!isCorporateClient || canManageCompanyBudget) && budgetVisibleStatuses.includes(data.status))
   const [order] = await hydrateOrders([data as Record<string, unknown>], supabase, canSeeBudget, role, userId)
   return order ?? null
 }
@@ -624,15 +624,14 @@ export async function fetchOrderDetailByCodeForUser(
   userId: string,
   role: Role,
   assignedTo?: string,
-  companyId?: string,
 ): Promise<Order | null> {
   const normalizedCode = code.trim().replace(/[-\s]/g, "").toUpperCase()
   if (!normalizedCode) return null
 
-  const candidates = await fetchOrdersForUser(userId, role, assignedTo, 0, 50, code.trim(), companyId)
+  const candidates = await fetchOrdersForUser(userId, role, assignedTo, 0, 50, code.trim())
   const candidate = candidates.find((order) => order.code.replace(/[-\s]/g, "").toUpperCase() === normalizedCode)
   if (candidate) {
-    return fetchOrderDetailForUser(candidate.id, userId, role, assignedTo, companyId)
+    return fetchOrderDetailForUser(candidate.id, userId, role, assignedTo)
   }
 
   const completedOrders = await fetchCompletedOrdersForUser(userId, role, assignedTo)

@@ -5,6 +5,11 @@
 - Added authenticated daily reminder processing with deduplication and per-channel delivery tracking, leaving the email-provider integration point available for later.
 - Moved recurring reminder controls and internal change history into the order actions menu to reduce visual clutter.
 
+### [0.3.1] - 2026-10-16
+- Restricted corporate ticket visibility by company role: members see tickets they created, while the company manager sees tickets created by all clients in that company.
+- Applied the same company-role access rules to ticket lists and ticket details, using current database membership so stale session company data does not hide authorized tickets.
+- Enabled company managers to review and decide budgets for company members' tickets, with budget notifications sent to the manager and the ticket owner.
+
 ### [0.3.0] - 2026-09-30
 - Moved corporate clients out of the general user list and added a search by name, email, or phone in company management.
 - Restricted corporate clients to tickets belonging to their company across authenticated order lists and ticket details, with server-side scope validation.
