@@ -5,6 +5,10 @@
 - Added authenticated daily reminder processing with deduplication and per-channel delivery tracking, leaving the email-provider integration point available for later.
 - Moved recurring reminder controls and internal change history into the order actions menu to reduce visual clutter.
 
+### [0.3.2] - 2026-10-16
+- Refined repair timelines across client, internal, and public ticket details with aligned progress markers, clearer current-state emphasis, and cleaner event cards.
+- Adjusted timeline connectors to stop between circle edges, keeping lines from crossing progress markers.
+
 ### [0.3.1] - 2026-10-16
 - Restricted corporate ticket visibility by company role: members see tickets they created, while the company manager sees tickets created by all clients in that company.
 - Applied the same company-role access rules to ticket lists and ticket details, using current database membership so stale session company data does not hide authorized tickets.
