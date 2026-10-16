@@ -1,5 +1,5 @@
 import Link from "next/link"
-import { ArrowLeft, CalendarDays, CheckCircle2, Clock3, History, TicketCheck } from "lucide-react"
+import { ArrowLeft, CalendarDays, Check, Clock3, History, TicketCheck } from "lucide-react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { compactTimelineEvents, type OccasionalTicketDetail, type OccasionalTicketTimelineEvent } from "@/lib/types"
 
@@ -113,31 +113,51 @@ export function PublicTicketDetail({ ticket }: { ticket: OccasionalTicketDetail 
                 Todavía no hay actualizaciones para mostrar.
               </div>
             ) : (
-              <ol className="relative space-y-6">
+              <ol aria-label="Historial de avances" className="relative">
                 {groupedTimeline.map((step, index) => {
                   const isLast = index === groupedTimeline.length - 1
                   const isCurrent = step.status === ticket.status
 
                   return (
-                    <li key={step.status} className="relative flex gap-4">
-                      {!isLast && <span className="absolute left-3.5 top-8 h-[calc(100%+1.5rem)] w-px bg-border" aria-hidden="true" />}
+                    <li
+                      key={step.status}
+                      aria-current={isCurrent ? "step" : undefined}
+                      className={`relative grid grid-cols-[2rem_minmax(0,1fr)] gap-x-3 sm:gap-x-4 ${!isLast ? "pb-6" : ""}`}
+                    >
+                      {!isLast && (
+                        <span
+                          className="absolute top-9 bottom-1 left-4 z-0 w-px -translate-x-1/2 bg-primary/35"
+                          aria-hidden="true"
+                        />
+                      )}
                       <span
                         className={
-                          "z-10 flex size-7 shrink-0 items-center justify-center rounded-full border " +
+                          "z-10 flex size-8 items-center justify-center self-start rounded-full border transition-colors " +
                           (isCurrent
                             ? "border-primary bg-primary text-primary-foreground shadow-[0_0_0_4px] shadow-primary/15"
-                            : "border-primary/40 bg-primary/10 text-primary")
+                            : "border-primary/35 bg-primary/10 text-primary")
                         }
                       >
-                        {isCurrent ? <CheckCircle2 className="size-4" /> : <span className="text-xs font-semibold">{index + 1}</span>}
+                        {isCurrent ? <span className="size-2 rounded-full bg-current" aria-hidden="true" /> : <Check className="size-4" aria-hidden="true" />}
                       </span>
-                      <div className="min-w-0 flex-1 pb-1">
-                        <p className="text-sm font-semibold text-foreground">{step.label}</p>
-                        <div className="mt-1.5 space-y-2">
+                      <div className="min-w-0 pb-1">
+                        <div className="flex min-h-8 flex-wrap items-center gap-x-2 gap-y-1">
+                          <p className="text-sm font-semibold tracking-tight text-foreground">{step.label}</p>
+                          {isCurrent && (
+                            <span className="inline-flex items-center gap-1 rounded-full border border-primary/20 bg-primary/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-primary">
+                              <span className="size-1.5 rounded-full bg-primary" aria-hidden="true" />
+                              Estado actual
+                            </span>
+                          )}
+                        </div>
+                        <div className="mt-2 space-y-2">
                           {step.events.map((event, eventIndex) => (
-                            <div key={`${event.date}-${event.note ?? "sin-nota"}-${eventIndex}`} className="rounded-md border border-border/70 bg-secondary/20 px-3 py-2">
-                              {event.note && <p className="text-sm text-muted-foreground">{event.note}</p>}
-                              <p className="mt-1 flex items-center gap-1.5 text-xs text-muted-foreground/70">
+                            <div
+                              key={`${event.date}-${event.note ?? "sin-nota"}-${eventIndex}`}
+                              className={`rounded-lg border px-3 py-2.5 shadow-sm shadow-black/[0.02] ${isCurrent ? "border-primary/20 bg-primary/[0.035]" : "border-border/70 bg-card/70"}`}
+                            >
+                              {event.note && <p className="text-sm leading-relaxed text-foreground/80">{event.note}</p>}
+                              <p className="mt-1.5 flex items-center gap-1.5 text-xs text-muted-foreground">
                                 <Clock3 className="size-3.5" />
                                 {formatDate(event.date)}
                               </p>
