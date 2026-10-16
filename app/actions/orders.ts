@@ -154,13 +154,13 @@ export async function fetchOrdersAction(offset = 0, limit = 50, search = "") {
     return []
   }
 
-  return fetchOrdersForUser(session.id, session.role, session.name, offset, limit, search, session.companyId)
+  return fetchOrdersForUser(session.id, session.role, session.name, offset, limit, search)
 }
 
 export async function fetchOrderDetailAction(orderId: string): Promise<Order | null> {
   const session = await getSessionAction()
   if (!session || !session.active) return null
-  return fetchOrderDetailForUser(orderId, session.id, session.role, session.name, session.companyId)
+  return fetchOrderDetailForUser(orderId, session.id, session.role, session.name)
 }
 
 export async function fetchCompletedOrdersAction(): Promise<Order[]> {
